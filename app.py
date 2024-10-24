@@ -12,8 +12,18 @@ def scrape_website():
     username = os.getenv('USERNAME')
     password = os.getenv('PASSWORD')
 
-    if not all([login_url, data_url, username, password]):
-        return {'error': 'Missing environment variables'}
+    missing_vars = []
+    if not login_url:
+        missing_vars.append('LOGIN_URL')
+    if not data_url:
+        missing_vars.append('DATA_URL')
+    if not username:
+        missing_vars.append('USERNAME')
+    if not password:
+        missing_vars.append('PASSWORD')
+    
+    if missing_vars:
+        return {'error': f'Missing environment variables: {", ".join(missing_vars)}'}
 
     login_payload = {'username': username, 'password': password}
 
