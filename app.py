@@ -1,23 +1,54 @@
 from flask import Flask, jsonify
 import requests
 from bs4 import BeautifulSoup
+import os
 
 app = Flask(__name__)
 
 def scrape_website():
-    # Replace with the actual URL and login details
-    login_url = 'https://example.com/login'
-    data_url = 'https://example.com/data'
-    login_payload = {'username': 'your_username', 'password': 'your_password'}
+    # Get environment variables
+    login_url = os.getenv('LOGIN_URL')
+    data_url = os.getenv('DATA_URL')
+    username = os.getenv('USERNAME')
+    password = os.getenv('PASSWORD')
+
+    missing_vars = []
+    if not login_url:
+        missing_vars.append('LOGIN_URL')
+    if not data_url:
+        missing_vars.append('DATA_URL')
+    if not username:
+        missing_vars.append('USERNAME')
+    if not password:
+        missing_vars.append('PASSWORD')
+    
+    if missing_vars:
+        return {'error': f'Missing environment variables: {", ".join(missing_vars)}'}
+
+    login_payload = {'username': username, 'password': password}
 
     with requests.Session() as session:
         # Login
-        session.post(login_url, data=login_payload)
+        try:
+            login_response = session.post(login_url, data=login_payload, timeout=10)
+            if login_response.status_code == 401:
+                return {'error': 'Invalid credentials'}
+            elif login_response.status_code != 200:
+                return {'error': f'Login failed with status {login_response.status_code}'}
+        except requests.Timeout:
+            return {'error': 'Login request timed out'}
+        except requests.ConnectionError:
+            return {'error': 'Failed to connect to login server'}
+
         # Scrape data
         response = session.get(data_url)
+        if response.status_code != 200:
+            return {'error': 'Failed to retrieve data'}
+
         soup = BeautifulSoup(response.content, 'html.parser')
         # Extract and process data
-        data = {'key': 'value'}  # Replace with actual data extraction logic
+        data_div = soup.find('div', id='data')
+        data = {'key': data_div.text if data_div else 'No data found'}
         return data
 
 @app.route('/data', methods=['GET'])

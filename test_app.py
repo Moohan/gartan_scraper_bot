@@ -1,5 +1,6 @@
 import pytest
 from app import app, scrape_website
+import os
 
 # Test the scraping function
 def test_scrape_website(monkeypatch):
@@ -17,14 +18,19 @@ def test_scrape_website(monkeypatch):
     monkeypatch.setattr('requests.Session.post', mock_post)
     monkeypatch.setattr('requests.Session.get', mock_get)
 
+    monkeypatch.setenv('LOGIN_URL', 'https://example.com/login')
+    monkeypatch.setenv('DATA_URL', 'https://example.com/data')
+    monkeypatch.setenv('USERNAME', 'your_username')
+    monkeypatch.setenv('PASSWORD', 'your_password')
+
     data = scrape_website()
-    assert data == {'key': 'value'}  # Adjust this based on your actual data extraction logic
+    assert data == {'key': 'Test Data'}  # Adjust this based on your actual data extraction logic
 
 # Test the Flask API endpoint
 def test_get_data(client):
     response = client.get('/data')
     assert response.status_code == 200
-    assert response.json == {'key': 'value'}  # Adjust this based on your actual data extraction logic
+    assert response.json == {'key': 'Test Data'}  # Adjust this based on your actual data extraction logic
 
 @pytest.fixture
 def client():
