@@ -1,23 +1,37 @@
 from flask import Flask, jsonify
 import requests
 from bs4 import BeautifulSoup
+import os
 
 app = Flask(__name__)
 
 def scrape_website():
-    # Replace with the actual URL and login details
-    login_url = 'https://example.com/login'
-    data_url = 'https://example.com/data'
-    login_payload = {'username': 'your_username', 'password': 'your_password'}
+    # Get environment variables
+    login_url = os.getenv('LOGIN_URL')
+    data_url = os.getenv('DATA_URL')
+    username = os.getenv('USERNAME')
+    password = os.getenv('PASSWORD')
+
+    if not all([login_url, data_url, username, password]):
+        return {'error': 'Missing environment variables'}
+
+    login_payload = {'username': username, 'password': password}
 
     with requests.Session() as session:
         # Login
-        session.post(login_url, data=login_payload)
+        login_response = session.post(login_url, data=login_payload)
+        if login_response.status_code != 200:
+            return {'error': 'Login failed'}
+
         # Scrape data
         response = session.get(data_url)
+        if response.status_code != 200:
+            return {'error': 'Failed to retrieve data'}
+
         soup = BeautifulSoup(response.content, 'html.parser')
         # Extract and process data
-        data = {'key': 'value'}  # Replace with actual data extraction logic
+        data_div = soup.find('div', id='data')
+        data = {'key': data_div.text if data_div else 'No data found'}
         return data
 
 @app.route('/data', methods=['GET'])
