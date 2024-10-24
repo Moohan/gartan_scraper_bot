@@ -29,9 +29,16 @@ def scrape_website():
 
     with requests.Session() as session:
         # Login
-        login_response = session.post(login_url, data=login_payload)
-        if login_response.status_code != 200:
-            return {'error': 'Login failed'}
+        try:
+            login_response = session.post(login_url, data=login_payload, timeout=10)
+            if login_response.status_code == 401:
+                return {'error': 'Invalid credentials'}
+            elif login_response.status_code != 200:
+                return {'error': f'Login failed with status {login_response.status_code}'}
+        except requests.Timeout:
+            return {'error': 'Login request timed out'}
+        except requests.ConnectionError:
+            return {'error': 'Failed to connect to login server'}
 
         # Scrape data
         response = session.get(data_url)
