@@ -1,7 +1,67 @@
+def fetch_and_cache_grid_html(
+    session,
+    booking_date,
+    cache_dir="_cache",
+    cache_minutes=15,
+    min_delay=1,
+    max_delay=10,
+    base=1.5,
+):
+    """
+    Fetch grid HTML for a given date, using cache if available and fresh.
+    Handles exponential backoff between fetches.
+    Returns grid_html (str or None).
+    """
+    import os, time, random
+
+    cache_file = os.path.join(cache_dir, f"grid_{booking_date.replace('/', '-')}.html")
+    use_cache = False
+    if os.path.exists(cache_file):
+        mtime = os.path.getmtime(cache_file)
+        age = time.time() - mtime
+        if age < cache_minutes * 60:
+            use_cache = True
+    if use_cache:
+        print(f"[CACHE] Using cached grid HTML for {booking_date}.")
+        with open(cache_file, "r", encoding="utf-8") as f:
+            grid_html = f.read()
+        return grid_html
+    print(f"[FETCH] Fetching grid HTML for {booking_date}...")
+    grid_html = fetch_grid_html_for_date(session, booking_date)
+    if grid_html:
+        with open(cache_file, "w", encoding="utf-8") as f:
+            f.write(grid_html)
+    # Exponential backoff: delay increases as more days are fetched
+    delay = min(
+        max_delay, min_delay * (base ** max(0, 0))
+    )  # day_offset handled by caller
+    actual_delay = random.uniform(min_delay, delay)
+    if actual_delay >= 2:
+        print(
+            f"[WAIT] Waiting {actual_delay:.1f}s before next fetch: ",
+            end="",
+            flush=True,
+        )
+        import sys
+
+        for i in range(int(actual_delay), 0, -1):
+            print(f"{i} ", end="", flush=True)
+            time.sleep(1)
+        leftover = actual_delay - int(actual_delay)
+        if leftover > 0:
+            time.sleep(leftover)
+        print()
+    else:
+        time.sleep(actual_delay)
+    return grid_html
+
+
 import os
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from datetime import datetime
+
 
 # Load environment variables
 load_dotenv()
@@ -15,12 +75,10 @@ PASSWORD = os.environ.get("GARTAN_PASSWORD")
 
 assert USERNAME and PASSWORD, "GARTAN_USERNAME and GARTAN_PASSWORD must be set in .env"
 
-from datetime import datetime
-
 
 def gartan_login_and_get_session():
     """
-    Logs in and returns an authenticated requests.Session().
+    Logs in to the Gartan system and returns an authenticated requests.Session().
     """
     session = requests.Session()
     form, resp = _get_login_form(session)
@@ -33,15 +91,22 @@ def gartan_login_and_get_session():
 
 
 def _get_login_form(session):
+    """
+    Retrieve the login form from the login page.
+    Returns the form element and the response object.
+    """
     resp = session.get(LOGIN_URL)
     soup = BeautifulSoup(resp.content, "html.parser")
     form = soup.find("form")
     if not form:
-        raise Exception("Login form not found in page")
+        raise Exception("[ERROR] Login form not found in login page HTML.")
     return form, resp
 
 
 def _get_login_post_url(form):
+    """
+    Determine the POST URL for the login form.
+    """
     action = form.get("action")
     if not action or not isinstance(action, str):
         return LOGIN_URL
@@ -54,6 +119,9 @@ def _get_login_post_url(form):
 
 
 def _build_login_payload(form, username, password):
+    """
+    Build the payload dictionary for the login POST request.
+    """
     payload = {}
     try:
         input_tags = list(form.find_all("input"))
@@ -70,8 +138,10 @@ def _build_login_payload(form, username, password):
             payload[name] = value
         except Exception:
             continue
+    # Overwrite with provided credentials
     payload["txt_userid"] = username
     payload["txt_pword"] = password
+    # Ensure login button is present
     if "btnLogin" not in payload:
         login_button_value = "Sign In"
         for input_tag in input_tags:
@@ -86,6 +156,9 @@ def _build_login_payload(form, username, password):
 
 
 def _get_login_headers():
+    """
+    Return headers for the login POST request.
+    """
     return {
         "Referer": LOGIN_URL,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -93,12 +166,18 @@ def _get_login_headers():
 
 
 def _post_login(session, post_url, payload, headers):
+    """
+    Perform the login POST request.
+    """
     login_resp = session.post(post_url, data=payload, headers=headers)
     if login_resp.status_code != 200:
         print(f"[ERROR] Login POST failed with status: {login_resp.status_code}")
 
 
 def _get_data_page(session, headers):
+    """
+    Retrieve the main data page after login to confirm authentication.
+    """
     data_resp = session.get(DATA_URL, headers=headers)
     if data_resp.status_code != 200:
         raise Exception(
@@ -120,6 +199,9 @@ def fetch_grid_html_for_date(session, booking_date):
 
 
 def _build_schedule_payload(booking_date):
+    """
+    Build the payload for the schedule AJAX request.
+    """
     return {
         "brigadeId": 47,
         "brigadeName": "P22 Dunkeld",
@@ -136,6 +218,9 @@ def _build_schedule_payload(booking_date):
 
 
 def _get_schedule_headers():
+    """
+    Return headers for the schedule AJAX request.
+    """
     return {
         "Referer": DATA_URL,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -145,6 +230,9 @@ def _get_schedule_headers():
 
 
 def _post_schedule_request(session, schedule_url, payload, headers, booking_date):
+    """
+    Perform the AJAX request to fetch the schedule grid HTML for a given date.
+    """
     import json
 
     schedule_resp = session.post(

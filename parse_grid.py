@@ -1,3 +1,78 @@
+def aggregate_crew_availability(daily_crew_lists):
+    """
+    Aggregate crew availability across multiple days, calculate next_available, next_available_until, available_now, available_for.
+    Args:
+        daily_crew_lists: list of lists of crew dicts (from parse_grid_html)
+    Returns:
+        crew_list: list of merged crew dicts with status fields
+    """
+    from datetime import datetime as dt
+
+    crew_dict = {}
+    for crew_list in daily_crew_lists:
+        for crew in crew_list:
+            name = crew["name"]
+            if name not in crew_dict:
+                crew_dict[name] = {"name": name, "availability": {}, "_all_slots": []}
+            for slot, avail in crew["availability"].items():
+                crew_dict[name]["availability"][slot] = avail
+                crew_dict[name]["_all_slots"].append((slot, avail))
+    now = dt.now()
+    for crew in crew_dict.values():
+        slot_tuples = []
+        for slot, avail in crew["_all_slots"]:
+            try:
+                slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+                slot_tuples.append((slot_dt, avail))
+            except Exception:
+                continue
+        slot_tuples.sort()
+        next_avail = None
+        next_avail_until = None
+        available_now = False
+        available_for = None
+        for idx, (slot_dt, avail) in enumerate(slot_tuples):
+            if slot_dt >= now:
+                if avail:
+                    if idx == 0 and slot_dt <= now:
+                        available_now = True
+                    elif slot_dt <= now:
+                        available_now = True
+                    next_avail = slot_dt.strftime("%d/%m/%Y %H:%M")
+                    available_hours = None
+                    for j in range(idx + 1, len(slot_tuples)):
+                        next_dt, next_avail_val = slot_tuples[j]
+                        hours_since_avail = (next_dt - slot_dt).total_seconds() / 3600.0
+                        if not next_avail_val:
+                            next_avail_until = next_dt.strftime("%d/%m/%Y %H:%M")
+                            available_hours = hours_since_avail
+                            break
+                        if hours_since_avail >= 72:
+                            available_hours = ">72"
+                            break
+                    if available_hours is None:
+                        if len(slot_tuples) > idx + 1:
+                            last_dt, last_avail = slot_tuples[-1]
+                            hours_since_avail = (
+                                last_dt - slot_dt
+                            ).total_seconds() / 3600.0
+                            if last_avail and hours_since_avail >= 72:
+                                available_hours = ">72"
+                    if available_hours == ">72":
+                        available_for = ">72h"
+                    elif isinstance(available_hours, (int, float)):
+                        available_for = f"{round(available_hours, 2)}h"
+                    else:
+                        available_for = None
+                    break
+        crew["available_now"] = available_now
+        crew["next_available"] = next_avail
+        crew["next_available_until"] = next_avail_until
+        crew["available_for"] = available_for
+        del crew["_all_slots"]
+    return list(crew_dict.values())
+
+
 # parse_grid.py: provides parse_grid_html(grid_html, date=None)
 from bs4 import BeautifulSoup, Tag
 import json
@@ -14,9 +89,12 @@ def parse_grid_html(grid_html, date=None):
     """
     table, header_row = _get_table_and_header(grid_html)
     if not table or not header_row:
-        return {"crew_availability": []}
+        return {"date": date, "crew_availability": []}
     time_slots = _extract_time_slots(header_row)
-    return _extract_crew_availability(date, table, time_slots)
+    result = _extract_crew_availability(date, table, time_slots)
+    # _extract_crew_availability always returns a dict
+    result["date"] = date  # type: ignore
+    return result
 
 
 def _get_table_and_header(grid_html):
@@ -31,7 +109,8 @@ def _get_table_and_header(grid_html):
     from bs4 import Tag
 
     # Only iterate over direct tr children (Tag elements)
-    rows = table.find_all("tr", recursive=False)
+    # BeautifulSoup's table is always Tag if not None, so find_all is safe
+    rows = table.find_all("tr", recursive=False)  # type: ignore[attr-defined]
     for tr in rows:
         if not isinstance(tr, Tag):
             continue
@@ -43,7 +122,7 @@ def _get_table_and_header(grid_html):
 
 def _extract_time_slots(header_row):
     """
-    Extract time slot labels from the header row.
+    Extract time slot labels from the header row (skipping first 5 columns).
     """
     header_cells = header_row.find_all("td")
     return [cell.get_text(strip=True) for cell in header_cells[5:]]
@@ -52,6 +131,7 @@ def _extract_time_slots(header_row):
 def _extract_crew_availability(date, table, time_slots):
     """
     Extract crew availability for all rows in the table.
+    Returns a dict with crew_availability list.
     """
     from datetime import datetime as dt
 
@@ -91,7 +171,7 @@ def _parse_crew_row(tr, time_slots, date_prefix, now):
 
 def _parse_availability_cells(avail_cells, time_slots, date_prefix):
     """
-    Parse availability cells for a crew row.
+    Parse availability cells for a crew row. Returns a dict mapping slot_key to bool.
     """
     availability = {}
     for i, cell in enumerate(avail_cells):
@@ -123,13 +203,13 @@ def _get_slot_datetimes(avail_cells, time_slots, date_prefix, availability):
 def _find_next_available(slot_datetimes, now):
     """
     Find the next available slot after 'now'.
+    Returns 'now' if available at the current time, else the next available slot as a string, or None.
     """
     for slot_dt, is_avail in slot_datetimes:
         if slot_dt >= now and is_avail:
             if slot_dt <= now:
                 return "now"
-            else:
-                return slot_dt.strftime("%d/%m/%Y %H:%M")
+            return slot_dt.strftime("%d/%m/%Y %H:%M")
     return None
 
 
