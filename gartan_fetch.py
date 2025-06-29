@@ -94,26 +94,16 @@ def _get_login_headers():
 
 def _post_login(session, post_url, payload, headers):
     login_resp = session.post(post_url, data=payload, headers=headers)
-    print(f"Login POST status: {login_resp.status_code}")
-    if login_resp.is_redirect or login_resp.is_permanent_redirect:
-        print(f"Login POST redirect location: {login_resp.headers.get('Location')}")
-    soup_resp = BeautifulSoup(login_resp.text, "html.parser")
-    login_msg = soup_resp.find(class_="loginMessage")
-    if login_msg and login_msg.text.strip():
-        print(
-            f"WARNING: Login message detected: {login_msg.text.strip()} (see login_response.html for details)"
-        )
-    if "invalid" in login_resp.text.lower() or "incorrect" in login_resp.text.lower():
-        print(
-            "WARNING: Possible login error detected in response text. See login_response.html for details."
-        )
+    if login_resp.status_code != 200:
+        print(f"[ERROR] Login POST failed with status: {login_resp.status_code}")
 
 
 def _get_data_page(session, headers):
     data_resp = session.get(DATA_URL, headers=headers)
-    print(f"Data page GET status: {data_resp.status_code}")
     if data_resp.status_code != 200:
-        raise Exception(f"Failed to retrieve data page: {data_resp.status_code}")
+        raise Exception(
+            f"[ERROR] Failed to retrieve data page: {data_resp.status_code}"
+        )
 
 
 def fetch_grid_html_for_date(session, booking_date):
@@ -160,11 +150,13 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     schedule_resp = session.post(
         schedule_url, headers=headers, data=json.dumps(payload)
     )
-    print(f"Schedule AJAX status for {booking_date}: {schedule_resp.status_code}")
+    if schedule_resp.status_code != 200:
+        print(
+            f"[ERROR] Schedule AJAX failed for {booking_date}: {schedule_resp.status_code}"
+        )
     try:
         grid_html = schedule_resp.json().get("d", "")
-        print(f"Fetched grid HTML from AJAX response for {booking_date}")
         return grid_html
     except Exception as e:
-        print(f"Could not extract grid HTML for {booking_date}: {e}")
+        print(f"[ERROR] Could not extract grid HTML for {booking_date}: {e}")
         return None
