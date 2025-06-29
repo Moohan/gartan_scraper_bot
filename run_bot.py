@@ -1,4 +1,4 @@
-from fetch_grid_html_and_date import (
+from gartan_fetch import (
     gartan_login_and_get_session,
     fetch_grid_html_for_date,
 )
