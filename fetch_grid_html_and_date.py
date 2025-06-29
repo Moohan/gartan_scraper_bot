@@ -21,30 +21,37 @@ def gartan_login_and_get_session():
     Logs in and returns an authenticated requests.Session().
     """
     session = requests.Session()
-    # Step 1: Get login page
+    form, resp = _get_login_form(session)
+    post_url = _get_login_post_url(form)
+    payload = _build_login_payload(form, USERNAME, PASSWORD)
+    headers = _get_login_headers()
+    _post_login(session, post_url, payload, headers)
+    _get_data_page(session, headers)
+    return session
+
+def _get_login_form(session):
     resp = session.get(LOGIN_URL)
     soup = BeautifulSoup(resp.content, 'html.parser')
-    # Find the login form and its action
     form = soup.find('form')
     if not form:
         raise Exception('Login form not found in page')
+    return form, resp
+
+def _get_login_post_url(form):
     action = form.get('action')
-    # Defensive: ensure action is a string
     if not action or not isinstance(action, str):
-        post_url = LOGIN_URL
-    elif isinstance(action, str) and action.startswith('http'):
-        post_url = action
+        return LOGIN_URL
+    elif action.startswith('http'):
+        return action
     else:
         from urllib.parse import urljoin
-        post_url = urljoin(LOGIN_URL, str(action))
+        return urljoin(LOGIN_URL, str(action))
 
-    # Collect all input fields in the form (defensively handle BeautifulSoup types)
+def _build_login_payload(form, username, password):
     payload = {}
-    input_tags = []
     try:
         input_tags = list(form.find_all('input'))
     except Exception:
-        # fallback: try iterating children
         input_tags = [el for el in form.descendants if getattr(el, 'name', None) == 'input']
     for input_tag in input_tags:
         try:
@@ -55,13 +62,9 @@ def gartan_login_and_get_session():
             payload[name] = value
         except Exception:
             continue
-
-    # Overwrite with actual credentials
-    payload['txt_userid'] = USERNAME
-    payload['txt_pword'] = PASSWORD
-    # The login button value may be required
+    payload['txt_userid'] = username
+    payload['txt_pword'] = password
     if 'btnLogin' not in payload:
-        # Find the login button by iterating inputs (since .find with attrs dict can be unreliable)
         login_button_value = 'Sign In'
         for input_tag in input_tags:
             try:
@@ -71,29 +74,31 @@ def gartan_login_and_get_session():
             except Exception:
                 continue
         payload['btnLogin'] = login_button_value
+    return payload
 
-    # Post login with all fields and cookies
-    headers = {
+def _get_login_headers():
+    return {
         'Referer': LOGIN_URL,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     }
+
+def _post_login(session, post_url, payload, headers):
     login_resp = session.post(post_url, data=payload, headers=headers)
     print(f"Login POST status: {login_resp.status_code}")
     if login_resp.is_redirect or login_resp.is_permanent_redirect:
         print(f"Login POST redirect location: {login_resp.headers.get('Location')}")
-    # Check for visible login error message
     soup_resp = BeautifulSoup(login_resp.text, 'html.parser')
     login_msg = soup_resp.find(class_='loginMessage')
     if login_msg and login_msg.text.strip():
         print(f'WARNING: Login message detected: {login_msg.text.strip()} (see login_response.html for details)')
     if 'invalid' in login_resp.text.lower() or 'incorrect' in login_resp.text.lower():
         print('WARNING: Possible login error detected in response text. See login_response.html for details.')
-    # Step 2: Get data page (after possible redirect)
+
+def _get_data_page(session, headers):
     data_resp = session.get(DATA_URL, headers=headers)
     print(f"Data page GET status: {data_resp.status_code}")
     if data_resp.status_code != 200:
         raise Exception(f'Failed to retrieve data page: {data_resp.status_code}')
-    return session
 
 def fetch_grid_html_for_date(session, booking_date):
     """
@@ -102,7 +107,12 @@ def fetch_grid_html_for_date(session, booking_date):
     """
     import json
     schedule_url = 'https://grampianrds.firescotland.gov.uk/GartanAvailability/Availability/Schedule/AvailabilityMain1.aspx/GetSchedule'
-    schedule_payload = {
+    payload = _build_schedule_payload(booking_date)
+    headers = _get_schedule_headers()
+    return _post_schedule_request(session, schedule_url, payload, headers, booking_date)
+
+def _build_schedule_payload(booking_date):
+    return {
         "brigadeId": 47,
         "brigadeName": "P22 Dunkeld",
         "employeeBrigadeId": 0,
@@ -115,13 +125,18 @@ def fetch_grid_html_for_date(session, booking_date):
         "highlightEmployeesOffStation": "true",
         "includeApplianceStatus": "true"
     }
-    headers = {
+
+def _get_schedule_headers():
+    return {
         'Referer': DATA_URL,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         "Content-Type": "application/json; charset=UTF-8",
         "X-Requested-With": "XMLHttpRequest"
     }
-    schedule_resp = session.post(schedule_url, headers=headers, data=json.dumps(schedule_payload))
+
+def _post_schedule_request(session, schedule_url, payload, headers, booking_date):
+    import json
+    schedule_resp = session.post(schedule_url, headers=headers, data=json.dumps(payload))
     print(f"Schedule AJAX status for {booking_date}: {schedule_resp.status_code}")
     try:
         grid_html = schedule_resp.json().get('d', '')
