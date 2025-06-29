@@ -1,3 +1,4 @@
 specification/*
 *.json
 .env
+__pycache__/*
