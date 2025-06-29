@@ -2,3 +2,4 @@ specification/*
 *.json
 .env
 __pycache__/*
+_cache/*
