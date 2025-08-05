@@ -3,3 +3,6 @@ specification/*
 .env
 __pycache__/*
 _cache/*
+gartan_debug.log
+crew_details.local
+gartan_availability.db
