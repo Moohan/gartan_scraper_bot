@@ -1,3 +1,7 @@
+from datetime import datetime as dt, timedelta
+from utils import log_debug
+
+
 def fetch_and_cache_grid_html(
     session,
     booking_date,
@@ -6,51 +10,177 @@ def fetch_and_cache_grid_html(
     min_delay=1,
     max_delay=10,
     base=1.5,
+    cache_mode=None,
 ):
     """
     Fetch grid HTML for a given date, using cache if available and fresh.
     Handles exponential backoff between fetches.
     Returns grid_html (str or None).
+    cache_mode: None (default), 'no-cache', 'cache-first', 'cache-only'
     """
     import os, time, random
 
     cache_file = os.path.join(cache_dir, f"grid_{booking_date.replace('/', '-')}.html")
     use_cache = False
-    if os.path.exists(cache_file):
+    cache_exists = os.path.exists(cache_file)
+    grid_html = None
+
+    # Handle cache modes
+    if cache_mode == "no-cache":
+        # Always fetch, ignore cache
+        print(
+            f"[NO-CACHE] Downloading fresh grid HTML for {booking_date} (ignoring cache)..."
+        )
+        log_debug("fetch", f"[no-cache] Fetching grid HTML for {booking_date}...")
+        grid_html = fetch_grid_html_for_date(session, booking_date)
+        if grid_html:
+            with open(cache_file, "w", encoding="utf-8") as f:
+                f.write(grid_html)
+        # Only delay after a real fetch
+        delay = min(max_delay, min_delay * (base ** max(0, 0)))
+        actual_delay = random.uniform(min_delay, delay)
+        if actual_delay >= 2:
+            log_debug("wait", f"Waiting {actual_delay:.1f}s before next fetch.")
+            for i in range(int(actual_delay), 0, -1):
+                log_debug("wait", f"{i} seconds left before next fetch.")
+                time.sleep(1)
+            leftover = actual_delay - int(actual_delay)
+            if leftover > 0:
+                time.sleep(leftover)
+        else:
+            time.sleep(actual_delay)
+        return grid_html
+
+    elif cache_mode == "cache-first":
+        # Use cache if exists, even if stale
+        if cache_exists:
+            print(
+                f"[CACHE-FIRST] Using cached grid HTML for {booking_date} (cache exists, not downloading)..."
+            )
+            log_debug(
+                "cache", f"[cache-first] Using cached grid HTML for {booking_date}."
+            )
+            with open(cache_file, "r", encoding="utf-8") as f:
+                grid_html = f.read()
+            # No delay for cache
+            return grid_html
+        else:
+            print(
+                f"[CACHE-FIRST] Downloading grid HTML for {booking_date} (no cache found)..."
+            )
+            log_debug(
+                "fetch", f"[cache-first] Fetching grid HTML for {booking_date}..."
+            )
+            grid_html = fetch_grid_html_for_date(session, booking_date)
+            if grid_html:
+                with open(cache_file, "w", encoding="utf-8") as f:
+                    f.write(grid_html)
+            # Only delay after a real fetch
+            delay = min(max_delay, min_delay * (base ** max(0, 0)))
+            actual_delay = random.uniform(min_delay, delay)
+            if actual_delay >= 2:
+                log_debug("wait", f"Waiting {actual_delay:.1f}s before next fetch.")
+                for i in range(int(actual_delay), 0, -1):
+                    log_debug("wait", f"{i} seconds left before next fetch.")
+                    time.sleep(1)
+                leftover = actual_delay - int(actual_delay)
+                if leftover > 0:
+                    time.sleep(leftover)
+            else:
+                time.sleep(actual_delay)
+            return grid_html
+
+    elif cache_mode == "cache-only":
+        # Only use cache, never fetch
+        if cache_exists:
+            print(
+                f"[CACHE-ONLY] Using cached grid HTML for {booking_date} (cache exists, not downloading)..."
+            )
+            log_debug(
+                "cache", f"[cache-only] Using cached grid HTML for {booking_date}."
+            )
+            with open(cache_file, "r", encoding="utf-8") as f:
+                grid_html = f.read()
+            # No delay for cache
+            return grid_html
+        else:
+            print(
+                f"[CACHE-ONLY] No cached grid HTML for {booking_date} (no cache found, not downloading)..."
+            )
+            log_debug("cache", f"[cache-only] No cached grid HTML for {booking_date}.")
+            return None
+
+    # Default: window-aligned cache expiry logic
+    if cache_exists:
         mtime = os.path.getmtime(cache_file)
-        age = time.time() - mtime
-        if age < cache_minutes * 60:
-            use_cache = True
+        mdt = dt.fromtimestamp(mtime)
+        nowdt = dt.now()
+        # Determine window boundary
+        if cache_minutes == 15:
+            # Next 15-min window
+            next_window = mdt.replace(second=0, microsecond=0)
+            minute = (mdt.minute // 15 + 1) * 15
+            if minute >= 60:
+                next_window = next_window.replace(minute=0) + timedelta(hours=1)
+            else:
+                next_window = next_window.replace(minute=minute)
+            if nowdt < next_window:
+                use_cache = True
+        elif cache_minutes == 60:
+            # Next hour
+            next_window = mdt.replace(minute=0, second=0, microsecond=0) + timedelta(
+                hours=1
+            )
+            if nowdt < next_window:
+                use_cache = True
+        elif cache_minutes == 360:
+            # Next 6-hour window
+            hour = ((mdt.hour // 6) + 1) * 6
+            if hour >= 24:
+                next_window = mdt.replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                ) + timedelta(days=1)
+            else:
+                next_window = mdt.replace(hour=hour, minute=0, second=0, microsecond=0)
+            if nowdt < next_window:
+                use_cache = True
+        elif cache_minutes == 1440:
+            # Next midnight
+            next_window = mdt.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ) + timedelta(days=1)
+            if nowdt < next_window:
+                use_cache = True
     if use_cache:
-        print(f"[CACHE] Using cached grid HTML for {booking_date}.")
+        print(
+            f"[CACHE] Using cached grid HTML for {booking_date} (cache is fresh for window)..."
+        )
+        log_debug("cache", f"Using cached grid HTML for {booking_date}.")
         with open(cache_file, "r", encoding="utf-8") as f:
             grid_html = f.read()
+        # No delay for cache
         return grid_html
-    print(f"[FETCH] Fetching grid HTML for {booking_date}...")
+    print(
+        f"[FETCH] Downloading grid HTML for {booking_date} (cache expired or missing)..."
+    )
+    log_debug("fetch", f"Fetching grid HTML for {booking_date}...")
     grid_html = fetch_grid_html_for_date(session, booking_date)
     if grid_html:
         with open(cache_file, "w", encoding="utf-8") as f:
             f.write(grid_html)
-    # Exponential backoff: delay increases as more days are fetched
+    # Only delay after a real fetch
     delay = min(
         max_delay, min_delay * (base ** max(0, 0))
     )  # day_offset handled by caller
     actual_delay = random.uniform(min_delay, delay)
     if actual_delay >= 2:
-        print(
-            f"[WAIT] Waiting {actual_delay:.1f}s before next fetch: ",
-            end="",
-            flush=True,
-        )
-        import sys
-
+        log_debug("wait", f"Waiting {actual_delay:.1f}s before next fetch.")
         for i in range(int(actual_delay), 0, -1):
-            print(f"{i} ", end="", flush=True)
+            log_debug("wait", f"{i} seconds left before next fetch.")
             time.sleep(1)
         leftover = actual_delay - int(actual_delay)
         if leftover > 0:
             time.sleep(leftover)
-        print()
     else:
         time.sleep(actual_delay)
     return grid_html
@@ -73,13 +203,15 @@ DATA_URL = "https://grampianrds.firescotland.gov.uk/GartanAvailability/Availabil
 USERNAME = os.environ.get("GARTAN_USERNAME")
 PASSWORD = os.environ.get("GARTAN_PASSWORD")
 
-assert USERNAME and PASSWORD, "GARTAN_USERNAME and GARTAN_PASSWORD must be set in .env"
-
 
 def gartan_login_and_get_session():
     """
     Logs in to the Gartan system and returns an authenticated requests.Session().
+    Raises AssertionError if credentials are missing.
     """
+    assert (
+        USERNAME and PASSWORD
+    ), "GARTAN_USERNAME and GARTAN_PASSWORD must be set in .env"
     session = requests.Session()
     form, resp = _get_login_form(session)
     post_url = _get_login_post_url(form)
@@ -171,7 +303,7 @@ def _post_login(session, post_url, payload, headers):
     """
     login_resp = session.post(post_url, data=payload, headers=headers)
     if login_resp.status_code != 200:
-        print(f"[ERROR] Login POST failed with status: {login_resp.status_code}")
+        log_debug("error", f"Login POST failed with status: {login_resp.status_code}")
 
 
 def _get_data_page(session, headers):
@@ -180,6 +312,7 @@ def _get_data_page(session, headers):
     """
     data_resp = session.get(DATA_URL, headers=headers)
     if data_resp.status_code != 200:
+        log_debug("error", f"Failed to retrieve data page: {data_resp.status_code}")
         raise Exception(
             f"[ERROR] Failed to retrieve data page: {data_resp.status_code}"
         )
@@ -196,6 +329,54 @@ def fetch_grid_html_for_date(session, booking_date):
     payload = _build_schedule_payload(booking_date)
     headers = _get_schedule_headers()
     return _post_schedule_request(session, schedule_url, payload, headers, booking_date)
+
+
+# CLI for direct testing of cache modes
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Test grid HTML fetch/caching with cache modes."
+    )
+    parser.add_argument("date", help="Booking date (dd/mm/yyyy)")
+    parser.add_argument(
+        "--no-cache", action="store_true", help="Always download, ignore cache"
+    )
+    parser.add_argument(
+        "--cache-first", action="store_true", help="Use cache if exists, even if stale"
+    )
+    parser.add_argument(
+        "--cache-only", action="store_true", help="Only use cache, never download"
+    )
+    parser.add_argument(
+        "--cache-minutes",
+        type=int,
+        default=15,
+        help="Cache expiry window in minutes (default 15)",
+    )
+    args = parser.parse_args()
+
+    # Determine cache_mode
+    cache_mode = None
+    if args.no_cache:
+        cache_mode = "no-cache"
+    elif args.cache_first:
+        cache_mode = "cache-first"
+    elif args.cache_only:
+        cache_mode = "cache-only"
+
+    print(f"[INFO] Running with cache_mode={cache_mode}, date={args.date}")
+    session = gartan_login_and_get_session()
+    html = fetch_and_cache_grid_html(
+        session,
+        args.date,
+        cache_minutes=args.cache_minutes,
+        cache_mode=cache_mode,
+    )
+    if html:
+        print(f"[SUCCESS] Grid HTML fetched for {args.date} (length={len(html)})")
+    else:
+        print(f"[FAIL] No grid HTML for {args.date}")
 
 
 def _build_schedule_payload(booking_date):
@@ -239,12 +420,13 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
         schedule_url, headers=headers, data=json.dumps(payload)
     )
     if schedule_resp.status_code != 200:
-        print(
-            f"[ERROR] Schedule AJAX failed for {booking_date}: {schedule_resp.status_code}"
+        log_debug(
+            "error",
+            f"Schedule AJAX failed for {booking_date}: {schedule_resp.status_code}",
         )
     try:
         grid_html = schedule_resp.json().get("d", "")
         return grid_html
     except Exception as e:
-        print(f"[ERROR] Could not extract grid HTML for {booking_date}: {e}")
+        log_debug("error", f"Could not extract grid HTML for {booking_date}: {e}")
         return None
