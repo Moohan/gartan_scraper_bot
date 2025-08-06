@@ -2,47 +2,95 @@
 
 ## Purpose
 
-This Python bot logs in to the Gartan Availability system, retrieves and parses crew/appliance availability, and stores normalized results in SQLite. The codebase is modular, with clear separation between session management, data retrieval, parsing, and database logic.
+This Python bot logs in to the Gartan Availability system, retrieves and parses crew/appliance availability, stores normalized results in SQLite, and exposes data via REST API. The codebase is highly modular with clear separation between scraping, parsing, storage, and API layers.
 
 ## Architecture & Key Files
 
-- `run_bot.py`: Main entry. Orchestrates session, fetches/caches HTML, aggregates results, prints progress/ETA, writes to SQLite DB, loads crew details from `crew_details.local`.
-- `gartan_fetch.py`: Handles login, session reuse, AJAX fetch to `/GetSchedule`, caching (window-aligned expiry), error handling.
-- `parse_grid.py`: Parses grid HTML for crew/appliance availability, aggregates status, calculates summary fields, fixes slot alignment, appliance name mapping.
-- `db_store.py`: Defines normalized SQLite schema for crew, crew_availability, appliance, appliance_availability; provides insert functions.
-- `utils.py`: Centralized logging (`log_debug`), delay logic, file ops.
-- `cache_utils.py`: Cache file naming, expiry, cleanup.
-- `specification/`: Contains `project_status.md`, `specifications.md`, and `database_schema.md` documenting requirements, conventions, and roadmap.
-- `tests/`: Pytest suite for login, fetch, parse, and DB storage (see `test_login.py`, `test_fetch.py`, `test_parse.py`, `test_db_store.py`).
-- **Output:** Data is stored in SQLite; output JSON files are deprecated.
+### Core Scraping Engine
+- `run_bot.py`: Main orchestrator. Handles multi-threaded fetching, progress/ETA tracking, CLI args, logging setup.
+- `gartan_fetch.py`: Session management, login, AJAX calls to `/GetSchedule`, intelligent caching with window-aligned expiry.
+- `parse_grid.py`: HTML parsing with crew/appliance detection, slot-to-block conversion, availability aggregation.
+- `db_store.py`: Normalized SQLite schema with foreign keys, block-based storage for efficient queries.
+
+### Configuration & Infrastructure  
+- `config.py`: Centralized settings with dataclass, cache expiry rules, environment variable access.
+- `cli.py`: Argument parsing and validation with dataclass patterns.
+- `logging_config.py`: Structured logging with file rotation, separate debug/console levels.
+- `cache_utils.py`: Cache file naming, timestamp alignment, cleanup logic.
+
+### API Layer
+- `test_direct_api.py`: Core API logic as pure functions (no Flask dependency), timezone-aware duration calculations.
+- `validate_api.py`: API validation framework testing specification compliance.
+- `specification/api_specification.md`: REST API spec with single-purpose endpoints (boolean/string responses).
+- **API Status**: Phase 1&2 complete (6 endpoints), Phase 3 pending (advanced queries).
+
+### Documentation & Testing
+- `specification/`: Project status, database schema, API docs, roadmap - **always check before changes**.
+- `tests/`: Comprehensive pytest suite covering login, parsing, DB operations, API validation.
+- **Output**: SQLite database with block-based availability storage; JSON files deprecated.
 
 ## Developer Workflow
 
-- **Run bot:** `python run_bot.py` (prints progress and ETA to terminal)
-- **Environment:** Set `GARTAN_USERNAME` and `GARTAN_PASSWORD` in `.env` (dotenv is used)
-- **Testing:** Use pytest; run all tests in `tests/` for validation
-- **Debugging:** Debug messages go to `gartan_debug.log` only if useful for troubleshooting; verbose logs are suppressed unless needed
-- **Manual validation:** Inspect SQLite DB tables for correctness
+### Primary Commands
+- **Run scraper**: `python run_bot.py --max-days 7` (supports cache options: `--no-cache`, `--cache-first`)
+- **API testing**: `python validate_api.py` (tests all endpoints without Flask server)
+- **Database inspection**: `python check_db.py` (shows row counts and sample data)
+- **Full test suite**: `pytest tests/` (comprehensive validation)
+
+### Environment Setup
+- **Credentials**: Set `GARTAN_USERNAME` and `GARTAN_PASSWORD` in `.env` (dotenv loaded automatically)
+- **Python**: 3.13+ with type hints, uses dataclass patterns extensively
+- **Dependencies**: requests, BeautifulSoup, sqlite3, pytest, Flask (for API server)
+
+### Debugging Workflows
+- **Parsing issues**: Check `gartan_debug.log` for slot detection and aggregation details
+- **API validation**: Use `test_direct_api.py` functions directly to bypass Flask server issues  
+- **Cache debugging**: Inspect `_cache/grid_*.html` files for raw HTML content
+- **DB schema**: Use `check_schema.py` for temporary schema inspection
 
 ## Project-Specific Conventions
 
-- Functions are small, modular, and single-purpose
-- Session is reused for all requests; avoid repeated logins
-- HTML is parsed in-memory; intermediate files are avoided unless debugging
-- Output is normalized in SQLite; crew/appliance tables use foreign keys
-- Use explicit imports; group stdlib, third-party, and local imports
-- snake_case for functions/variables, PascalCase for classes, UPPER_CASE for constants
-- Credentials must never be hardcoded; always use environment variables
-- When adding features, update both code and `specification/` docs
+### Code Patterns
+- **Dataclass configurations**: `config.py` (ScraperConfig), `cli.py` (CliArgs) - use dataclasses with validation
+- **Function modularity**: Small, single-purpose functions with clear input/output contracts
+- **Logging strategy**: Use `log_debug()` from utils.py; debug goes to file, info+ to console  
+- **Session reuse**: `gartan_fetch.py` maintains persistent session; avoid repeated logins
+- **Cache intelligence**: Window-aligned expiry (15min today, 1hr tomorrow, 6hr+ beyond)
+
+### Data Flow Conventions
+- **HTML → Blocks**: Raw slots converted to continuous availability blocks in `parse_grid.py`
+- **Foreign keys**: Database uses normalized schema; crew/appliance tables reference base entities
+- **Timezone handling**: All database times are UTC; API calculations use timezone-aware datetime
+- **Empty cell logic**: For crew, no background-color = available; for appliances, different logic applies
+
+### API Design Patterns
+- **Single-purpose endpoints**: Each endpoint returns one data type (boolean, string, JSON array)
+- **Direct function testing**: `test_direct_api.py` bypasses Flask for pure logic validation
+- **Specification-driven**: All API responses match `api_specification.md` format exactly
+- **Error handling**: 404 for invalid IDs, proper JSON error responses
 
 ## Integration Points & Data Flow
 
-- External API: Gartan web endpoints (login, AJAX schedule fetch)
-- Data flow: `run_bot.py` → `gartan_fetch.py` (session, fetch) → `parse_grid.py` (parse, aggregate) → `db_store.py` (DB insert)
+### External Dependencies
+- **Gartan web system**: Login endpoint, AJAX `/GetSchedule` calls, session-based authentication
+- **Database**: SQLite with normalized schema, foreign key constraints enabled
+- **Environment**: `.env` file for credentials, `crew_details.local` for contact info
+- **Cache layer**: Filesystem cache in `_cache/` with intelligent expiry policies
+
+### Critical Data Transformations
+1. **Raw HTML** → `parse_grid.py` → **Crew/appliance availability dicts**
+2. **Availability dicts** → `db_store.py` → **Continuous time blocks** (slot aggregation)
+3. **Time blocks** → `test_direct_api.py` → **API responses** (duration calculations)
+
+### Testing Architecture
+- **Unit tests**: `tests/` directory with pytest, mocks external API calls
+- **API validation**: `validate_api.py` tests actual database with real scraped data
+- **Direct function testing**: Bypass Flask server issues by testing core logic functions
+- **Specification compliance**: Automated verification that responses match `api_specification.md`
 
 ## Extensibility
 
-- New features (e.g., periodic scraping, REST API, custom date ranges) should be added as separate modules/scripts
+- New features (e.g., periodic scraping, custom date ranges) should be added as separate modules/scripts
 - Maintain backward compatibility with DB schema unless specified in `specification/database_schema.md`
 
 ## AI Agent Instructions
