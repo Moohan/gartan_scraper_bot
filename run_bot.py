@@ -23,6 +23,7 @@ from db_store import init_db, insert_crew_availability, insert_appliance_availab
 from config import config
 from cli import create_argument_parser, CliArgs
 from logging_config import setup_logging, get_logger
+import logging
 
 logger = get_logger()
 
@@ -44,7 +45,7 @@ def cleanup_old_cache_files(cache_dir: str, today: datetime) -> None:
 
 if __name__ == "__main__":
     # Set up logging
-    setup_logging()
+    setup_logging(log_level=logging.DEBUG)
 
     # Parse and validate arguments
     parser = create_argument_parser()
@@ -70,137 +71,153 @@ if __name__ == "__main__":
     logger.info(f"Fetching up to {args.max_days} days of availability...")
     start_time = time.time()
 
-    init_db()
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=config.max_workers
-    ) as executor:
-        parse_futures = []
-        booking_dates = []
-        while not all_statuses_determined and day_offset < args.max_days:
-            booking_date = (today + timedelta(days=day_offset)).strftime("%d/%m/%Y")
-            logger.info(
-                f"Processing day {day_offset+1}/{args.max_days}: {booking_date}"
-            )
+    db_conn = init_db()
+    try:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=config.max_workers
+        ) as executor:
+            parse_futures = []
+            booking_dates = []
+            while not all_statuses_determined and day_offset < args.max_days:
+                booking_date = (today + timedelta(days=day_offset)).strftime("%d/%m/%Y")
+                logger.info(
+                    f"Processing day {day_offset+1}/{args.max_days}: {booking_date}"
+                )
 
-            # Get cache minutes from config
-            cache_minutes = config.get_cache_minutes(day_offset)
+                # Get cache minutes from config
+                cache_minutes = config.get_cache_minutes(day_offset)
 
-            grid_html = fetch_and_cache_grid_html(
-                session,
-                booking_date,
-                cache_dir=config.cache_dir,
-                cache_minutes=cache_minutes,
-                min_delay=1,
-                max_delay=10,
-                base=1.5,
-                cache_mode=args.cache_mode,
-            )
+                grid_html = fetch_and_cache_grid_html(
+                    session,
+                    booking_date,
+                    cache_dir=config.cache_dir,
+                    cache_minutes=cache_minutes,
+                    min_delay=1,
+                    max_delay=10,
+                    base=1.5,
+                    cache_mode=args.cache_mode,
+                )
 
-            if not grid_html:
-                logger.error(f"Failed to get grid HTML for {booking_date}.")
-                day_offset += 1
-                continue
-
-            # Start parsing in background
-            future = executor.submit(parse_grid_html, grid_html, booking_date)
-            parse_futures.append(future)
-            booking_dates.append(booking_date)
-
-            # Calculate and display progress
-            elapsed = time.time() - start_time
-            avg_per_day = elapsed / (day_offset + 1)
-            eta = avg_per_day * (args.max_days - (day_offset + 1))
-            logger.info(
-                f"Progress: {day_offset+1}/{args.max_days} days | ETA: {int(eta)}s"
-            )
-            day_offset += 1
-
-        # Collect results as they complete
-        for i, future in enumerate(parse_futures):
-            try:
-                result = future.result()
-                crew_list = result.get("crew_availability", [])
-                appliance_obj = result.get("appliance_availability", {})
-                daily_crew_lists.append(crew_list)
-                daily_appliance_lists.append(appliance_obj)
-            except Exception as e:
-                log_debug("error", f"Failed to parse grid for {booking_dates[i]}: {e}")
-
-        crew_list_agg = aggregate_crew_availability(daily_crew_lists)
-        all_statuses_determined = all(
-            (
-                crew["next_available"] is not None
-                and crew["next_available_until"] is not None
-            )
-            for crew in crew_list_agg
-        )
-
-    # Read crew contact info from crew_details.local
-    contact_map = {}
-    if os.path.exists("crew_details.local"):
-        with open("crew_details.local", "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
+                if not grid_html:
+                    logger.error(f"Failed to get grid HTML for {booking_date}.")
+                    day_offset += 1
                     continue
-                parts = line.split("|")
-                if len(parts) == 3:
-                    crew_id, display_name, phone = parts
-                    contact_map[crew_id] = f"{display_name}|{phone}"
-    from db_store import insert_crew_details
 
-    insert_crew_details(crew_list_agg, contact_map)
-    insert_crew_availability(crew_list_agg)
-    print(
-        f"Saved crew details and availability for {len(crew_list_agg)} crew members to gartan_availability.db"
-    )
-    log_debug(
-        "ok",
-        f"Saved crew details and availability for {len(crew_list_agg)} crew members to gartan_availability.db",
-    )
+                # Start parsing in background
+                future = executor.submit(parse_grid_html, grid_html, booking_date)
+                parse_futures.append(future)
+                booking_dates.append(booking_date)
 
-    # Aggregate and store appliance availability in SQLite
-    appliance_agg = aggregate_appliance_availability(
-        daily_appliance_lists, crew_list_agg
-    )
-    # Insert appliance data with correct naming
-    if isinstance(appliance_agg, list):
-        for appliance_entry in appliance_agg:
-            appliance_name = appliance_entry.get("appliance", "UNKNOWN")
-            info = {k: v for k, v in appliance_entry.items() if k != "appliance"}
-            insert_appliance_availability({appliance_name: info})
-    else:
-        insert_appliance_availability(appliance_agg)
-    print(
-        f"Saved appliance availability for {len(appliance_agg)} appliances to gartan_availability.db"
-    )
-    log_debug(
-        "ok",
-        f"Saved appliance availability for {len(appliance_agg)} appliances to gartan_availability.db",
-    )
+                # Calculate and display progress
+                elapsed = time.time() - start_time
+                avg_per_day = elapsed / (day_offset + 1)
+                eta = avg_per_day * (args.max_days - (day_offset + 1))
+                logger.info(
+                    f"Progress: {day_offset+1}/{args.max_days} days | ETA: {int(eta)}s"
+                )
+                day_offset += 1
 
-    undetermined = [
-        crew["name"]
-        for crew in crew_list_agg
-        if (
-            (crew["next_available"] is None or crew["next_available_until"] is None)
-            and crew.get("available_for") != ">72h"
+            # Collect results as they complete
+            for i, future in enumerate(concurrent.futures.as_completed(parse_futures)):
+                try:
+                    result = future.result()
+                    crew_list = result.get("crew_availability", [])
+                    appliance_obj = result.get("appliance_availability", {})
+                    daily_crew_lists.append(crew_list)
+                    daily_appliance_lists.append(appliance_obj)
+                except Exception as e:
+                    # Find the booking date corresponding to the failed future
+                    failed_booking_date = "Unknown"
+                    for j, f in enumerate(parse_futures):
+                        if f == future:
+                            failed_booking_date = booking_dates[j]
+                            break
+                    log_debug(
+                        "error",
+                        f"Failed to parse grid for {failed_booking_date}: {e}",
+                    )
+
+            crew_list_agg = aggregate_crew_availability(daily_crew_lists)
+            all_statuses_determined = all(
+                (
+                    crew["next_available"] is not None
+                    and crew["next_available_until"] is not None
+                )
+                for crew in crew_list_agg
+            )
+
+        # Read crew contact info from crew_details.local
+        contact_map = {}
+        if os.path.exists("crew_details.local"):
+            with open("crew_details.local", "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    parts = line.split("|")
+                    if len(parts) == 3:
+                        crew_id, display_name, phone = parts
+                        contact_map[crew_id] = f"{display_name}|{phone}"
+        from db_store import (
+            insert_crew_details,
+            insert_crew_availability,
+            insert_appliance_availability,
         )
-    ]
-    got_72h = [
-        crew["name"] for crew in crew_list_agg if crew.get("available_for") == ">72h"
-    ]
-    if all_statuses_determined:
-        logger.info(
-            f"All upcoming crew availability determined after {day_offset} days."
+
+        insert_crew_details(crew_list_agg, contact_map, db_conn=db_conn)
+        insert_crew_availability(crew_list_agg, db_conn=db_conn)
+        print(
+            f"Saved crew availability for {len(crew_list_agg)} crew members to gartan_availability.db"
         )
-    elif undetermined:
-        logger.warning(
-            f"Could not get all upcoming availability after searching {args.max_days} days "
-            f"for crew members: {', '.join(undetermined)}"
+        log_debug(
+            "ok",
+            f"Saved crew availability for {len(crew_list_agg)} crew members to gartan_availability.db",
         )
-    elif got_72h:
-        logger.info(
-            f"Got at least 72 hours availability for crew after searching {day_offset} days: "
-            f"{', '.join(got_72h)}"
+
+        # Aggregate and store appliance availability in SQLite
+        appliance_agg = aggregate_appliance_availability(
+            daily_appliance_lists, crew_list_agg
         )
+        # Convert list of dicts to a single dict keyed by appliance name
+        appliance_agg_dict = {
+            item["appliance"]: item for item in appliance_agg if "appliance" in item
+        }
+        insert_appliance_availability(appliance_agg_dict, db_conn=db_conn)
+        print(
+            f"Saved appliance availability for {len(appliance_agg)} appliances to gartan_availability.db"
+        )
+        log_debug(
+            "ok",
+            f"Saved appliance availability for {len(appliance_agg)} appliances to gartan_availability.db",
+        )
+
+        undetermined = [
+            crew["name"]
+            for crew in crew_list_agg
+            if (
+                (crew["next_available"] is None or crew["next_available_until"] is None)
+                and crew.get("available_for") != ">72h"
+            )
+        ]
+        got_72h = [
+            crew["name"]
+            for crew in crew_list_agg
+            if crew.get("available_for") == ">72h"
+        ]
+        if all_statuses_determined:
+            logger.info(
+                f"All upcoming crew availability determined after {day_offset} days."
+            )
+        elif undetermined:
+            logger.warning(
+                f"Could not get all upcoming availability after searching {args.max_days} days "
+                f"for crew members: {', '.join(undetermined)}"
+            )
+        elif got_72h:
+            logger.info(
+                f"Got at least 72 hours availability for crew after searching {day_offset} days: "
+                f"{', '.join(got_72h)}"
+            )
+    finally:
+        if db_conn:
+            db_conn.close()

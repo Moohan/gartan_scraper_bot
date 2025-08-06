@@ -1,6 +1,6 @@
 """Configuration management for Gartan Scraper Bot."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional
 import os
 from pathlib import Path
@@ -18,18 +18,17 @@ class ScraperConfig:
     crew_details_file: str = "crew_details.local"
 
     # Cache expiry times in minutes for different day offsets
-    cache_minutes: Dict[int, int] | None = None
+    cache_minutes: Dict[int, int] = field(
+        default_factory=lambda: {
+            0: 15,  # Today: 15 minutes
+            1: 60,  # Tomorrow: 1 hour
+            2: 360,  # Next 7 days: 6 hours
+            8: 1440,  # Beyond 7 days: 24 hours
+        }
+    )
 
     def __post_init__(self):
-        if self.cache_minutes is None:
-            self.cache_minutes = {
-                0: 15,  # Today
-                1: 60,  # Tomorrow
-                2: 360,  # Next week
-                8: 1440,  # Beyond
-            }
-
-        # Ensure cache directory exists
+        """Ensure the cache directory exists after initialization."""
         Path(self.cache_dir).mkdir(exist_ok=True)
 
     @property
@@ -43,21 +42,15 @@ class ScraperConfig:
         return os.getenv("GARTAN_PASSWORD")
 
     def get_cache_minutes(self, day_offset: int) -> int:
-        """Get cache expiry time in minutes for a given day offset."""
-        if not self.cache_minutes:
-            # This shouldn't happen due to __post_init__, but just in case
-            self.cache_minutes = {
-                0: 15,  # Today
-                1: 60,  # Tomorrow
-                2: 360,  # Next week
-                8: 1440,  # Beyond
-            }
-
-        # Return the cache time for the smallest threshold that is >= day_offset
-        for threshold, minutes in sorted(self.cache_minutes.items()):
+        """
+        Get cache expiry time in minutes for a given day offset.
+        Finds the first threshold in the sorted cache_minutes dict that the offset fits into.
+        """
+        # Assumes self.cache_minutes is sorted by key, which it is by default in Python 3.7+
+        for threshold, minutes in self.cache_minutes.items():
             if day_offset <= threshold:
                 return minutes
-        # If no threshold matches, use the largest threshold's value
+        # Fallback to the largest value if the offset is greater than all thresholds
         return self.cache_minutes[max(self.cache_minutes.keys())]
 
 

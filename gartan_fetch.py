@@ -32,23 +32,8 @@ def fetch_and_cache_grid_html(
             f"[NO-CACHE] Downloading fresh grid HTML for {booking_date} (ignoring cache)..."
         )
         log_debug("fetch", f"[no-cache] Fetching grid HTML for {booking_date}...")
-        grid_html = fetch_grid_html_for_date(session, booking_date)
-        if grid_html:
-            with open(cache_file, "w", encoding="utf-8") as f:
-                f.write(grid_html)
-        # Only delay after a real fetch
-        delay = min(max_delay, min_delay * (base ** max(0, 0)))
-        actual_delay = random.uniform(min_delay, delay)
-        if actual_delay >= 2:
-            log_debug("wait", f"Waiting {actual_delay:.1f}s before next fetch.")
-            for i in range(int(actual_delay), 0, -1):
-                log_debug("wait", f"{i} seconds left before next fetch.")
-                time.sleep(1)
-            leftover = actual_delay - int(actual_delay)
-            if leftover > 0:
-                time.sleep(leftover)
-        else:
-            time.sleep(actual_delay)
+        grid_html = _fetch_and_write_cache(session, booking_date, cache_file)
+        _perform_delay(min_delay, max_delay, base)
         return grid_html
 
     elif cache_mode == "cache-first":
@@ -71,23 +56,8 @@ def fetch_and_cache_grid_html(
             log_debug(
                 "fetch", f"[cache-first] Fetching grid HTML for {booking_date}..."
             )
-            grid_html = fetch_grid_html_for_date(session, booking_date)
-            if grid_html:
-                with open(cache_file, "w", encoding="utf-8") as f:
-                    f.write(grid_html)
-            # Only delay after a real fetch
-            delay = min(max_delay, min_delay * (base ** max(0, 0)))
-            actual_delay = random.uniform(min_delay, delay)
-            if actual_delay >= 2:
-                log_debug("wait", f"Waiting {actual_delay:.1f}s before next fetch.")
-                for i in range(int(actual_delay), 0, -1):
-                    log_debug("wait", f"{i} seconds left before next fetch.")
-                    time.sleep(1)
-                leftover = actual_delay - int(actual_delay)
-                if leftover > 0:
-                    time.sleep(leftover)
-            else:
-                time.sleep(actual_delay)
+            grid_html = _fetch_and_write_cache(session, booking_date, cache_file)
+            _perform_delay(min_delay, max_delay, base)
             return grid_html
 
     elif cache_mode == "cache-only":
@@ -110,68 +80,48 @@ def fetch_and_cache_grid_html(
             log_debug("cache", f"[cache-only] No cached grid HTML for {booking_date}.")
             return None
 
-    # Default: window-aligned cache expiry logic
-    if cache_exists:
-        mtime = os.path.getmtime(cache_file)
-        mdt = dt.fromtimestamp(mtime)
-        nowdt = dt.now()
-        # Determine window boundary
-        if cache_minutes == 15:
-            # Next 15-min window
-            next_window = mdt.replace(second=0, microsecond=0)
-            minute = (mdt.minute // 15 + 1) * 15
-            if minute >= 60:
-                next_window = next_window.replace(minute=0) + timedelta(hours=1)
-            else:
-                next_window = next_window.replace(minute=minute)
-            if nowdt < next_window:
-                use_cache = True
-        elif cache_minutes == 60:
-            # Next hour
-            next_window = mdt.replace(minute=0, second=0, microsecond=0) + timedelta(
-                hours=1
-            )
-            if nowdt < next_window:
-                use_cache = True
-        elif cache_minutes == 360:
-            # Next 6-hour window
-            hour = ((mdt.hour // 6) + 1) * 6
-            if hour >= 24:
-                next_window = mdt.replace(
-                    hour=0, minute=0, second=0, microsecond=0
-                ) + timedelta(days=1)
-            else:
-                next_window = mdt.replace(hour=hour, minute=0, second=0, microsecond=0)
-            if nowdt < next_window:
-                use_cache = True
-        elif cache_minutes == 1440:
-            # Next midnight
-            next_window = mdt.replace(
-                hour=0, minute=0, second=0, microsecond=0
-            ) + timedelta(days=1)
-            if nowdt < next_window:
-                use_cache = True
-    if use_cache:
-        print(
-            f"[CACHE] Using cached grid HTML for {booking_date} (cache is fresh for window)..."
-        )
+    # Default: check cache expiry
+    if _is_cache_valid(cache_file, cache_minutes):
+        print(f"[CACHE] Using cached grid HTML for {booking_date} (cache is fresh)...")
         log_debug("cache", f"Using cached grid HTML for {booking_date}.")
         with open(cache_file, "r", encoding="utf-8") as f:
             grid_html = f.read()
         # No delay for cache
         return grid_html
+
     print(
         f"[FETCH] Downloading grid HTML for {booking_date} (cache expired or missing)..."
     )
     log_debug("fetch", f"Fetching grid HTML for {booking_date}...")
+    grid_html = _fetch_and_write_cache(session, booking_date, cache_file)
+    _perform_delay(min_delay, max_delay, base)
+    return grid_html
+
+
+def _is_cache_valid(cache_file: str, cache_minutes: int) -> bool:
+    """Check if the cache file exists and is not expired."""
+    if not os.path.exists(cache_file):
+        return False
+    mtime = os.path.getmtime(cache_file)
+    if (dt.now() - dt.fromtimestamp(mtime)).total_seconds() / 60 < cache_minutes:
+        return True
+    return False
+
+
+def _fetch_and_write_cache(session, booking_date, cache_file):
+    """Fetch grid HTML and write it to the cache file."""
     grid_html = fetch_grid_html_for_date(session, booking_date)
     if grid_html:
         with open(cache_file, "w", encoding="utf-8") as f:
             f.write(grid_html)
-    # Only delay after a real fetch
-    delay = min(
-        max_delay, min_delay * (base ** max(0, 0))
-    )  # day_offset handled by caller
+    return grid_html
+
+
+def _perform_delay(min_delay, max_delay, base):
+    """Perform a randomized delay between fetches."""
+    import time, random
+
+    delay = min(max_delay, min_delay * (base ** max(0, 0)))
     actual_delay = random.uniform(min_delay, delay)
     if actual_delay >= 2:
         log_debug("wait", f"Waiting {actual_delay:.1f}s before next fetch.")
@@ -183,7 +133,6 @@ def fetch_and_cache_grid_html(
             time.sleep(leftover)
     else:
         time.sleep(actual_delay)
-    return grid_html
 
 
 import os

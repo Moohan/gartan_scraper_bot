@@ -6,7 +6,7 @@ from typing import Optional
 from config import config
 
 
-def setup_logging(log_level: int = logging.INFO) -> None:
+def setup_logging(log_level: int = logging.DEBUG) -> None:
     """Configure logging with file and console handlers."""
     # Create logger
     logger = logging.getLogger("gartan_scraper")
