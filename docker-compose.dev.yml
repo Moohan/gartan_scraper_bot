@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  gartan-scraper:
+    environment:
+      - GARTAN_USERNAME=${GARTAN_USERNAME}
+      - GARTAN_PASSWORD=${GARTAN_PASSWORD}
+      - PORT=5000
+      - FLASK_ENV=development
+      - FLASK_DEBUG=true
+    volumes:
+      # Mount source code for development hot-reload
+      - .:/app
+    command: ["python", "container_main.py"]
+    # Override restart policy for development
+    restart: "no"
