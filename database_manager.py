@@ -284,6 +284,17 @@ class DatabaseManager:
             
             logger.debug(f"Inserted {len(availability_data)} {entity_type} availability records")
     
+    def get_pool_status(self) -> Dict[str, Any]:
+        """Get database connection pool status."""
+        with self.db_pool._lock:
+            return {
+                'total_connections': len(self.db_pool._connections) + len(self.db_pool._in_use),
+                'available_connections': len(self.db_pool._connections),
+                'in_use_connections': len(self.db_pool._in_use),
+                'max_connections': self.db_pool.max_connections,
+                'database_path': self.db_path
+            }
+    
     def get_database_stats(self) -> Dict[str, int]:
         """Get database statistics."""
         with self.get_connection() as conn:
