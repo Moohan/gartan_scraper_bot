@@ -123,9 +123,14 @@ def insert_crew_details(
     Insert or update crew details (name, role, contact) into crew table.
     crew_list: list of dicts with 'name' and 'role' keys
     contact_map: dict mapping name to contact info
-    db_conn: an existing database connection to use
+    db_conn: an existing database connection to use (connection object, not path)
     """
-    conn = db_conn or sqlite3.connect(DB_PATH)
+    if db_conn is None:
+        conn = sqlite3.connect(DB_PATH)
+        should_close = True
+    else:
+        conn = db_conn
+        should_close = False
     c = conn.cursor()
     try:
         for crew in crew_list:
@@ -145,7 +150,7 @@ def insert_crew_details(
             )
         conn.commit()
     finally:
-        if not db_conn:
+        if should_close:
             conn.close()
 
 
@@ -153,7 +158,12 @@ def insert_crew_availability(
     crew_list: List[Dict[str, Any]], db_conn: sqlite3.Connection = None
 ):
     """Converts crew availability slots into blocks and inserts them into the database."""
-    conn = db_conn or sqlite3.connect(DB_PATH)
+    if db_conn is None:
+        conn = sqlite3.connect(DB_PATH)
+        should_close = True
+    else:
+        conn = db_conn
+        should_close = False
     c = conn.cursor()
     from logging_config import get_logger
 
@@ -188,7 +198,7 @@ def insert_crew_availability(
                 )
         conn.commit()
     finally:
-        if not db_conn:
+        if should_close:
             conn.close()
 
 
@@ -196,7 +206,12 @@ def insert_appliance_availability(
     appliance_obj: Dict[str, Any], db_conn: sqlite3.Connection = None
 ):
     """Converts appliance availability slots into blocks and inserts them into the database."""
-    conn = db_conn or sqlite3.connect(DB_PATH)
+    if db_conn is None:
+        conn = sqlite3.connect(DB_PATH)
+        should_close = True
+    else:
+        conn = db_conn
+        should_close = False
     c = conn.cursor()
     try:
         for appliance, info in appliance_obj.items():
@@ -219,5 +234,5 @@ def insert_appliance_availability(
                 )
         conn.commit()
     finally:
-        if not db_conn:
+        if should_close:
             conn.close()
