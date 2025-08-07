@@ -22,8 +22,8 @@ class ScraperConfig:
         default_factory=lambda: {
             0: 15,  # Today: 15 minutes
             1: 60,  # Tomorrow: 1 hour
-            2: 360,  # Next 7 days: 6 hours
-            8: 1440,  # Beyond 7 days: 24 hours
+            7: 360,  # Next 7 days: 6 hours
+            14: 1440,  # Beyond 7 days: 24 hours
         }
     )
 
