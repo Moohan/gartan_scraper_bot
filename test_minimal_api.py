@@ -6,12 +6,13 @@ Minimal API test to isolate issues
 import sqlite3
 from datetime import datetime, timezone
 from flask import Flask, jsonify
+import pytest
 
 app = Flask(__name__)
 
 
 @app.route("/test")
-def test():
+def api_test_endpoint():
     """Simple test endpoint"""
     return jsonify({"status": "ok", "message": "API is working"})
 
@@ -29,6 +30,17 @@ def db_test():
         return jsonify({"status": "ok", "crew_count": result["count"]})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+def test_minimal_api():
+    """Test the API endpoints with proper Flask context"""
+    with app.test_client() as client:
+        # Test the basic endpoint
+        response = client.get("/test")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["status"] == "ok"
+        assert data["message"] == "API is working"
 
 
 if __name__ == "__main__":

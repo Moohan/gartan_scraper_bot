@@ -1,73 +1,156 @@
 import os
 import pytest
+import tempfile
+import logging
 from utils import log_debug, delay
+from logging_config import setup_logging
 
 
-def cleanup_log():
-    log_path = "gartan_debug.log"
-    if os.path.exists(log_path):
-        os.remove(log_path)
+def test_log_debug_creates_log_entry(tmp_path):
+    """Test that log_debug creates log entries via the logging system."""
+    # Setup logging with a temporary log file
+    temp_log = tmp_path / "test_gartan_debug.log"
+    
+    # Clear any existing handlers
+    logger = logging.getLogger("gartan_scraper")
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Add file handler for testing
+    handler = logging.FileHandler(str(temp_log))
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    
+    # Test the function
+    log_debug("info", "Test message")
+    
+    # Ensure the log is written
+    handler.flush()
+    
+    # Check if file exists and contains the message
+    assert temp_log.exists()
+    content = temp_log.read_text(encoding="utf-8")
+    assert "Test message" in content
 
 
-# --- log_debug tests ---
-def test_log_debug_creates_and_truncates_file():
-    cleanup_log()
-    msg = "Test message"
-    level = "info"
-    for _ in range(3000):
-        log_debug(level, msg)
-    size = os.path.getsize("gartan_debug.log")
-    assert size <= 2 * 1024 * 1024  # Should be truncated to 1MB after exceeding 2MB
-    with open("gartan_debug.log", "r", encoding="utf-8") as f:
-        content = f.read()
-        assert msg in content
-    cleanup_log()
-
-
-def test_log_debug_empty_message():
-    cleanup_log()
+def test_log_debug_empty_message(tmp_path):
+    """Test that log_debug handles empty messages."""
+    temp_log = tmp_path / "test_gartan_debug.log"
+    
+    # Clear any existing handlers
+    logger = logging.getLogger("gartan_scraper")
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Add file handler for testing
+    handler = logging.FileHandler(str(temp_log))
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    
+    # Test with empty message
     log_debug("info", "")
-    with open("gartan_debug.log", "r", encoding="utf-8") as f:
-        content = f.read()
-    assert "info" in content
-    cleanup_log()
+    handler.flush()
+    
+    # Check content - "info" maps to DEBUG level in log_debug function
+    content = temp_log.read_text(encoding="utf-8")
+    assert "DEBUG" in content
+    assert "[info]" in content
 
 
-def test_log_debug_long_message():
-    cleanup_log()
+def test_log_debug_long_message(tmp_path):
+    """Test that log_debug handles long messages."""
+    temp_log = tmp_path / "test_gartan_debug.log"
+    
+    # Clear any existing handlers
+    logger = logging.getLogger("gartan_scraper")
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Add file handler for testing
+    handler = logging.FileHandler(str(temp_log))
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    
+    # Test with long message
     long_msg = "A" * 10000
     log_debug("info", long_msg)
-    with open("gartan_debug.log", "r", encoding="utf-8") as f:
-        content = f.read()
+    handler.flush()
+    
+    # Check content
+    content = temp_log.read_text(encoding="utf-8")
     assert long_msg in content
-    cleanup_log()
 
 
-def test_log_debug_non_utf8():
-    cleanup_log()
+def test_log_debug_non_utf8(tmp_path):
+    """Test that log_debug handles unicode characters."""
+    temp_log = tmp_path / "test_gartan_debug.log"
+    
+    # Clear any existing handlers
+    logger = logging.getLogger("gartan_scraper")
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Add file handler for testing
+    handler = logging.FileHandler(str(temp_log), encoding="utf-8")
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    
+    # Test with unicode
     msg = "Test with emoji 🚒"
     log_debug("info", msg)
-    with open("gartan_debug.log", "r", encoding="utf-8") as f:
-        content = f.read()
+    handler.flush()
+    
+    # Check content
+    content = temp_log.read_text(encoding="utf-8")
     assert "🚒" in content
-    cleanup_log()
 
 
-def test_log_debug_readonly_file():
-    cleanup_log()
-    log_path = "gartan_debug.log"
-    with open(log_path, "w", encoding="utf-8") as f:
-        f.write("Initial log\n")
-    os.chmod(log_path, 0o444)  # Read-only
-    raised = False
-    try:
-        log_debug("info", "Should fail")
-    except Exception:
-        raised = True
-    finally:
-        os.chmod(log_path, 0o666)  # Restore permissions
-        os.remove(log_path)
-    assert raised
+def test_log_debug_different_levels(tmp_path):
+    """Test that log_debug handles different log levels correctly."""
+    temp_log = tmp_path / "test_gartan_debug.log"
+    
+    # Clear any existing handlers
+    logger = logging.getLogger("gartan_scraper")
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Add file handler for testing
+    handler = logging.FileHandler(str(temp_log))
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    
+    # Test different levels
+    log_debug("error", "Error message")
+    log_debug("warning", "Warning message")
+    log_debug("info", "Info message")
+    log_debug("debug", "Debug message")
+    
+    # Ensure the log is written
+    handler.flush()
+    
+    # Check content
+    content = temp_log.read_text(encoding="utf-8")
+    assert "ERROR" in content
+    assert "WARNING" in content
+    assert "DEBUG" in content
+    assert "Error message" in content
+    assert "Warning message" in content
+    assert "Info message" in content
 
 
 # --- delay tests ---

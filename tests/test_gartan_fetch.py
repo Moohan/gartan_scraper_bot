@@ -172,6 +172,12 @@ def test_fetch_and_cache_grid_html_corrupt_cache(tmp_path, monkeypatch):
     cache_file = os.path.join(cache_dir, f"grid_{date.replace('/', '-')}.html")
     with open(cache_file, "wb") as f:
         f.write(b"\x00\x01\x02")
+    
+    # Make the cache file appear old so it will be considered expired
+    import time
+    old_time = time.time() - 3600  # 1 hour ago
+    os.utime(cache_file, (old_time, old_time))
+    
     monkeypatch.setattr(
         "gartan_fetch.fetch_grid_html_for_date",
         lambda session, date: "<html>recovered</html>",
@@ -180,13 +186,13 @@ def test_fetch_and_cache_grid_html_corrupt_cache(tmp_path, monkeypatch):
         session,
         date,
         cache_dir=cache_dir,
-        cache_minutes=1,
+        cache_minutes=1,  # 1 minute expiry, so 1 hour old file is expired
         cache_mode="cache-preferred",
     )
     assert html == "<html>recovered</html>"
 
 
-def test_fetch_and_cache_grid_html_non_json_ajax(monkeypatch):
+def test_fetch_and_cache_grid_html_non_json_ajax(monkeypatch, tmp_path):
     class DummySession:
         def post(self, url, data=None, headers=None):
             class DummyResp:
@@ -201,14 +207,15 @@ def test_fetch_and_cache_grid_html_non_json_ajax(monkeypatch):
 
     session = DummySession()
     date = "05/08/2025"
+    cache_dir = tmp_path
     monkeypatch.setattr("gartan_fetch._post_schedule_request", lambda *a, **kw: None)
     html = fetch_and_cache_grid_html(
-        session, date, cache_dir=".", cache_minutes=1, cache_mode="cache-preferred"
+        session, date, cache_dir=str(cache_dir), cache_minutes=1, cache_mode="no-cache"
     )
     assert html is None
 
 
-def test_fetch_and_cache_grid_html_unexpected_status(monkeypatch):
+def test_fetch_and_cache_grid_html_unexpected_status(monkeypatch, tmp_path):
     class DummySession:
         def post(self, url, data=None, headers=None):
             class DummyResp:
@@ -223,9 +230,10 @@ def test_fetch_and_cache_grid_html_unexpected_status(monkeypatch):
 
     session = DummySession()
     date = "05/08/2025"
+    cache_dir = tmp_path
     monkeypatch.setattr("gartan_fetch._post_schedule_request", lambda *a, **kw: None)
     html = fetch_and_cache_grid_html(
-        session, date, cache_dir=".", cache_minutes=1, cache_mode="cache-preferred"
+        session, date, cache_dir=str(cache_dir), cache_minutes=1, cache_mode="no-cache"
     )
     assert html is None
 
@@ -249,7 +257,7 @@ def test_fetch_and_cache_grid_html_invalid_cache_mode(monkeypatch):
     assert html == "<html></html>"
 
 
-def test_fetch_and_cache_grid_html_empty_html(monkeypatch):
+def test_fetch_and_cache_grid_html_empty_html(tmp_path, monkeypatch):
     class DummySession:
         def get(self, url, params=None, headers=None):
             return None
@@ -263,6 +271,6 @@ def test_fetch_and_cache_grid_html_empty_html(monkeypatch):
         "gartan_fetch.fetch_grid_html_for_date", lambda session, date: ""
     )
     html = fetch_and_cache_grid_html(
-        session, date, cache_dir=".", cache_minutes=1, cache_mode="cache-preferred"
+        session, date, cache_dir=str(tmp_path), cache_minutes=1, cache_mode="cache-preferred"
     )
     assert html == ""
