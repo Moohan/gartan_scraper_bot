@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS appliance (
 import sqlite3
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
+from connection_manager import get_database_pool
 
 DB_PATH = "gartan_availability.db"
 
@@ -121,18 +122,28 @@ def insert_crew_details(
 ):
     """
     Insert or update crew details (name, role, contact) into crew table.
+    Uses optimized batch operations and connection pooling.
+    
     crew_list: list of dicts with 'name' and 'role' keys
     contact_map: dict mapping name to contact info
     db_conn: an existing database connection to use (connection object, not path)
     """
-    if db_conn is None:
-        conn = sqlite3.connect(DB_PATH)
-        should_close = True
-    else:
+    if db_conn is not None:
+        # Use provided connection
         conn = db_conn
         should_close = False
-    c = conn.cursor()
+    else:
+        # Use connection pool for better performance
+        db_pool = get_database_pool(DB_PATH)
+        pool_context = db_pool.get_connection()
+        conn = pool_context.__enter__()
+        should_close = True
+    
     try:
+        c = conn.cursor()
+        
+        # Prepare batch data for efficient bulk insert
+        crew_data = []
         for crew in crew_list:
             name = crew.get("name")
             role = crew.get("role")
@@ -140,36 +151,52 @@ def insert_crew_details(
             contact = None
             if contact_map and name in contact_map:
                 contact = contact_map[name]
-            # Insert or update
-            c.execute(
-                """
-                INSERT INTO crew (name, role, contact, skills) VALUES (?, ?, ?, ?)
-                ON CONFLICT(name) DO UPDATE SET role=excluded.role, contact=excluded.contact, skills=excluded.skills
-                """,
-                (name, role, contact, skills),
-            )
+            crew_data.append((name, role, contact, skills))
+        
+        # Use executemany for batch operations
+        c.executemany(
+            """
+            INSERT INTO crew (name, role, contact, skills) VALUES (?, ?, ?, ?)
+            ON CONFLICT(name) DO UPDATE SET role=excluded.role, contact=excluded.contact, skills=excluded.skills
+            """,
+            crew_data
+        )
         conn.commit()
+        
     finally:
         if should_close:
-            conn.close()
+            if db_conn is None:  # Only exit context if we created it
+                pool_context.__exit__(None, None, None)
 
 
 def insert_crew_availability(
     crew_list: List[Dict[str, Any]], db_conn: sqlite3.Connection = None
 ):
-    """Converts crew availability slots into blocks and inserts them into the database."""
-    if db_conn is None:
-        conn = sqlite3.connect(DB_PATH)
-        should_close = True
-    else:
+    """
+    Converts crew availability slots into blocks and inserts them into the database.
+    Uses optimized batch operations and connection pooling.
+    """
+    if db_conn is not None:
+        # Use provided connection
         conn = db_conn
         should_close = False
-    c = conn.cursor()
-    from logging_config import get_logger
-
-    logger = get_logger()
-    logger.debug(f"Inserting crew availability for {len(crew_list)} crew members.")
+        pool_context = None
+    else:
+        # Use connection pool for better performance
+        db_pool = get_database_pool(DB_PATH)
+        pool_context = db_pool.get_connection()
+        conn = pool_context.__enter__()
+        should_close = True
+    
     try:
+        c = conn.cursor()
+        from logging_config import get_logger
+        logger = get_logger()
+        logger.debug(f"Inserting crew availability for {len(crew_list)} crew members.")
+
+        # Batch data preparation
+        crew_availability_data = []
+        
         for crew in crew_list:
             name = crew["name"]
             logger.debug(f"Processing crew member: {name}")
@@ -185,21 +212,33 @@ def insert_crew_availability(
                 f"Found {len(availability_blocks)} availability blocks for {name}."
             )
 
+            # Prepare batch data instead of individual inserts
             for block in availability_blocks:
                 logger.debug(
                     f"Inserting block for {name}: {block['start_time']} -> {block['end_time']}"
                 )
-                c.execute(
-                    """
-                    INSERT INTO crew_availability (crew_id, start_time, end_time)
-                    VALUES (?, ?, ?)
-                    """,
-                    (crew_id, block["start_time"], block["end_time"]),
-                )
+                crew_availability_data.append((
+                    crew_id, 
+                    block["start_time"], 
+                    block["end_time"]
+                ))
+
+        # Batch insert all availability blocks
+        if crew_availability_data:
+            c.executemany(
+                """
+                INSERT INTO crew_availability (crew_id, start_time, end_time)
+                VALUES (?, ?, ?)
+                """,
+                crew_availability_data
+            )
+            logger.debug(f"[ok] Saved crew availability for {len(crew_list)} crew members to {DB_PATH}")
+
         conn.commit()
+        
     finally:
-        if should_close:
-            conn.close()
+        if should_close and pool_context:
+            pool_context.__exit__(None, None, None)
 
 
 def insert_appliance_availability(

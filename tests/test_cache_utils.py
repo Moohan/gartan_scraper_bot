@@ -24,16 +24,31 @@ def test_is_cache_expired(tmp_path):
 
 
 def test_cleanup_cache_files(tmp_path):
-    # Create some cache files
+    # Create some cache files with different dates - one old, two recent
+    from datetime import datetime
     files = []
-    for i in range(3):
-        f = tmp_path / f"grid_0{i}-08-2025.html"
-        f.write_text("test")
-        files.append(str(f))
-    # Expire one file
-    old_time = datetime.now() - timedelta(days=2)
-    os.utime(files[0], (old_time.timestamp(), old_time.timestamp()))
-    removed = cleanup_cache_files(str(tmp_path), expiry_minutes=60 * 24)
+    
+    # Create one old file (from 30 days ago)
+    old_date = datetime.now() - timedelta(days=30)
+    f1 = tmp_path / f"grid_{old_date.strftime('%d-%m-%Y')}.html"
+    f1.write_text("test")
+    files.append(str(f1))
+    
+    # Create two recent files (today and tomorrow)
+    today = datetime.now()
+    tomorrow = today + timedelta(days=1)
+    f2 = tmp_path / f"grid_{today.strftime('%d-%m-%Y')}.html"
+    f2.write_text("test")
+    files.append(str(f2))
+    
+    f3 = tmp_path / f"grid_{tomorrow.strftime('%d-%m-%Y')}.html"
+    f3.write_text("test")
+    files.append(str(f3))
+    
+    # Clean up files older than 7 days
+    removed = cleanup_cache_files(str(tmp_path), expiry_minutes=7 * 24 * 60)
+    
+    # The old file should be removed, recent ones should remain
     assert files[0] in removed
     assert os.path.exists(files[1]) and os.path.exists(files[2])
 

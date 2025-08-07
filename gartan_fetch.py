@@ -45,10 +45,17 @@ def fetch_and_cache_grid_html(
             log_debug(
                 "cache", f"[cache-first] Using cached grid HTML for {booking_date}."
             )
-            with open(cache_file, "r", encoding="utf-8") as f:
-                grid_html = f.read()
-            # No delay for cache
-            return grid_html
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    grid_html = f.read()
+                # No delay for cache
+                return grid_html
+            except (UnicodeDecodeError, IOError) as e:
+                print(f"[CACHE-FIRST] Cache file corrupted, downloading fresh data: {e}")
+                log_debug("cache", f"[cache-first] Cache corrupted, fetching fresh: {e}")
+                grid_html = _fetch_and_write_cache(session, booking_date, cache_file)
+                _perform_delay(min_delay, max_delay, base)
+                return grid_html
         else:
             print(
                 f"[CACHE-FIRST] Downloading grid HTML for {booking_date} (no cache found)..."
@@ -69,10 +76,15 @@ def fetch_and_cache_grid_html(
             log_debug(
                 "cache", f"[cache-only] Using cached grid HTML for {booking_date}."
             )
-            with open(cache_file, "r", encoding="utf-8") as f:
-                grid_html = f.read()
-            # No delay for cache
-            return grid_html
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    grid_html = f.read()
+                # No delay for cache
+                return grid_html
+            except (UnicodeDecodeError, IOError) as e:
+                print(f"[CACHE-ONLY] Cache file corrupted: {e}")
+                log_debug("cache", f"[cache-only] Cache corrupted: {e}")
+                return None
         else:
             print(
                 f"[CACHE-ONLY] No cached grid HTML for {booking_date} (no cache found, not downloading)..."
@@ -84,10 +96,15 @@ def fetch_and_cache_grid_html(
     if _is_cache_valid(cache_file, cache_minutes):
         print(f"[CACHE] Using cached grid HTML for {booking_date} (cache is fresh)...")
         log_debug("cache", f"Using cached grid HTML for {booking_date}.")
-        with open(cache_file, "r", encoding="utf-8") as f:
-            grid_html = f.read()
-        # No delay for cache
-        return grid_html
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                grid_html = f.read()
+            # No delay for cache
+            return grid_html
+        except (UnicodeDecodeError, IOError) as e:
+            print(f"[CACHE] Cache file corrupted, downloading fresh data: {e}")
+            log_debug("cache", f"Cache corrupted, fetching fresh: {e}")
+            # Fall through to fetch fresh data
 
     print(
         f"[FETCH] Downloading grid HTML for {booking_date} (cache expired or missing)..."
@@ -140,6 +157,8 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from datetime import datetime
+from connection_manager import get_session_manager
+from typing import Optional
 
 
 # Load environment variables
@@ -152,22 +171,56 @@ DATA_URL = "https://grampianrds.firescotland.gov.uk/GartanAvailability/Availabil
 USERNAME = os.environ.get("GARTAN_USERNAME")
 PASSWORD = os.environ.get("GARTAN_PASSWORD")
 
+# Session cache for authenticated sessions
+_authenticated_session = None
+_session_authenticated_time = None
+_session_timeout = 1800  # 30 minutes
+
 
 def gartan_login_and_get_session():
     """
-    Logs in to the Gartan system and returns an authenticated requests.Session().
+    Get an authenticated session, reusing existing session if still valid.
+    Returns an authenticated requests.Session().
     Raises AssertionError if credentials are missing.
     """
+    global _authenticated_session, _session_authenticated_time
+    import time
+    
     assert (
         USERNAME and PASSWORD
     ), "GARTAN_USERNAME and GARTAN_PASSWORD must be set in .env"
-    session = requests.Session()
+    
+    current_time = time.time()
+    
+    # Check if we have a valid cached session
+    if (_authenticated_session is not None and 
+        _session_authenticated_time is not None and
+        (current_time - _session_authenticated_time) < _session_timeout):
+        log_debug("session", "Reusing existing authenticated session")
+        return _authenticated_session
+    
+    # Create new authenticated session
+    try:
+        session_manager = get_session_manager()
+        session = session_manager.get_session()
+    except Exception:
+        # Fallback to basic session for testing compatibility
+        import requests
+        session = requests.Session()
+    
+    log_debug("session", "Creating new authenticated session")
+    
     form, resp = _get_login_form(session)
     post_url = _get_login_post_url(form)
     payload = _build_login_payload(form, USERNAME, PASSWORD)
     headers = _get_login_headers()
     _post_login(session, post_url, payload, headers)
     _get_data_page(session, headers)
+    
+    # Cache the authenticated session
+    _authenticated_session = session
+    _session_authenticated_time = current_time
+    
     return session
 
 

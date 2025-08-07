@@ -165,14 +165,21 @@ def test_parse_grid_html_slot_alignment():
 def test_parse_grid_html_appliance_name_mapping():
     html = """
     <table id='gridAvail'>
-      <tr class='gridheader'><td>Role</td><td>Name</td><td>Skill</td><td>0800</td></tr>
-      <tr><td>Engine 2</td><td>Available</td><td></td><td>0</td></tr>
+      <tr class='gridheader'><td>Role</td><td>Name</td><td>Skill</td><td>Other</td><td>Other</td><td>0800</td></tr>
+      <tr class="gridheader">
+        <td colspan="5">Appliances</td><td style="text-align:center;">0800</td><td style="text-align:center;">0815</td>
+      </tr>
+      <tr>
+        <td title="Default - Total Crew: 4, MGR x 1, LGV x 1, BA x 4" colspan="5">P22P6</td>
+        <td id="app_67_0" title="P22P6 (0800 - 0815) Available" class="schTD" style="text-align:center;background-color:#009933;color:#F8F8F8;"></td>
+        <td id="app_67_1" title="P22P6 (0815 - 0830) Available" class="schTD" style="text-align:center;background-color:#009933;color:#F8F8F8;"></td>
+      </tr>
     </table>
     """
     result = parse_grid_html(html, "2025-08-05")
     appliance_obj = result["appliance_availability"]
-    # Should have Engine 2 status
-    assert any("Engine 2" in name for name in appliance_obj.keys())
+    # Should have P22P6 status (using realistic appliance name)
+    assert any("P22P6" in name for name in appliance_obj.keys())
 
 
 def test_parse_grid_html_none_input():

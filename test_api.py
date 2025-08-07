@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 API_BASE = "http://127.0.0.1:5000/v1"
 
 
-def test_endpoint(method, url, expected_type=None, description=""):
+def check_endpoint(method, url, expected_type=None, description=""):
     """Test an API endpoint"""
     print(f"\n{'='*60}")
     print(f"Testing: {method} {url}")
@@ -124,7 +124,7 @@ def main():
     total = len(tests)
 
     for method, url, expected_type, description in tests:
-        success = test_endpoint(method, url, expected_type, description)
+        success = check_endpoint(method, url, expected_type, description)
         if success:
             passed += 1
 

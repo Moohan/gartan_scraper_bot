@@ -19,9 +19,18 @@ def test_login_success(monkeypatch):
     assert "Availability" in resp.text or "Crew" in resp.text
 
 
-def test_login_missing_credentials():
+def test_login_missing_credentials(monkeypatch):
     """Test login fails with missing credentials."""
+    # Clear environment variables to ensure they're not set
+    monkeypatch.delenv("GARTAN_USERNAME", raising=False)
+    monkeypatch.delenv("GARTAN_PASSWORD", raising=False)
+    
+    # Directly patch the module-level variables to None
+    import gartan_fetch
+    monkeypatch.setattr("gartan_fetch.USERNAME", None)
+    monkeypatch.setattr("gartan_fetch.PASSWORD", None)
+    
     with pytest.raises(
         AssertionError, match="GARTAN_USERNAME and GARTAN_PASSWORD must be set in .env"
     ):
-        login_gartan()
+        gartan_fetch.gartan_login_and_get_session()
