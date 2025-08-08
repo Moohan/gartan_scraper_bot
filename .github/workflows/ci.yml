@@ -116,10 +116,10 @@ jobs:
     - name: Push to Docker Hub
       if: github.ref == 'refs/heads/main'
       run: |
-        docker tag gartan-scraper:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:latest
-        docker tag gartan-scraper:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.sha }}
-        docker push ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:latest
-        docker push ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.sha }}
+        docker tag gartan-scraper:${{ github.sha }} moohan/gartan_scraper_bot:latest
+        docker tag gartan-scraper:${{ github.sha }} moohan/gartan_scraper_bot:${{ github.sha }}
+        docker push moohan/gartan_scraper_bot:latest
+        docker push moohan/gartan_scraper_bot:${{ github.sha }}
 
   lint:
     name: Code Quality

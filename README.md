@@ -26,27 +26,43 @@ A streamlined Python bot that logs in to the Gartan Availability system, retriev
 - Docker and Docker Compose
 - Gartan system credentials
 
+## Quick Start (Docker)
+
+### Prerequisites
+- Docker and Docker Compose
+- Gartan system credentials
+
 ### Deployment
 
-1. **Set up credentials:**
-   ```bash
-   echo "GARTAN_USERNAME=your_username" > .env
-   echo "GARTAN_PASSWORD=your_password" >> .env
-   ```
+**Option 1: Use Published Image (Recommended)**
+```bash
+# 1. Set up credentials
+echo "GARTAN_USERNAME=your_username" > .env
+echo "GARTAN_PASSWORD=your_password" >> .env
 
-2. **Deploy with one command:**
-   ```bash
-   # Linux/macOS
-   ./deploy.sh
-   
-   # Windows PowerShell  
-   .\deploy.ps1
-   ```
+# 2. Deploy with published image
+docker-compose up -d
 
-3. **Verify deployment:**
-   ```bash
-   python validate_deployment.py
-   ```
+# 3. Verify deployment
+curl http://localhost:5000/health
+```
+
+**Option 2: Local Build**
+```bash
+# 1. Set up credentials
+echo "GARTAN_USERNAME=your_username" > .env
+echo "GARTAN_PASSWORD=your_password" >> .env
+
+# 2. Deploy with automated scripts
+# Linux/macOS
+./deploy.sh
+
+# Windows PowerShell  
+.\deploy.ps1
+
+# 3. Verify deployment
+python validate_deployment.py
+```
 
 ### API Usage
 

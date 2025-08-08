@@ -43,10 +43,10 @@ jobs:
         
     - name: Push release to Docker Hub
       run: |
-        docker tag gartan-scraper:${{ github.ref_name }} ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.ref_name }}
-        docker tag gartan-scraper:${{ github.ref_name }} ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:latest
-        docker push ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.ref_name }}
-        docker push ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:latest
+        docker tag gartan-scraper:${{ github.ref_name }} moohan/gartan_scraper_bot:${{ github.ref_name }}
+        docker tag gartan-scraper:${{ github.ref_name }} moohan/gartan_scraper_bot:latest
+        docker push moohan/gartan_scraper_bot:${{ github.ref_name }}
+        docker push moohan/gartan_scraper_bot:latest
         
     - name: Create GitHub Release
       uses: actions/create-release@v1
@@ -63,12 +63,12 @@ jobs:
           
           ### 🐳 Docker Deployment
           ```bash
-          docker pull ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.ref_name }}
+          docker pull moohan/gartan_scraper_bot:${{ github.ref_name }}
           docker run -d --name gartan-scraper \
             -e GARTAN_USERNAME=your_username \
             -e GARTAN_PASSWORD=your_password \
             -p 5000:5000 \
-            ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.ref_name }}
+            moohan/gartan_scraper_bot:${{ github.ref_name }}
           ```
           
           ### 📋 Requirements
@@ -77,7 +77,7 @@ jobs:
           - Valid Gartan system credentials
           
           ### 🔗 Links
-          - [Docker Hub](${{ secrets.DOCKER_HUB_URL }}/gartan-scraper)
+          - [Docker Hub](https://hub.docker.com/r/moohan/gartan_scraper_bot)
           - [Documentation](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md)
         draft: false
         prerelease: false
