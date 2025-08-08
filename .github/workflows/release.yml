@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v
+        
+    - name: Build Docker image
+      run: |
+        docker build -t gartan-scraper:${{ github.ref_name }} .
+        
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        
+    - name: Push release to Docker Hub
+      run: |
+        docker tag gartan-scraper:${{ github.ref_name }} ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.ref_name }}
+        docker tag gartan-scraper:${{ github.ref_name }} ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:latest
+        docker push ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.ref_name }}
+        docker push ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:latest
+        
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
+        body: |
+          ## Changes in ${{ github.ref_name }}
+          
+          ### 🚀 Features
+          - Docker image available as `${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.ref_name }}`
+          
+          ### 🐳 Docker Deployment
+          ```bash
+          docker pull ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.ref_name }}
+          docker run -d --name gartan-scraper \
+            -e GARTAN_USERNAME=your_username \
+            -e GARTAN_PASSWORD=your_password \
+            -p 5000:5000 \
+            ${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.ref_name }}
+          ```
+          
+          ### 📋 Requirements
+          - Python 3.13+
+          - Docker (optional)
+          - Valid Gartan system credentials
+          
+          ### 🔗 Links
+          - [Docker Hub](${{ secrets.DOCKER_HUB_URL }}/gartan-scraper)
+          - [Documentation](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md)
+        draft: false
+        prerelease: false

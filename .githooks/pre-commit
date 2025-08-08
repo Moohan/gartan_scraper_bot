@@ -1,0 +1,73 @@
+#!/bin/bash
+# Pre-commit hook for Gartan Scraper Bot
+# Runs tests, linting, and validation before allowing commits
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Check if we're in the right directory
+if [ ! -f "run_bot.py" ]; then
+    echo "❌ Error: Not in project root directory"
+    exit 1
+fi
+
+# Check Python syntax
+echo "🐍 Checking Python syntax..."
+python -m py_compile *.py || {
+    echo "❌ Python syntax errors found"
+    exit 1
+}
+
+# Run core tests
+echo "🧪 Running core tests..."
+python -m pytest tests/ -v --tb=short || {
+    echo "❌ Tests failed"
+    exit 1
+}
+
+# Check for TODO/FIXME comments in staged files
+echo "📝 Checking for TODO/FIXME comments..."
+staged_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(py|md)$' || true)
+if [ -n "$staged_files" ]; then
+    todo_count=$(grep -n -i "TODO\|FIXME" $staged_files | wc -l || true)
+    if [ "$todo_count" -gt 0 ]; then
+        echo "⚠️  Warning: Found $todo_count TODO/FIXME comments in staged files"
+        grep -n -i "TODO\|FIXME" $staged_files || true
+        echo "Consider addressing these before committing"
+    fi
+fi
+
+# Check that required files exist
+echo "📂 Checking required files..."
+required_files=("requirements.txt" "Dockerfile" "docker-compose.yml" ".env.example")
+for file in "${required_files[@]}"; do
+    if [ ! -f "$file" ]; then
+        echo "❌ Required file missing: $file"
+        exit 1
+    fi
+done
+
+# Validate database schema if database exists
+if [ -f "gartan_availability.db" ]; then
+    echo "🗄️  Validating database schema..."
+    python -c "
+import sqlite3
+conn = sqlite3.connect('gartan_availability.db')
+cursor = conn.cursor()
+# Check required tables exist
+tables = ['crew', 'appliance', 'crew_availability', 'appliance_availability']
+for table in tables:
+    cursor.execute(\"SELECT name FROM sqlite_master WHERE type='table' AND name=?\", (table,))
+    if not cursor.fetchone():
+        print(f'❌ Required table missing: {table}')
+        exit(1)
+print('✅ Database schema validation passed')
+conn.close()
+" || {
+        echo "❌ Database schema validation failed"
+        exit 1
+    }
+fi
+
+echo "✅ All pre-commit checks passed!"
