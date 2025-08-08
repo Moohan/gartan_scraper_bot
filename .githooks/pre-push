@@ -1,0 +1,66 @@
+#!/bin/bash
+# Pre-push hook for Gartan Scraper Bot
+# Runs comprehensive tests and validations before pushing
+
+set -e
+
+echo "🚀 Running pre-push checks..."
+
+# Run all tests including integration tests
+echo "🧪 Running comprehensive test suite..."
+python -m pytest tests/ -v --cov=. --cov-report=term-missing || {
+    echo "❌ Comprehensive tests failed"
+    exit 1
+}
+
+# Check that API server can start
+echo "🌐 Testing API server startup..."
+timeout 10s python api_server.py > /dev/null 2>&1 &
+server_pid=$!
+sleep 3
+
+# Test if server is responsive
+if curl -f http://localhost:5000/health > /dev/null 2>&1; then
+    echo "✅ API server starts successfully"
+else
+    echo "❌ API server failed to start or respond"
+    kill $server_pid 2>/dev/null || true
+    exit 1
+fi
+
+# Cleanup
+kill $server_pid 2>/dev/null || true
+
+# Check Docker build (if Docker is available)
+if command -v docker &> /dev/null; then
+    echo "🐳 Testing Docker build..."
+    docker build -t gartan-scraper-test . > /dev/null || {
+        echo "❌ Docker build failed"
+        exit 1
+    }
+    echo "✅ Docker build successful"
+    docker rmi gartan-scraper-test > /dev/null 2>&1 || true
+fi
+
+# Check for large files
+echo "📏 Checking for large files..."
+large_files=$(git ls-files | xargs ls -l | awk '$5 > 1048576 {print $9, $5}' || true)
+if [ -n "$large_files" ]; then
+    echo "⚠️  Warning: Large files detected (>1MB):"
+    echo "$large_files"
+    echo "Consider using Git LFS for large files"
+fi
+
+# Check for secrets in code
+echo "🔒 Checking for potential secrets..."
+secret_patterns=("password" "secret" "key" "token" "api_key")
+for pattern in "${secret_patterns[@]}"; do
+    matches=$(git diff origin/main --name-only | xargs grep -il "$pattern" 2>/dev/null | grep -v ".env.example" || true)
+    if [ -n "$matches" ]; then
+        echo "⚠️  Warning: Potential secrets found in files containing '$pattern':"
+        echo "$matches"
+        echo "Please review these files to ensure no secrets are committed"
+    fi
+done
+
+echo "✅ All pre-push checks passed!"
