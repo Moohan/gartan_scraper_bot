@@ -1,58 +1,31 @@
-"""Configuration management for Gartan Scraper Bot."""
+"""Minimal configuration for Gartan Scraper Bot."""
 
-from dataclasses import dataclass, field
-from typing import Dict, Optional
 import os
-from pathlib import Path
 
 
-@dataclass
-class ScraperConfig:
-    """Configuration settings for the Gartan Scraper Bot."""
-
-    cache_dir: str = "_cache"
-    max_workers: int = 4
-    log_file: str = "gartan_debug.log"
-    max_log_size: int = 10 * 1024 * 1024  # 10MB
-    db_file: str = "gartan_availability.db"
-    crew_details_file: str = "crew_details.local"
-
-    # Cache expiry times in minutes for different day offsets
-    cache_minutes: Dict[int, int] = field(
-        default_factory=lambda: {
-            0: 15,  # Today: 15 minutes
-            1: 60,  # Tomorrow: 1 hour
-            7: 360,  # Next 7 days: 6 hours
-            14: 1440,  # Beyond 7 days: 24 hours
-        }
-    )
-
-    def __post_init__(self):
-        """Ensure the cache directory exists after initialization."""
-        Path(self.cache_dir).mkdir(exist_ok=True)
-
-    @property
-    def gartan_username(self) -> Optional[str]:
-        """Get Gartan username from environment variables."""
-        return os.getenv("GARTAN_USERNAME")
-
-    @property
-    def gartan_password(self) -> Optional[str]:
-        """Get Gartan password from environment variables."""
-        return os.getenv("GARTAN_PASSWORD")
-
+class Config:
+    """Configuration class with attribute access."""
+    
+    def __init__(self):
+        self.log_level = 'DEBUG'
+        self.db_path = 'gartan_availability.db'
+        self.cache_dir = '_cache'
+        self.max_cache_minutes = 60 * 24 * 7  # 1 week
+        self.gartan_username = os.environ.get('GARTAN_USERNAME', '')
+        self.gartan_password = os.environ.get('GARTAN_PASSWORD', '')
+        self.log_file = 'gartan_debug.log'
+        self.max_log_size = 10 * 1024 * 1024  # 10MB
+        self.max_workers = 4  # For concurrent processing
+    
     def get_cache_minutes(self, day_offset: int) -> int:
-        """
-        Get cache expiry time in minutes for a given day offset.
-        Finds the first threshold in the sorted cache_minutes dict that the offset fits into.
-        """
-        # Assumes self.cache_minutes is sorted by key, which it is by default in Python 3.7+
-        for threshold, minutes in self.cache_minutes.items():
-            if day_offset <= threshold:
-                return minutes
-        # Fallback to the largest value if the offset is greater than all thresholds
-        return self.cache_minutes[max(self.cache_minutes.keys())]
+        """Get cache expiry minutes based on day offset."""
+        if day_offset == 0:  # Today
+            return 15  # 15 minutes
+        elif day_offset == 1:  # Tomorrow
+            return 60  # 1 hour
+        else:  # Future days
+            return 60 * 24  # 24 hours
 
 
 # Global config instance
-config = ScraperConfig()
+config = Config()
