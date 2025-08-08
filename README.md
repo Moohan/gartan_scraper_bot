@@ -1,13 +1,22 @@
 # Gartan Scraper Bot
 
-A Python bot that logs in to the Gartan Availability system, retrieves crew and appliance availability, stores data in SQLite, and provides REST API access. Now available as a production-ready Docker container.
+A streamlined Python bot that logs in to the Gartan Availability system, retrieves crew and appliance availability, stores data in SQLite, and provides REST API access.
+
+## Core Components
+
+- **📊 Data Collection**: Automated scraping with cache optimization (`run_bot.py`)
+- **🏗️ Data Processing**: HTML parsing and normalization (`parse_grid.py`)
+- **💾 Data Storage**: SQLite database with availability blocks (`db_store.py`)
+- **🌐 API Server**: REST endpoints for availability queries (`api_server.py`)
+- **🐳 Containerization**: Docker deployment configuration
+- **🧪 Testing**: Comprehensive test suite (62 tests)
 
 ## Features
 
 - **🔐 Secure Authentication**: Environment variable credentials
-- **📊 Intelligent Data Collection**: Scrapes every 5 minutes with cache optimization
+- **📊 Intelligent Data Collection**: Scrapes every 5 minutes with smart caching
 - **🏗️ Normalized Database**: SQLite with block-based availability storage
-- **🌐 REST API**: 6 production endpoints with health monitoring
+- **🌐 REST API**: 6 endpoints with health monitoring
 - **🐳 Docker Ready**: Single container with automated deployment
 - **📈 Production Monitoring**: Health checks, logging, and graceful shutdown
 
@@ -59,6 +68,18 @@ curl http://localhost:5000/v1/crew/1/duration
 # Check appliance availability
 curl http://localhost:5000/v1/appliances/P22P6/available
 ```
+
+## Recent Updates
+
+### v1.2.0 - Codebase Cleanup (2025-08-08)
+- **🧹 Major Cleanup**: Reduced codebase by 40% (removed ~20 non-essential files)
+- **🔧 Core Focus**: Streamlined to 6 essential components (read, process, store, serve, containerize, test)
+- **✅ Validation**: All 62 core tests passing, real data integration confirmed
+- **🚀 API Fixes**: All 6 REST endpoints working correctly
+- **📦 Minimal Config**: Lightweight configuration management with environment variable support
+
+**Files Removed**: test_compatibility.py, test_direct_api.py, validate_*.py, check_db.py, improvements/ directory
+**Files Created**: Minimal config.py, connection_manager.py, cli.py replacements
 
 ## Architecture
 

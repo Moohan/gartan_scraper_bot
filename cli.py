@@ -1,64 +1,76 @@
-"""CLI argument validation for Gartan Scraper Bot."""
+"""Minimal CLI interface for run_bot.py."""
 
-from typing import Optional
-from dataclasses import dataclass
 import argparse
-from logging_config import get_logger
+from typing import Optional
 
-logger = get_logger()
-
-
-@dataclass
 class CliArgs:
-    """Validated command line arguments."""
-
-    max_days: int
-    cache_mode: Optional[str] = None
-
+    """Simple CLI arguments container."""
+    def __init__(self):
+        self.max_days: int = 3
+        self.cache_mode: str = "cache-preferred"
+        self.force_scrape: bool = False
+    
     @classmethod
-    def from_args(cls, args: argparse.Namespace) -> "CliArgs":
-        """Create validated CliArgs from parsed arguments."""
-        # Validate max_days
-        if args.max_days < 1:
-            raise ValueError("max_days must be at least 1")
-        if args.max_days > 365:
-            logger.warning("Fetching more than 365 days of data may be slow")
-
-        # Determine cache mode
-        cache_mode = None
-        if args.no_cache:
-            cache_mode = "no-cache"
-        elif args.cache_first:
-            cache_mode = "cache-first"
-        elif args.cache_only:
-            cache_mode = "cache-only"
-
-        # Validate cache mode combinations
-        cache_flags = [args.no_cache, args.cache_first, args.cache_only]
-        if sum(cache_flags) > 1:
-            raise ValueError("Only one cache mode flag can be specified")
-
-        return cls(max_days=args.max_days, cache_mode=cache_mode)
+    def from_args(cls, args):
+        """Create CliArgs from parsed arguments."""
+        cli_args = cls()
+        cli_args.max_days = args.max_days
+        
+        # Set cache mode based on flags
+        if hasattr(args, 'cache_only') and args.cache_only:
+            cli_args.cache_mode = "cache-only"
+        elif hasattr(args, 'cache_off') and args.cache_off:
+            cli_args.cache_mode = "cache-off"
+        elif hasattr(args, 'cache_mode'):
+            cli_args.cache_mode = args.cache_mode
+        else:
+            cli_args.cache_mode = "cache-preferred"
+            
+        cli_args.force_scrape = getattr(args, 'force_scrape', False)
+        return cli_args
 
 
 def create_argument_parser() -> argparse.ArgumentParser:
-    """Create the argument parser with validation."""
-    parser = argparse.ArgumentParser(
-        description="Gartan Scraper Bot",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
+    """Create argument parser for the scraper bot."""
+    parser = argparse.ArgumentParser(description="Gartan Scraper Bot")
+    
     parser.add_argument(
-        "--no-cache", action="store_true", help="Always download, ignore cache"
+        "--max-days",
+        type=int,
+        default=3,
+        help="Maximum days to scrape (default: 3)"
     )
+    
+    # Cache mode options
+    cache_group = parser.add_mutually_exclusive_group()
+    cache_group.add_argument(
+        "--cache-only",
+        action="store_true",
+        help="Use cache only, don't fetch new data"
+    )
+    cache_group.add_argument(
+        "--cache-off",
+        action="store_true",
+        help="Don't use cache, always fetch fresh data"
+    )
+    cache_group.add_argument(
+        "--cache-mode",
+        choices=["cache-only", "cache-preferred", "cache-off"],
+        default="cache-preferred",
+        help="Cache behavior mode"
+    )
+    
     parser.add_argument(
-        "--cache-first", action="store_true", help="Use cache if exists, even if stale"
+        "--force-scrape",
+        action="store_true",
+        help="Force scrape even if cache is fresh"
     )
-    parser.add_argument(
-        "--cache-only", action="store_true", help="Only use cache, never download"
-    )
-    parser.add_argument(
-        "--max-days", type=int, default=28, help="Number of days to fetch (1-365)"
-    )
-
+    
     return parser
+
+
+def parse_args() -> CliArgs:
+    """Parse command line arguments into CliArgs object."""
+    parser = create_argument_parser()
+    args = parser.parse_args()
+    return CliArgs.from_args(args)

@@ -8,18 +8,9 @@ Serves REST API endpoints for crew and appliance availability data
 from flask import Flask, jsonify, request
 import sqlite3
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 import os
-
-# Import existing API logic
-from test_direct_api import (
-    get_crew_list_data,
-    get_crew_available_data,
-    get_crew_duration_data,
-    get_appliance_available_data,
-    get_appliance_duration_data,
-)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +18,153 @@ logger = logging.getLogger(__name__)
 
 # Create Flask app
 app = Flask(__name__)
+
+# Database path
+DB_PATH = "gartan_availability.db"
+
+
+def get_db_connection():
+    """Get database connection with row factory."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_crew_list_data() -> List[Dict[str, Any]]:
+    """Get list of all crew members."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name FROM crew ORDER BY name")
+            rows = cursor.fetchall()
+            return [{"id": row["id"], "name": row["name"]} for row in rows]
+    except Exception as e:
+        logger.error(f"Error getting crew list: {e}")
+        return []
+
+
+def get_crew_available_data(crew_id: int) -> Dict[str, Any]:
+    """Check if crew member is available right now."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if crew exists
+            cursor.execute("SELECT name FROM crew WHERE id = ?", (crew_id,))
+            crew = cursor.fetchone()
+            if not crew:
+                return {"error": f"Crew ID {crew_id} not found"}
+            
+            # Check current availability
+            now = datetime.now()
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM crew_availability 
+                WHERE crew_id = ? AND start_time <= ? AND end_time > ?
+            """, (crew_id, now, now))
+            
+            result = cursor.fetchone()
+            is_available = result["count"] > 0
+            
+            return {"available": is_available}
+    except Exception as e:
+        logger.error(f"Error checking crew availability: {e}")
+        return {"error": "Internal server error"}
+
+
+def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
+    """Get how long crew member is available for."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if crew exists
+            cursor.execute("SELECT name FROM crew WHERE id = ?", (crew_id,))
+            crew = cursor.fetchone()
+            if not crew:
+                return {"error": f"Crew ID {crew_id} not found"}
+            
+            # Get next availability block
+            now = datetime.now()
+            cursor.execute("""
+                SELECT start_time, end_time FROM crew_availability 
+                WHERE crew_id = ? AND start_time <= ? AND end_time > ?
+                ORDER BY start_time LIMIT 1
+            """, (crew_id, now, now))
+            
+            result = cursor.fetchone()
+            if result:
+                end_time = datetime.fromisoformat(result[1])  # end_time is second column
+                duration_minutes = int((end_time - now).total_seconds() / 60)
+                return {"duration_minutes": max(0, duration_minutes)}
+            else:
+                return {"duration_minutes": 0}
+    except Exception as e:
+        logger.error(f"Error getting crew duration: {e}")
+        return {"error": "Internal server error"}
+
+
+def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
+    """Check if appliance is available right now."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if appliance exists
+            cursor.execute("SELECT id FROM appliance WHERE name = ?", (appliance_name,))
+            appliance = cursor.fetchone()
+            if not appliance:
+                return {"error": f"Appliance {appliance_name} not found"}
+            
+            appliance_id = appliance[0]  # id is first column
+            
+            # Check current availability
+            now = datetime.now()
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM appliance_availability 
+                WHERE appliance_id = ? AND start_time <= ? AND end_time > ?
+            """, (appliance_id, now, now))
+            
+            result = cursor.fetchone()
+            is_available = result[0] > 0  # count is first column
+            
+            return {"available": is_available}
+    except Exception as e:
+        logger.error(f"Error checking appliance availability: {e}")
+        return {"error": "Internal server error"}
+
+
+def get_appliance_duration_data(appliance_name: str) -> Dict[str, Any]:
+    """Get how long appliance is available for."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if appliance exists
+            cursor.execute("SELECT id FROM appliance WHERE name = ?", (appliance_name,))
+            appliance = cursor.fetchone()
+            if not appliance:
+                return {"error": f"Appliance {appliance_name} not found"}
+            
+            appliance_id = appliance[0]  # id is first column
+            
+            # Get next availability block
+            now = datetime.now()
+            cursor.execute("""
+                SELECT start_time, end_time FROM appliance_availability 
+                WHERE appliance_id = ? AND start_time <= ? AND end_time > ?
+                ORDER BY start_time LIMIT 1
+            """, (appliance_id, now, now))
+            
+            result = cursor.fetchone()
+            if result:
+                end_time = datetime.fromisoformat(result[1])  # end_time is second column
+                duration_minutes = int((end_time - now).total_seconds() / 60)
+                return {"duration_minutes": max(0, duration_minutes)}
+            else:
+                return {"duration_minutes": 0}
+    except Exception as e:
+        logger.error(f"Error getting appliance duration: {e}")
+        return {"error": "Internal server error"}
 
 # Database configuration
 DB_PATH = "gartan_availability.db"
@@ -116,7 +254,7 @@ def get_crew_duration(crew_id: int):
             else:
                 return jsonify({"error": "Internal server error"}), 500
 
-        return jsonify(result["duration"])
+        return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting crew {crew_id} duration: {e}")
         return jsonify({"error": "Internal server error"}), 500
@@ -158,7 +296,7 @@ def get_appliance_duration(appliance_name: str):
             else:
                 return jsonify({"error": "Internal server error"}), 500
 
-        return jsonify(result["duration"])
+        return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting appliance {appliance_name} duration: {e}")
         return jsonify({"error": "Internal server error"}), 500
