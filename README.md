@@ -267,3 +267,13 @@ See `DOCKER_README.md` for detailed production configuration.
 ## License
 
 Internal fire service use.
+
+## 🎯 CI/CD Pipeline Status: ACTIVE ✅
+
+Automated Docker Hub publishing is now live! Every push to main automatically: 
+
+- Runs comprehensive test suite (62 tests)
+- Builds and publishes to moohan/gartan_scraper_bot
+- Creates versioned releases and security scans
+
+Deploy anywhere with: `docker-compose up -d`
