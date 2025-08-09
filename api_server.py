@@ -103,6 +103,108 @@ def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
         return {"error": "Internal server error"}
 
 
+def get_week_boundaries() -> tuple[datetime, datetime]:
+    """Get start (Monday 00:00) and end (Sunday 23:59:59) of current week."""
+    now = datetime.now()
+    
+    # Get Monday of current week (weekday 0=Monday, 6=Sunday)
+    days_since_monday = now.weekday()
+    monday = now - timedelta(days=days_since_monday)
+    week_start = monday.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Get Sunday of current week
+    week_end = week_start + timedelta(days=6, hours=23, minutes=59, seconds=59)
+    
+    return week_start, week_end
+
+
+def get_crew_hours_this_week_data(crew_id: int) -> Dict[str, Any]:
+    """Get how many hours crew member has been available since Monday."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if crew exists
+            cursor.execute("SELECT name FROM crew WHERE id = ?", (crew_id,))
+            crew = cursor.fetchone()
+            if not crew:
+                return {"error": f"Crew ID {crew_id} not found"}
+            
+            week_start, _ = get_week_boundaries()
+            now = datetime.now()
+            
+            # Get all availability blocks from Monday to now
+            cursor.execute("""
+                SELECT start_time, end_time FROM crew_availability 
+                WHERE crew_id = ? AND end_time > ? AND start_time < ?
+                ORDER BY start_time
+            """, (crew_id, week_start, now))
+            
+            blocks = cursor.fetchall()
+            total_hours = 0.0
+            
+            for block in blocks:
+                block_start = datetime.fromisoformat(block[0])
+                block_end = datetime.fromisoformat(block[1])
+                
+                # Clamp block to week boundaries and current time
+                effective_start = max(block_start, week_start)
+                effective_end = min(block_end, now)
+                
+                # Only count if there's actual overlap
+                if effective_end > effective_start:
+                    duration = effective_end - effective_start
+                    total_hours += duration.total_seconds() / 3600
+            
+            return {"hours_this_week": round(total_hours, 2)}
+    except Exception as e:
+        logger.error(f"Error getting crew weekly hours: {e}")
+        return {"error": "Internal server error"}
+
+
+def get_crew_hours_planned_week_data(crew_id: int) -> Dict[str, Any]:
+    """Get total planned + actual availability hours for the current week."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if crew exists
+            cursor.execute("SELECT name FROM crew WHERE id = ?", (crew_id,))
+            crew = cursor.fetchone()
+            if not crew:
+                return {"error": f"Crew ID {crew_id} not found"}
+            
+            week_start, week_end = get_week_boundaries()
+            
+            # Get all availability blocks for the entire week
+            cursor.execute("""
+                SELECT start_time, end_time FROM crew_availability 
+                WHERE crew_id = ? AND end_time > ? AND start_time < ?
+                ORDER BY start_time
+            """, (crew_id, week_start, week_end))
+            
+            blocks = cursor.fetchall()
+            total_hours = 0.0
+            
+            for block in blocks:
+                block_start = datetime.fromisoformat(block[0])
+                block_end = datetime.fromisoformat(block[1])
+                
+                # Clamp block to week boundaries
+                effective_start = max(block_start, week_start)
+                effective_end = min(block_end, week_end)
+                
+                # Only count if there's actual overlap
+                if effective_end > effective_start:
+                    duration = effective_end - effective_start
+                    total_hours += duration.total_seconds() / 3600
+            
+            return {"hours_planned_week": round(total_hours, 2)}
+    except Exception as e:
+        logger.error(f"Error getting crew planned weekly hours: {e}")
+        return {"error": "Internal server error"}
+
+
 def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
     """Check if appliance is available right now."""
     try:
@@ -257,6 +359,42 @@ def get_crew_duration(crew_id: int):
         return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting crew {crew_id} duration: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/v1/crew/<int:crew_id>/hours-this-week", methods=["GET"])
+def get_crew_hours_this_week(crew_id: int):
+    """Get crew member's availability hours since Monday"""
+    try:
+        result = get_crew_hours_this_week_data(crew_id)
+
+        if "error" in result:
+            if "not found" in result["error"]:
+                return jsonify({"error": f"Crew ID {crew_id} not found"}), 404
+            else:
+                return jsonify({"error": "Internal server error"}), 500
+
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error getting crew {crew_id} weekly hours: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/v1/crew/<int:crew_id>/hours-planned-week", methods=["GET"])
+def get_crew_hours_planned_week(crew_id: int):
+    """Get crew member's total planned weekly availability hours"""
+    try:
+        result = get_crew_hours_planned_week_data(crew_id)
+
+        if "error" in result:
+            if "not found" in result["error"]:
+                return jsonify({"error": f"Crew ID {crew_id} not found"}), 404
+            else:
+                return jsonify({"error": "Internal server error"}), 500
+
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error getting crew {crew_id} planned weekly hours: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
 
