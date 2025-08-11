@@ -1,6 +1,11 @@
+import os
 from datetime import datetime as dt
 from datetime import timedelta
 
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+
+from connection_manager import get_session_manager
 from utils import log_debug
 
 
@@ -22,10 +27,8 @@ def fetch_and_cache_grid_html(
     """
     import os
     import random
-    import time
 
     cache_file = os.path.join(cache_dir, f"grid_{booking_date.replace('/', '-')}.html")
-    use_cache = False
     cache_exists = os.path.exists(cache_file)
     grid_html = None
 
@@ -152,8 +155,21 @@ def _fetch_and_write_cache(session, booking_date, cache_file):
     """Fetch grid HTML and write it to the cache file."""
     grid_html = fetch_grid_html_for_date(session, booking_date)
     if grid_html:
-        with open(cache_file, "w", encoding="utf-8") as f:
-            f.write(grid_html)
+        import os
+
+        cache_dir = os.path.dirname(cache_file) or "."
+        # Create cache directory if missing (CI environments may not have it yet)
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+        except OSError:
+            # If directory creation fails, skip writing (function still returns html)
+            log_debug("cache", f"Could not create cache dir {cache_dir}, continuing without cache write")
+        else:
+            try:
+                with open(cache_file, "w", encoding="utf-8") as f:
+                    f.write(grid_html)
+            except OSError as e:
+                log_debug("cache", f"Failed writing cache file {cache_file}: {e}")
     return grid_html
 
 
@@ -176,15 +192,7 @@ def _perform_delay(min_delay, max_delay, base):
         time.sleep(actual_delay)
 
 
-import os
-from datetime import datetime
-from typing import Optional
-
-import requests
-from bs4 import BeautifulSoup
-from dotenv import load_dotenv
-
-from connection_manager import get_session_manager
+# (removed duplicate imports; consolidated at top)
 
 # Load environment variables
 load_dotenv()
