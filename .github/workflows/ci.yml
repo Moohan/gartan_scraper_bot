@@ -68,7 +68,13 @@ jobs:
         run: |
           bandit -r . -f txt || true
       - name: Tests with coverage
+        env:
+          GARTAN_USERNAME: ${{ secrets.GARTAN_USERNAME }}
+          GARTAN_PASSWORD: ${{ secrets.GARTAN_PASSWORD }}
         run: |
+          if [ -z "${GARTAN_USERNAME}" ] || [ -z "${GARTAN_PASSWORD}" ]; then
+            echo "Warning: GARTAN_USERNAME / GARTAN_PASSWORD secrets not set. Tests that require credentials may fail." >&2
+          fi
           python -m pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
       - name: Upload coverage
         uses: codecov/codecov-action@v4

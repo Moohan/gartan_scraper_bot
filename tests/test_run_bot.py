@@ -5,6 +5,16 @@ import sys
 import pytest
 
 
+def _subprocess_env(extra=None):
+    env = os.environ.copy()
+    # Provide dummy credentials so run_bot does not assert
+    env.setdefault("GARTAN_USERNAME", "dummy_user")
+    env.setdefault("GARTAN_PASSWORD", "dummy_pass")
+    if extra:
+        env.update(extra)
+    return env
+
+
 def test_run_bot_cli(tmp_path):
     # Create a dummy crew_details.local
     crew_details = tmp_path / "crew_details.local"
@@ -16,6 +26,7 @@ def test_run_bot_cli(tmp_path):
         cwd=project_root,
         capture_output=True,
         text=True,
+        env=_subprocess_env(),
     )
     assert result.returncode == 0
     assert (
@@ -33,6 +44,7 @@ def test_run_bot_cli_cache_preferred(tmp_path):
         cwd=project_root,
         capture_output=True,
         text=True,
+        env=_subprocess_env(),
     )
     assert result.returncode == 0
     assert (
@@ -50,6 +62,7 @@ def test_run_bot_cli_cache_off(tmp_path):
         cwd=project_root,
         capture_output=True,
         text=True,
+        env=_subprocess_env(),
     )
     assert result.returncode == 0
     assert (
@@ -65,6 +78,7 @@ def test_run_bot_cli_missing_crew_details(tmp_path):
         cwd=project_root,
         capture_output=True,
         text=True,
+        env=_subprocess_env(),
     )
     # Should fallback to default/test crew details or print a warning
     assert result.returncode == 0
@@ -80,6 +94,7 @@ def test_run_bot_cli_invalid_args(tmp_path):
         cwd=project_root,
         capture_output=True,
         text=True,
+        env=_subprocess_env(),
     )
     assert (
         result.returncode != 0
