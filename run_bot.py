@@ -84,7 +84,9 @@ if __name__ == "__main__":
             parse_futures = []
             booking_dates = []
             while not all_statuses_determined and day_offset < effective_max_days:
-                booking_date = (start_date + timedelta(days=day_offset)).strftime("%d/%m/%Y")
+                booking_date = (start_date + timedelta(days=day_offset)).strftime(
+                    "%d/%m/%Y"
+                )
                 logger.info(
                     f"Processing day {day_offset+1}/{effective_max_days}: {booking_date}"
                 )
@@ -96,9 +98,13 @@ if __name__ == "__main__":
 
                 # Log cache strategy
                 if cache_minutes == -1:
-                    logger.debug(f"Using infinite cache for historic date: {booking_date}")
+                    logger.debug(
+                        f"Using infinite cache for historic date: {booking_date}"
+                    )
                 else:
-                    logger.debug(f"Cache duration for {booking_date}: {cache_minutes} minutes")
+                    logger.debug(
+                        f"Cache duration for {booking_date}: {cache_minutes} minutes"
+                    )
 
                 grid_html = fetch_and_cache_grid_html(
                     session,

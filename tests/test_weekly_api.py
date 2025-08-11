@@ -27,11 +27,12 @@ class TestWeeklyAPI:
     def temp_db(self):
         """Create temporary database for testing"""
         # Create temporary database file
-        fd, temp_path = tempfile.mkstemp(suffix='.db')
+        fd, temp_path = tempfile.mkstemp(suffix=".db")
         os.close(fd)
 
         # Store original DB_PATH
         import api_server
+
         original_path = api_server.DB_PATH
         api_server.DB_PATH = temp_path
 
@@ -40,14 +41,17 @@ class TestWeeklyAPI:
         cursor = conn.cursor()
 
         # Create tables
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE crew (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE crew_availability (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 crew_id INTEGER NOT NULL,
@@ -55,7 +59,8 @@ class TestWeeklyAPI:
                 end_time DATETIME NOT NULL,
                 FOREIGN KEY (crew_id) REFERENCES crew (id)
             )
-        """)
+        """
+        )
 
         # Insert test crew
         cursor.execute("INSERT INTO crew (id, name) VALUES (1, 'TEST CREW')")
@@ -124,10 +129,13 @@ class TestWeeklyAPI:
         tuesday_10 = week_start + timedelta(days=1, hours=10)  # Tuesday 10:00
         wednesday_14 = week_start + timedelta(days=2, hours=14)  # Wednesday 14:00
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO crew_availability (crew_id, start_time, end_time)
             VALUES (1, ?, ?)
-        """, (tuesday_10.isoformat(), wednesday_14.isoformat()))
+        """,
+            (tuesday_10.isoformat(), wednesday_14.isoformat()),
+        )
 
         conn.commit()
         conn.close()
@@ -162,10 +170,13 @@ class TestWeeklyAPI:
         prev_sunday = week_start - timedelta(days=1)
         next_tuesday = week_end + timedelta(days=2)
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO crew_availability (crew_id, start_time, end_time)
             VALUES (1, ?, ?)
-        """, (prev_sunday.isoformat(), next_tuesday.isoformat()))
+        """,
+            (prev_sunday.isoformat(), next_tuesday.isoformat()),
+        )
 
         conn.commit()
         conn.close()
@@ -193,15 +204,21 @@ class TestWeeklyAPI:
         wednesday_9 = week_start + timedelta(days=2, hours=9)
         wednesday_21 = week_start + timedelta(days=2, hours=21)
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO crew_availability (crew_id, start_time, end_time)
             VALUES (1, ?, ?)
-        """, (monday_8.isoformat(), monday_20.isoformat()))
+        """,
+            (monday_8.isoformat(), monday_20.isoformat()),
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO crew_availability (crew_id, start_time, end_time)
             VALUES (1, ?, ?)
-        """, (wednesday_9.isoformat(), wednesday_21.isoformat()))
+        """,
+            (wednesday_9.isoformat(), wednesday_21.isoformat()),
+        )
 
         conn.commit()
         conn.close()
@@ -222,10 +239,13 @@ class TestWeeklyAPI:
         start_time = week_start + timedelta(hours=10)
         end_time = start_time + timedelta(minutes=90)
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO crew_availability (crew_id, start_time, end_time)
             VALUES (1, ?, ?)
-        """, (start_time.isoformat(), end_time.isoformat()))
+        """,
+            (start_time.isoformat(), end_time.isoformat()),
+        )
 
         conn.commit()
         conn.close()

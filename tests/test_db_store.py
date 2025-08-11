@@ -200,5 +200,6 @@ def test_insert_appliance_availability():
     finally:
         conn.close()
         import time
+
         time.sleep(0.1)  # Ensure file is closed before delete
         os.remove(db_path)
