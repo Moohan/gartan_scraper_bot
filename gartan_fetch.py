@@ -193,8 +193,15 @@ LOGIN_URL = (
     "https://grampianrds.firescotland.gov.uk/GartanAvailability/Account/Login.aspx"
 )
 DATA_URL = "https://grampianrds.firescotland.gov.uk/GartanAvailability/Availability/Schedule/AvailabilityMain1.aspx?UseDefaultStation=1"
-USERNAME = os.environ.get("GARTAN_USERNAME")
-PASSWORD = os.environ.get("GARTAN_PASSWORD")
+ 
+
+def _get_credentials():
+    """Fetch credentials at call time so tests can monkeypatch environment.
+
+    Returns (username, password) tuple. Does not cache to allow dynamic override.
+    """
+    return os.environ.get("GARTAN_USERNAME"), os.environ.get("GARTAN_PASSWORD")
+
 
 # Session cache for authenticated sessions
 _authenticated_session = None
@@ -211,9 +218,10 @@ def gartan_login_and_get_session():
     global _authenticated_session, _session_authenticated_time
     import time
 
+    username, password = _get_credentials()
     assert (
-        USERNAME and PASSWORD
-    ), "GARTAN_USERNAME and GARTAN_PASSWORD must be set in .env"
+        username and password
+    ), "GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment (not committed)"
 
     current_time = time.time()
 
@@ -240,7 +248,7 @@ def gartan_login_and_get_session():
 
     form, resp = _get_login_form(session)
     post_url = _get_login_post_url(form)
-    payload = _build_login_payload(form, USERNAME, PASSWORD)
+    payload = _build_login_payload(form, username, password)
     headers = _get_login_headers()
     _post_login(session, post_url, payload, headers)
     _get_data_page(session, headers)

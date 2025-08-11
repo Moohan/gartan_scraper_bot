@@ -1,9 +1,11 @@
+import importlib
 import os
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from gartan_fetch import fetch_and_cache_grid_html, gartan_login_and_get_session
+import gartan_fetch
+from gartan_fetch import fetch_and_cache_grid_html
 
 
 def test_gartan_login_and_get_session(monkeypatch):
@@ -23,7 +25,9 @@ def test_gartan_login_and_get_session(monkeypatch):
     monkeypatch.setattr("requests.Session", lambda: DummySession())
     monkeypatch.setenv("GARTAN_USERNAME", "user")
     monkeypatch.setenv("GARTAN_PASSWORD", "pass")
-    session = gartan_login_and_get_session()
+    # Reload module to ensure it sees monkeypatched env (credentials fetched dynamically)
+    importlib.reload(gartan_fetch)
+    session = gartan_fetch.gartan_login_and_get_session()
     assert session is not None
 
 
@@ -45,7 +49,8 @@ def test_gartan_login_failure(monkeypatch):
     monkeypatch.setenv("GARTAN_USERNAME", "baduser")
     monkeypatch.setenv("GARTAN_PASSWORD", "badpass")
     try:
-        gartan_login_and_get_session()
+        importlib.reload(gartan_fetch)
+        gartan_fetch.gartan_login_and_get_session()
     except Exception as e:
         assert "Failed to retrieve data page" in str(e)
 
