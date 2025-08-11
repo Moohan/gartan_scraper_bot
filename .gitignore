@@ -7,3 +7,5 @@ gartan_debug.log
 crew_details.local
 gartan_availability.db
 tests/__pycache__/*
+.coverage
+examples/

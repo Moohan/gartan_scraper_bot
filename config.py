@@ -5,7 +5,7 @@ import os
 
 class Config:
     """Configuration class with attribute access."""
-    
+
     def __init__(self):
         self.log_level = 'DEBUG'
         self.db_path = 'gartan_availability.db'
@@ -16,14 +16,14 @@ class Config:
         self.log_file = 'gartan_debug.log'
         self.max_log_size = 10 * 1024 * 1024  # 10MB
         self.max_workers = 4  # For concurrent processing
-    
+
     def get_cache_minutes(self, day_offset: int) -> int:
         """
         Get cache expiry minutes based on day offset from today.
-        
+
         Args:
             day_offset: Days relative to today (negative = historic, 0 = today, positive = future)
-            
+
         Returns:
             Cache expiry minutes (or -1 for infinite cache for historic data)
         """

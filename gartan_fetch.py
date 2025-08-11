@@ -118,21 +118,21 @@ def fetch_and_cache_grid_html(
 def _is_cache_valid(cache_file: str, cache_minutes: int) -> bool:
     """
     Check if the cache file exists and is not expired.
-    
+
     Args:
         cache_file: Path to cache file
         cache_minutes: Cache expiry in minutes (-1 = infinite cache for historic data)
-        
+
     Returns:
         True if cache is valid and should be used
     """
     if not os.path.exists(cache_file):
         return False
-    
+
     # Historic data with infinite cache
     if cache_minutes == -1:
         return True
-    
+
     # Time-based cache expiry for current/future data
     mtime = os.path.getmtime(cache_file)
     if (dt.now() - dt.fromtimestamp(mtime)).total_seconds() / 60 < cache_minutes:
@@ -200,20 +200,20 @@ def gartan_login_and_get_session():
     """
     global _authenticated_session, _session_authenticated_time
     import time
-    
+
     assert (
         USERNAME and PASSWORD
     ), "GARTAN_USERNAME and GARTAN_PASSWORD must be set in .env"
-    
+
     current_time = time.time()
-    
+
     # Check if we have a valid cached session
-    if (_authenticated_session is not None and 
+    if (_authenticated_session is not None and
         _session_authenticated_time is not None and
         (current_time - _session_authenticated_time) < _session_timeout):
         log_debug("session", "Reusing existing authenticated session")
         return _authenticated_session
-    
+
     # Create new authenticated session
     try:
         session_manager = get_session_manager()
@@ -222,20 +222,20 @@ def gartan_login_and_get_session():
         # Fallback to basic session for testing compatibility
         import requests
         session = requests.Session()
-    
+
     log_debug("session", "Creating new authenticated session")
-    
+
     form, resp = _get_login_form(session)
     post_url = _get_login_post_url(form)
     payload = _build_login_payload(form, USERNAME, PASSWORD)
     headers = _get_login_headers()
     _post_login(session, post_url, payload, headers)
     _get_data_page(session, headers)
-    
+
     # Cache the authenticated session
     _authenticated_session = session
     _session_authenticated_time = current_time
-    
+
     return session
 
 
