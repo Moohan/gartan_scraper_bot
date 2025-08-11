@@ -193,7 +193,7 @@ LOGIN_URL = (
     "https://grampianrds.firescotland.gov.uk/GartanAvailability/Account/Login.aspx"
 )
 DATA_URL = "https://grampianrds.firescotland.gov.uk/GartanAvailability/Availability/Schedule/AvailabilityMain1.aspx?UseDefaultStation=1"
- 
+
 
 def _get_credentials():
     """Fetch credentials at call time so tests can monkeypatch environment.
