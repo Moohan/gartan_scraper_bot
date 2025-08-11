@@ -19,9 +19,23 @@ python -m py_compile *.py || {
     exit 1
 }
 
-# Run core tests
+# Auto-format with Black & isort (only changed/staged files to speed up)
+echo "🧹 Auto-formatting (black & isort)..."
+if command -v black >/dev/null 2>&1; then
+    black . >/dev/null 2>&1 || true
+fi
+if command -v isort >/dev/null 2>&1; then
+    isort . >/dev/null 2>&1 || true
+fi
+
+# Re-stage any formatting changes
+if [ -n "$(git diff --name-only --diff-filter=ACM)" ]; then
+    git add .
+fi
+
+# Run core tests (fast feedback)
 echo "🧪 Running core tests..."
-python -m pytest tests/ -v --tb=short || {
+python -m pytest tests/ -q || {
     echo "❌ Tests failed"
     exit 1
 }

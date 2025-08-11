@@ -1,4 +1,6 @@
-from datetime import datetime as dt, timedelta
+from datetime import datetime as dt
+from datetime import timedelta
+
 from utils import log_debug
 
 
@@ -18,7 +20,9 @@ def fetch_and_cache_grid_html(
     Returns grid_html (str or None).
     cache_mode: None (default), 'no-cache', 'cache-first', 'cache-only'
     """
-    import os, time, random
+    import os
+    import random
+    import time
 
     cache_file = os.path.join(cache_dir, f"grid_{booking_date.replace('/', '-')}.html")
     use_cache = False
@@ -151,7 +155,8 @@ def _fetch_and_write_cache(session, booking_date, cache_file):
 
 def _perform_delay(min_delay, max_delay, base):
     """Perform a randomized delay between fetches."""
-    import time, random
+    import random
+    import time
 
     delay = min(max_delay, min_delay * (base ** max(0, 0)))
     actual_delay = random.uniform(min_delay, delay)
@@ -168,13 +173,14 @@ def _perform_delay(min_delay, max_delay, base):
 
 
 import os
+from datetime import datetime
+from typing import Optional
+
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from datetime import datetime
-from connection_manager import get_session_manager
-from typing import Optional
 
+from connection_manager import get_session_manager
 
 # Load environment variables
 load_dotenv()

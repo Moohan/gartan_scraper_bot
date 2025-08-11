@@ -1,9 +1,11 @@
-import os
-import pytest
-import tempfile
 import logging
-from utils import log_debug, delay
+import os
+import tempfile
+
+import pytest
+
 from logging_config import setup_logging
+from utils import delay, log_debug
 
 
 def test_log_debug_creates_log_entry(tmp_path):

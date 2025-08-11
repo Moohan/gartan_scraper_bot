@@ -1,8 +1,9 @@
 import pytest
+
 from parse_grid import (
-    parse_grid_html,
-    aggregate_crew_availability,
     aggregate_appliance_availability,
+    aggregate_crew_availability,
+    parse_grid_html,
 )
 
 VALID_GRID_HTML = """

@@ -9,8 +9,8 @@ from datetime import datetime, timedelta
 import pytest
 
 sys.path.insert(0, ".")
-from gartan_fetch import _is_cache_valid  # noqa: E402
 from config import config  # noqa: E402
+from gartan_fetch import _is_cache_valid  # noqa: E402
 
 
 class TestInfiniteCache:

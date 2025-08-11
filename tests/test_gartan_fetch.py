@@ -1,7 +1,9 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from gartan_fetch import fetch_and_cache_grid_html, gartan_login_and_get_session
 import os
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from gartan_fetch import fetch_and_cache_grid_html, gartan_login_and_get_session
 
 
 def test_gartan_login_and_get_session(monkeypatch):

@@ -5,12 +5,14 @@ Production Flask API Server for Gartan Availability System
 Serves REST API endpoints for crew and appliance availability data
 """
 
-from flask import Flask, jsonify, request
-import sqlite3
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any
 import os
+import sqlite3
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
+from flask import Flask, jsonify, request
+
 from config import config
 
 # Configure logging

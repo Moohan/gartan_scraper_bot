@@ -3,6 +3,7 @@
 import sqlite3
 from contextlib import contextmanager
 from typing import Generator
+
 import requests
 
 DB_PATH = "gartan_availability.db"

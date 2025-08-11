@@ -1,7 +1,8 @@
-import pytest
+import os
 import subprocess
 import sys
-import os
+
+import pytest
 
 
 def test_run_bot_cli(tmp_path):

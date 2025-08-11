@@ -1,10 +1,12 @@
 import os
+
 import pytest
+
 from db_store import (
     init_db,
-    insert_crew_details,
-    insert_crew_availability,
     insert_appliance_availability,
+    insert_crew_availability,
+    insert_crew_details,
 )
 
 

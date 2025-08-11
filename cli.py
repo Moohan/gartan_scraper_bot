@@ -3,6 +3,7 @@
 import argparse
 from typing import Optional
 
+
 class CliArgs:
     """Simple CLI arguments container."""
     def __init__(self):
