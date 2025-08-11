@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import concurrent.futures
 import re
 
-from utils import log_debug
+from utils import log_debug, get_week_aligned_date_range
 from gartan_fetch import (
     gartan_login_and_get_session,
     fetch_grid_html_for_date,
@@ -58,6 +58,9 @@ if __name__ == "__main__":
     today = datetime.now()
     session = gartan_login_and_get_session()
 
+    # Calculate week-aligned date range for weekly availability tracking
+    start_date, effective_max_days = get_week_aligned_date_range(args.max_days)
+
     # Clean up old cache files if not using cache
     if args.cache_mode is None:
         cleanup_old_cache_files(config.cache_dir, today)
@@ -68,7 +71,7 @@ if __name__ == "__main__":
     crew_list_agg: List[Dict[str, Any]] = []
     daily_appliance_lists: List[Dict[str, Any]] = []
 
-    logger.info(f"Fetching up to {args.max_days} days of availability...")
+    logger.info(f"Fetching {effective_max_days} days of availability (week-aligned)...")
     start_time = time.time()
 
     db_conn = init_db()
@@ -78,14 +81,22 @@ if __name__ == "__main__":
         ) as executor:
             parse_futures = []
             booking_dates = []
-            while not all_statuses_determined and day_offset < args.max_days:
-                booking_date = (today + timedelta(days=day_offset)).strftime("%d/%m/%Y")
+            while not all_statuses_determined and day_offset < effective_max_days:
+                booking_date = (start_date + timedelta(days=day_offset)).strftime("%d/%m/%Y")
                 logger.info(
-                    f"Processing day {day_offset+1}/{args.max_days}: {booking_date}"
+                    f"Processing day {day_offset+1}/{effective_max_days}: {booking_date}"
                 )
 
-                # Get cache minutes from config
-                cache_minutes = config.get_cache_minutes(day_offset)
+                # Get cache minutes from config based on actual date
+                current_date = start_date + timedelta(days=day_offset)
+                days_from_today = (current_date.date() - today.date()).days
+                cache_minutes = config.get_cache_minutes(days_from_today)
+                
+                # Log cache strategy
+                if cache_minutes == -1:
+                    logger.debug(f"Using infinite cache for historic date: {booking_date}")
+                else:
+                    logger.debug(f"Cache duration for {booking_date}: {cache_minutes} minutes")
 
                 grid_html = fetch_and_cache_grid_html(
                     session,
@@ -111,9 +122,9 @@ if __name__ == "__main__":
                 # Calculate and display progress
                 elapsed = time.time() - start_time
                 avg_per_day = elapsed / (day_offset + 1)
-                eta = avg_per_day * (args.max_days - (day_offset + 1))
+                eta = avg_per_day * (effective_max_days - (day_offset + 1))
                 logger.info(
-                    f"Progress: {day_offset+1}/{args.max_days} days | ETA: {int(eta)}s"
+                    f"Progress: {day_offset+1}/{effective_max_days} days | ETA: {int(eta)}s"
                 )
                 day_offset += 1
 
@@ -210,7 +221,7 @@ if __name__ == "__main__":
             )
         elif undetermined:
             logger.warning(
-                f"Could not get all upcoming availability after searching {args.max_days} days "
+                f"Could not get all upcoming availability after searching {effective_max_days} days "
                 f"for crew members: {', '.join(undetermined)}"
             )
         elif got_72h:

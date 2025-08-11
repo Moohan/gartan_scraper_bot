@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 import os
+from config import config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # Database path
-DB_PATH = "gartan_availability.db"
+DB_PATH = config.db_path
 
 
 def get_db_connection():
@@ -48,56 +49,68 @@ def get_crew_available_data(crew_id: int) -> Dict[str, Any]:
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Check if crew exists
             cursor.execute("SELECT name FROM crew WHERE id = ?", (crew_id,))
             crew = cursor.fetchone()
             if not crew:
                 return {"error": f"Crew ID {crew_id} not found"}
-            
+
             # Check current availability
             now = datetime.now()
             cursor.execute("""
-                SELECT COUNT(*) as count FROM crew_availability 
+                SELECT COUNT(*) as count FROM crew_availability
                 WHERE crew_id = ? AND start_time <= ? AND end_time > ?
             """, (crew_id, now, now))
-            
+
             result = cursor.fetchone()
             is_available = result["count"] > 0
-            
+
             return {"available": is_available}
     except Exception as e:
         logger.error(f"Error checking crew availability: {e}")
         return {"error": "Internal server error"}
 
 
+def _format_duration_minutes_to_hours_string(minutes: int | None) -> Optional[str]:
+    """Convert duration in minutes to spec hours string (e.g. 59.25h) or None."""
+    if minutes is None:
+        return None
+    if minutes <= 0:
+        return None
+    hours = minutes / 60.0
+    # Keep up to 2 decimal places without trailing zeros
+    formatted = f"{hours:.2f}".rstrip("0").rstrip(".")
+    return f"{formatted}h"
+
+
 def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
-    """Get how long crew member is available for."""
+    """Get how long crew member is available for (string hours or null)."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Check if crew exists
             cursor.execute("SELECT name FROM crew WHERE id = ?", (crew_id,))
             crew = cursor.fetchone()
             if not crew:
                 return {"error": f"Crew ID {crew_id} not found"}
-            
+
             # Get next availability block
             now = datetime.now()
             cursor.execute("""
-                SELECT start_time, end_time FROM crew_availability 
+                SELECT start_time, end_time FROM crew_availability
                 WHERE crew_id = ? AND start_time <= ? AND end_time > ?
                 ORDER BY start_time LIMIT 1
             """, (crew_id, now, now))
-            
+
             result = cursor.fetchone()
             if result:
-                end_time = datetime.fromisoformat(result[1])  # end_time is second column
+                end_time = datetime.fromisoformat(result[1])
                 duration_minutes = int((end_time - now).total_seconds() / 60)
-                return {"duration_minutes": max(0, duration_minutes)}
+                return {"duration": _format_duration_minutes_to_hours_string(max(0, duration_minutes))}
             else:
-                return {"duration_minutes": 0}
+                return {"duration": None}
     except Exception as e:
         logger.error(f"Error getting crew duration: {e}")
         return {"error": "Internal server error"}
@@ -106,15 +119,15 @@ def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
 def get_week_boundaries() -> tuple[datetime, datetime]:
     """Get start (Monday 00:00) and end (Sunday 23:59:59) of current week."""
     now = datetime.now()
-    
+
     # Get Monday of current week (weekday 0=Monday, 6=Sunday)
     days_since_monday = now.weekday()
     monday = now - timedelta(days=days_since_monday)
     week_start = monday.replace(hour=0, minute=0, second=0, microsecond=0)
-    
+
     # Get Sunday of current week
     week_end = week_start + timedelta(days=6, hours=23, minutes=59, seconds=59)
-    
+
     return week_start, week_end
 
 
@@ -123,39 +136,39 @@ def get_crew_hours_this_week_data(crew_id: int) -> Dict[str, Any]:
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Check if crew exists
             cursor.execute("SELECT name FROM crew WHERE id = ?", (crew_id,))
             crew = cursor.fetchone()
             if not crew:
                 return {"error": f"Crew ID {crew_id} not found"}
-            
+
             week_start, _ = get_week_boundaries()
             now = datetime.now()
-            
+
             # Get all availability blocks from Monday to now
             cursor.execute("""
-                SELECT start_time, end_time FROM crew_availability 
+                SELECT start_time, end_time FROM crew_availability
                 WHERE crew_id = ? AND end_time > ? AND start_time < ?
                 ORDER BY start_time
             """, (crew_id, week_start, now))
-            
+
             blocks = cursor.fetchall()
             total_hours = 0.0
-            
+
             for block in blocks:
                 block_start = datetime.fromisoformat(block[0])
                 block_end = datetime.fromisoformat(block[1])
-                
+
                 # Clamp block to week boundaries and current time
                 effective_start = max(block_start, week_start)
                 effective_end = min(block_end, now)
-                
+
                 # Only count if there's actual overlap
                 if effective_end > effective_start:
                     duration = effective_end - effective_start
                     total_hours += duration.total_seconds() / 3600
-            
+
             return {"hours_this_week": round(total_hours, 2)}
     except Exception as e:
         logger.error(f"Error getting crew weekly hours: {e}")
@@ -167,38 +180,38 @@ def get_crew_hours_planned_week_data(crew_id: int) -> Dict[str, Any]:
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Check if crew exists
             cursor.execute("SELECT name FROM crew WHERE id = ?", (crew_id,))
             crew = cursor.fetchone()
             if not crew:
                 return {"error": f"Crew ID {crew_id} not found"}
-            
+
             week_start, week_end = get_week_boundaries()
-            
+
             # Get all availability blocks for the entire week
             cursor.execute("""
-                SELECT start_time, end_time FROM crew_availability 
+                SELECT start_time, end_time FROM crew_availability
                 WHERE crew_id = ? AND end_time > ? AND start_time < ?
                 ORDER BY start_time
             """, (crew_id, week_start, week_end))
-            
+
             blocks = cursor.fetchall()
             total_hours = 0.0
-            
+
             for block in blocks:
                 block_start = datetime.fromisoformat(block[0])
                 block_end = datetime.fromisoformat(block[1])
-                
+
                 # Clamp block to week boundaries
                 effective_start = max(block_start, week_start)
                 effective_end = min(block_end, week_end)
-                
+
                 # Only count if there's actual overlap
                 if effective_end > effective_start:
                     duration = effective_end - effective_start
                     total_hours += duration.total_seconds() / 3600
-            
+
             return {"hours_planned_week": round(total_hours, 2)}
     except Exception as e:
         logger.error(f"Error getting crew planned weekly hours: {e}")
@@ -210,25 +223,25 @@ def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Check if appliance exists
             cursor.execute("SELECT id FROM appliance WHERE name = ?", (appliance_name,))
             appliance = cursor.fetchone()
             if not appliance:
                 return {"error": f"Appliance {appliance_name} not found"}
-            
+
             appliance_id = appliance[0]  # id is first column
-            
+
             # Check current availability
             now = datetime.now()
             cursor.execute("""
-                SELECT COUNT(*) as count FROM appliance_availability 
+                SELECT COUNT(*) as count FROM appliance_availability
                 WHERE appliance_id = ? AND start_time <= ? AND end_time > ?
             """, (appliance_id, now, now))
-            
+
             result = cursor.fetchone()
             is_available = result[0] > 0  # count is first column
-            
+
             return {"available": is_available}
     except Exception as e:
         logger.error(f"Error checking appliance availability: {e}")
@@ -236,34 +249,34 @@ def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
 
 
 def get_appliance_duration_data(appliance_name: str) -> Dict[str, Any]:
-    """Get how long appliance is available for."""
+    """Get how long appliance is available for (string hours or null)."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Check if appliance exists
             cursor.execute("SELECT id FROM appliance WHERE name = ?", (appliance_name,))
             appliance = cursor.fetchone()
             if not appliance:
                 return {"error": f"Appliance {appliance_name} not found"}
-            
+
             appliance_id = appliance[0]  # id is first column
-            
+
             # Get next availability block
             now = datetime.now()
             cursor.execute("""
-                SELECT start_time, end_time FROM appliance_availability 
+                SELECT start_time, end_time FROM appliance_availability
                 WHERE appliance_id = ? AND start_time <= ? AND end_time > ?
                 ORDER BY start_time LIMIT 1
             """, (appliance_id, now, now))
-            
+
             result = cursor.fetchone()
             if result:
-                end_time = datetime.fromisoformat(result[1])  # end_time is second column
+                end_time = datetime.fromisoformat(result[1])
                 duration_minutes = int((end_time - now).total_seconds() / 60)
-                return {"duration_minutes": max(0, duration_minutes)}
+                return {"duration": _format_duration_minutes_to_hours_string(max(0, duration_minutes))}
             else:
-                return {"duration_minutes": 0}
+                return {"duration": None}
     except Exception as e:
         logger.error(f"Error getting appliance duration: {e}")
         return {"error": "Internal server error"}
@@ -355,8 +368,8 @@ def get_crew_duration(crew_id: int):
                 return jsonify({"error": f"Crew ID {crew_id} not found"}), 404
             else:
                 return jsonify({"error": "Internal server error"}), 500
-
-        return jsonify(result)
+        # Return string hours or null directly
+        return jsonify(result.get("duration"))
     except Exception as e:
         logger.error(f"Error getting crew {crew_id} duration: {e}")
         return jsonify({"error": "Internal server error"}), 500
@@ -373,7 +386,6 @@ def get_crew_hours_this_week(crew_id: int):
                 return jsonify({"error": f"Crew ID {crew_id} not found"}), 404
             else:
                 return jsonify({"error": "Internal server error"}), 500
-
         return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting crew {crew_id} weekly hours: {e}")
@@ -391,7 +403,6 @@ def get_crew_hours_planned_week(crew_id: int):
                 return jsonify({"error": f"Crew ID {crew_id} not found"}), 404
             else:
                 return jsonify({"error": "Internal server error"}), 500
-
         return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting crew {crew_id} planned weekly hours: {e}")
@@ -412,7 +423,6 @@ def get_appliance_available(appliance_name: str):
                 )
             else:
                 return jsonify({"error": "Internal server error"}), 500
-
         return jsonify(result["available"])
     except Exception as e:
         logger.error(f"Error checking appliance {appliance_name} availability: {e}")
@@ -433,8 +443,7 @@ def get_appliance_duration(appliance_name: str):
                 )
             else:
                 return jsonify({"error": "Internal server error"}), 500
-
-        return jsonify(result)
+        return jsonify(result.get("duration"))
     except Exception as e:
         logger.error(f"Error getting appliance {appliance_name} duration: {e}")
         return jsonify({"error": "Internal server error"}), 500

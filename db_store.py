@@ -17,9 +17,9 @@ CREATE TABLE IF NOT EXISTS appliance (
 import sqlite3
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
-from connection_manager import get_database_pool
+from config import config
 
-DB_PATH = "gartan_availability.db"
+DB_PATH = config.db_path
 
 CREW_TABLE = """
 CREATE TABLE IF NOT EXISTS crew_availability (
@@ -42,20 +42,32 @@ CREATE TABLE IF NOT EXISTS appliance_availability (
 """
 
 
-def init_db(db_path=DB_PATH):
-    """Initializes the database, dropping existing tables to ensure a fresh start."""
+def init_db(db_path: str = DB_PATH, reset: bool = False):
+    """Initialise the database schema.
+
+    If reset=True the existing tables are dropped (legacy behaviour).
+    Otherwise tables are created if they do not already exist and existing
+    data is preserved to allow historical accumulation across scraper runs.
+    """
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    # Drop tables to ensure a clean slate on each run
-    c.execute("DROP TABLE IF EXISTS crew_availability")
-    c.execute("DROP TABLE IF EXISTS appliance_availability")
-    c.execute("DROP TABLE IF EXISTS crew")
-    c.execute("DROP TABLE IF EXISTS appliance")
-    # Create tables
+    if reset:
+        c.execute("DROP TABLE IF EXISTS crew_availability")
+        c.execute("DROP TABLE IF EXISTS appliance_availability")
+        c.execute("DROP TABLE IF EXISTS crew")
+        c.execute("DROP TABLE IF EXISTS appliance")
+    # (Re)create tables if missing
     c.execute(CREW_DETAILS_TABLE)
     c.execute(APPLIANCE_META_TABLE)
     c.execute(CREW_TABLE)
     c.execute(APPLIANCE_TABLE)
+    # Idempotent indexes to prevent duplicate block inserts
+    c.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_crew_block ON crew_availability(crew_id,start_time,end_time)"
+    )
+    c.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_appliance_block ON appliance_availability(appliance_id,start_time,end_time)"
+    )
     conn.commit()
     return conn
 
@@ -123,25 +135,21 @@ def insert_crew_details(
     """
     Insert or update crew details (name, role, contact) into crew table.
     Uses optimized batch operations and connection pooling.
-    
+
     crew_list: list of dicts with 'name' and 'role' keys
     contact_map: dict mapping name to contact info
     db_conn: an existing database connection to use (connection object, not path)
     """
     if db_conn is not None:
-        # Use provided connection
         conn = db_conn
         should_close = False
     else:
-        # Use connection pool for better performance
-        db_pool = get_database_pool(DB_PATH)
-        pool_context = db_pool.get_connection()
-        conn = pool_context.__enter__()
+        conn = sqlite3.connect(DB_PATH)
         should_close = True
-    
+
     try:
         c = conn.cursor()
-        
+
         # Prepare batch data for efficient bulk insert
         crew_data = []
         for crew in crew_list:
@@ -152,7 +160,7 @@ def insert_crew_details(
             if contact_map and name in contact_map:
                 contact = contact_map[name]
             crew_data.append((name, role, contact, skills))
-        
+
         # Use executemany for batch operations
         c.executemany(
             """
@@ -162,11 +170,10 @@ def insert_crew_details(
             crew_data
         )
         conn.commit()
-        
+
     finally:
         if should_close:
-            if db_conn is None:  # Only exit context if we created it
-                pool_context.__exit__(None, None, None)
+            conn.close()
 
 
 def insert_crew_availability(
@@ -177,17 +184,12 @@ def insert_crew_availability(
     Uses optimized batch operations and connection pooling.
     """
     if db_conn is not None:
-        # Use provided connection
         conn = db_conn
         should_close = False
-        pool_context = None
     else:
-        # Use connection pool for better performance
-        db_pool = get_database_pool(DB_PATH)
-        pool_context = db_pool.get_connection()
-        conn = pool_context.__enter__()
+        conn = sqlite3.connect(DB_PATH)
         should_close = True
-    
+
     try:
         c = conn.cursor()
         from logging_config import get_logger
@@ -196,7 +198,7 @@ def insert_crew_availability(
 
         # Batch data preparation
         crew_availability_data = []
-        
+
         for crew in crew_list:
             name = crew["name"]
             logger.debug(f"Processing crew member: {name}")
@@ -218,8 +220,8 @@ def insert_crew_availability(
                     f"Inserting block for {name}: {block['start_time']} -> {block['end_time']}"
                 )
                 crew_availability_data.append((
-                    crew_id, 
-                    block["start_time"], 
+                    crew_id,
+                    block["start_time"],
                     block["end_time"]
                 ))
 
@@ -227,30 +229,30 @@ def insert_crew_availability(
         if crew_availability_data:
             c.executemany(
                 """
-                INSERT INTO crew_availability (crew_id, start_time, end_time)
+                INSERT OR IGNORE INTO crew_availability (crew_id, start_time, end_time)
                 VALUES (?, ?, ?)
                 """,
-                crew_availability_data
+                crew_availability_data,
             )
             logger.debug(f"[ok] Saved crew availability for {len(crew_list)} crew members to {DB_PATH}")
 
         conn.commit()
-        
+
     finally:
-        if should_close and pool_context:
-            pool_context.__exit__(None, None, None)
+        if should_close:
+            conn.close()
 
 
 def insert_appliance_availability(
     appliance_obj: Dict[str, Any], db_conn: sqlite3.Connection = None
 ):
-    """Converts appliance availability slots into blocks and inserts them into the database."""
-    if db_conn is None:
-        conn = sqlite3.connect(DB_PATH)
-        should_close = True
-    else:
+    """Convert appliance slot availability into blocks and insert non-duplicates."""
+    if db_conn is not None:
         conn = db_conn
         should_close = False
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        should_close = True
     c = conn.cursor()
     try:
         for appliance, info in appliance_obj.items():
@@ -260,13 +262,11 @@ def insert_appliance_availability(
             if not row:
                 continue
             appliance_id = row[0]
-
             availability_blocks = _convert_slots_to_blocks(info["availability"])
-
             for block in availability_blocks:
                 c.execute(
                     """
-                    INSERT INTO appliance_availability (appliance_id, start_time, end_time)
+                    INSERT OR IGNORE INTO appliance_availability (appliance_id, start_time, end_time)
                     VALUES (?, ?, ?)
                     """,
                     (appliance_id, block["start_time"], block["end_time"]),

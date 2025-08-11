@@ -38,7 +38,8 @@ def create_argument_parser() -> argparse.ArgumentParser:
         "--max-days",
         type=int,
         default=3,
-        help="Maximum days to scrape (default: 3)"
+        help="Days to fetch forward from today (default: 3). "
+             "Note: Always starts from Monday of current week for weekly availability tracking."
     )
     
     # Cache mode options
