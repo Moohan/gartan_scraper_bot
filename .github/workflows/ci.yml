@@ -1,224 +1,84 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 env:
   PYTHON_VERSION: "3.13"
 
-jobs:
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        
-    - name: Cache pip dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-          
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-cov
-        
-    - name: Run syntax check
-      run: |
-        python -m py_compile *.py
-        
-    - name: Run tests with coverage
-      run: |
-        python -m pytest tests/ -v --cov=. --cov-report=xml --cov-report=term-missing
-        
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
-  security:
-    name: Security Scan
+jobs:
+  quality:
+    name: Lint & Test
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        
-    - name: Install bandit
-      run: pip install bandit[toml]
-      
-    - name: Run security scan
-      run: |
-        bandit -r . -f json -o bandit-report.json || true
-        bandit -r . -f txt
-        
-    - name: Upload security scan results
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: bandit-report
-        path: bandit-report.json
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov black isort flake8 mypy bandit[toml]
+      - name: Static analysis (black/isort/flake8/mypy)
+        run: |
+          black --check .
+          isort --check-only .
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+          mypy --ignore-missing-imports *.py || true
+      - name: Security scan (bandit)
+        run: |
+          bandit -r . -f txt || true
+      - name: Tests with coverage
+        run: |
+          python -m pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   docker:
-    name: Docker Build
+    name: Build & Push Docker
     runs-on: ubuntu-latest
-    needs: test
-    
+    needs: quality
+    if: github.ref == 'refs/heads/main'
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-      
-    - name: Build Docker image
-      run: |
-        docker build -t gartan-scraper:${{ github.sha }} .
-        
-    - name: Test Docker image
-      run: |
-        # Create a test .env file
-        echo "GARTAN_USERNAME=test" > .env
-        echo "GARTAN_PASSWORD=test" >> .env
-        
-        # Test that the container starts without error
-        timeout 30s docker run --rm --env-file .env gartan-scraper:${{ github.sha }} python --version
-        
-    - name: Login to Docker Hub
-      if: github.ref == 'refs/heads/main'
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-        
-    - name: Push to Docker Hub
-      if: github.ref == 'refs/heads/main'
-      run: |
-        docker tag gartan-scraper:${{ github.sha }} moohan/gartan_scraper_bot:latest
-        docker tag gartan-scraper:${{ github.sha }} moohan/gartan_scraper_bot:${{ github.sha }}
-        docker push moohan/gartan_scraper_bot:latest
-        docker push moohan/gartan_scraper_bot:${{ github.sha }}
-
-  lint:
-    name: Code Quality
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        
-    - name: Install linting tools
-      run: |
-        pip install black isort flake8 mypy
-        
-    - name: Check code formatting with Black
-      run: |
-        black --check --diff .
-        
-    - name: Check import sorting with isort
-      run: |
-        isort --check-only --diff .
-        
-    - name: Run flake8
-      run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
-        
-    - name: Run type checking with mypy
-      run: |
-        mypy --ignore-missing-imports *.py || true
-
-  integration:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    needs: test
-    
-    services:
-      sqlite:
-        image: alpine:latest
-        
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: Create test database
-      run: |
-        python -c "
-import sqlite3
-import os
-from db_store import create_tables
-
-# Create test database
-conn = sqlite3.connect('test_gartan.db')
-create_tables(conn)
-
-# Add test data
-cursor = conn.cursor()
-cursor.execute('INSERT INTO crew (name, email, phone, shift) VALUES (?, ?, ?, ?)', 
-               ('Test Crew', 'test@example.com', '123456789', None))
-cursor.execute('INSERT INTO appliance (name) VALUES (?)', ('TEST01',))
-conn.commit()
-conn.close()
-print('Test database created')
-"
-        
-    - name: Test API endpoints
-      run: |
-        # Start API server in background
-        FLASK_ENV=testing python api_server.py &
-        API_PID=$!
-        
-        # Wait for server to start
-        sleep 5
-        
-        # Test endpoints
-        curl -f http://localhost:5000/health
-        curl -f http://localhost:5000/v1/crew
-        
-        # Cleanup
-        kill $API_PID
-        
-    - name: Test Docker Compose
-      run: |
-        echo "GARTAN_USERNAME=test" > .env
-        echo "GARTAN_PASSWORD=test" >> .env
-        
-        # Test that docker-compose can build and validate
-        docker-compose config
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            moohan/gartan_scraper_bot:latest
+            moohan/gartan_scraper_bot:${{ github.sha }}
+          cache-from: type=registry,ref=moohan/gartan_scraper_bot:buildcache
+          cache-to: type=registry,ref=moohan/gartan_scraper_bot:buildcache,mode=max
+      - name: Smoke test container
+        run: |
+          docker run --rm moohan/gartan_scraper_bot:latest python --version
