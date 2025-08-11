@@ -163,7 +163,10 @@ def _fetch_and_write_cache(session, booking_date, cache_file):
             os.makedirs(cache_dir, exist_ok=True)
         except OSError:
             # If directory creation fails, skip writing (function still returns html)
-            log_debug("cache", f"Could not create cache dir {cache_dir}, continuing without cache write")
+            log_debug(
+                "cache",
+                f"Could not create cache dir {cache_dir}, continuing without cache write",
+            )
         else:
             try:
                 with open(cache_file, "w", encoding="utf-8") as f:
