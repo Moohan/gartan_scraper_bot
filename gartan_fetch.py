@@ -55,8 +55,12 @@ def fetch_and_cache_grid_html(
                 # No delay for cache
                 return grid_html
             except (UnicodeDecodeError, IOError) as e:
-                print(f"[CACHE-FIRST] Cache file corrupted, downloading fresh data: {e}")
-                log_debug("cache", f"[cache-first] Cache corrupted, fetching fresh: {e}")
+                print(
+                    f"[CACHE-FIRST] Cache file corrupted, downloading fresh data: {e}"
+                )
+                log_debug(
+                    "cache", f"[cache-first] Cache corrupted, fetching fresh: {e}"
+                )
                 grid_html = _fetch_and_write_cache(session, booking_date, cache_file)
                 _perform_delay(min_delay, max_delay, base)
                 return grid_html
@@ -214,9 +218,11 @@ def gartan_login_and_get_session():
     current_time = time.time()
 
     # Check if we have a valid cached session
-    if (_authenticated_session is not None and
-        _session_authenticated_time is not None and
-        (current_time - _session_authenticated_time) < _session_timeout):
+    if (
+        _authenticated_session is not None
+        and _session_authenticated_time is not None
+        and (current_time - _session_authenticated_time) < _session_timeout
+    ):
         log_debug("session", "Reusing existing authenticated session")
         return _authenticated_session
 
@@ -227,6 +233,7 @@ def gartan_login_and_get_session():
     except Exception:
         # Fallback to basic session for testing compatibility
         import requests
+
         session = requests.Session()
 
     log_debug("session", "Creating new authenticated session")

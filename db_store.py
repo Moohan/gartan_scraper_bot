@@ -168,7 +168,7 @@ def insert_crew_details(
             INSERT INTO crew (name, role, contact, skills) VALUES (?, ?, ?, ?)
             ON CONFLICT(name) DO UPDATE SET role=excluded.role, contact=excluded.contact, skills=excluded.skills
             """,
-            crew_data
+            crew_data,
         )
         conn.commit()
 
@@ -194,6 +194,7 @@ def insert_crew_availability(
     try:
         c = conn.cursor()
         from logging_config import get_logger
+
         logger = get_logger()
         logger.debug(f"Inserting crew availability for {len(crew_list)} crew members.")
 
@@ -220,11 +221,9 @@ def insert_crew_availability(
                 logger.debug(
                     f"Inserting block for {name}: {block['start_time']} -> {block['end_time']}"
                 )
-                crew_availability_data.append((
-                    crew_id,
-                    block["start_time"],
-                    block["end_time"]
-                ))
+                crew_availability_data.append(
+                    (crew_id, block["start_time"], block["end_time"])
+                )
 
         # Batch insert all availability blocks
         if crew_availability_data:
@@ -235,7 +234,9 @@ def insert_crew_availability(
                 """,
                 crew_availability_data,
             )
-            logger.debug(f"[ok] Saved crew availability for {len(crew_list)} crew members to {DB_PATH}")
+            logger.debug(
+                f"[ok] Saved crew availability for {len(crew_list)} crew members to {DB_PATH}"
+            )
 
         conn.commit()
 
