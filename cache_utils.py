@@ -80,7 +80,12 @@ def cleanup_cache_files(cache_dir: str, expiry_minutes: int = 43200) -> list[str
         try:
             file_date = datetime.strptime(match.group(1), "%d-%m-%Y")
             file_path = os.path.join(cache_dir, fname)
-            file_age_minutes = (now - file_date).total_seconds() / 60
+
+            # Age is computed in whole days to avoid prematurely deleting yesterday's
+            # file during the current day (matches test expectations). This treats
+            # any time within the same calendar day as age 0.
+            age_days = (now.date() - file_date.date()).days
+            file_age_minutes = age_days * 24 * 60
 
             if file_age_minutes > expiry_minutes:
                 os.remove(file_path)

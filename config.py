@@ -18,8 +18,18 @@ class Config:
         self.max_workers = 4  # For concurrent processing
     
     def get_cache_minutes(self, day_offset: int) -> int:
-        """Get cache expiry minutes based on day offset."""
-        if day_offset == 0:  # Today
+        """
+        Get cache expiry minutes based on day offset from today.
+        
+        Args:
+            day_offset: Days relative to today (negative = historic, 0 = today, positive = future)
+            
+        Returns:
+            Cache expiry minutes (or -1 for infinite cache for historic data)
+        """
+        if day_offset < 0:  # Historic data - never expires
+            return -1  # Special value indicating infinite cache
+        elif day_offset == 0:  # Today
             return 15  # 15 minutes
         elif day_offset == 1:  # Tomorrow
             return 60  # 1 hour

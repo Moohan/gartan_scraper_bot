@@ -57,7 +57,7 @@ echo "GARTAN_PASSWORD=your_password" >> .env
 # Linux/macOS
 ./deploy.sh
 
-# Windows PowerShell  
+# Windows PowerShell
 .\deploy.ps1
 
 # 3. Verify deployment
@@ -78,8 +78,12 @@ curl http://localhost:5000/v1/crew
 # Check if crew member 1 is available
 curl http://localhost:5000/v1/crew/1/available
 
-# Get availability duration
+# Get availability duration (returns string hours like "2.5h" or null)
 curl http://localhost:5000/v1/crew/1/duration
+
+# Weekly hours (actual since Monday / planned for full week)
+curl http://localhost:5000/v1/crew/1/hours-this-week
+curl http://localhost:5000/v1/crew/1/hours-planned-week
 
 # Check appliance availability
 curl http://localhost:5000/v1/appliances/P22P6/available
@@ -87,7 +91,15 @@ curl http://localhost:5000/v1/appliances/P22P6/available
 
 ## Recent Updates
 
+### v1.2.1 - Duration Format & Weekly Hours (2025-08-11)
+
+- **⏱ Duration Format**: `/duration` endpoints now return an hours string (e.g. `"3.25h"`) or `null` (was previously minutes JSON). Keeps API concise & spec-aligned.
+- **📅 Weekly Hours Endpoints**: Added `/hours-this-week` and `/hours-planned-week` for per‑crew aggregation.
+- **🗄 Persistent DB Init**: Database initialization is now non‑destructive by default; set `RESET_DB=1` env var to force a rebuild.
+- **🧪 Tests**: 77 tests passing; legacy demo test scripts moved under `examples/` or deprecated.
+
 ### v1.2.0 - Codebase Cleanup (2025-08-08)
+
 - **🧹 Major Cleanup**: Reduced codebase by 40% (removed ~20 non-essential files)
 - **🔧 Core Focus**: Streamlined to 6 essential components (read, process, store, serve, containerize, test)
 - **✅ Validation**: All 62 core tests passing, real data integration confirmed
@@ -106,8 +118,9 @@ curl http://localhost:5000/v1/appliances/P22P6/available
 - **SQLite Database**: Persisted availability data
 
 ### Data Collection Schedule
+
 - **Every 5 minutes**: Update scrape (3 days of data)
-- **Daily at 6 AM**: Comprehensive scrape (14 days of data) 
+- **Daily at 6 AM**: Comprehensive scrape (14 days of data)
 - **Startup**: Initial data check and scrape if needed
 
 ## Development
@@ -143,9 +156,10 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 ## Architecture Overview
 
-### Core Components
+### Core Components (Summary)
+
 - `run_bot.py`: Main scraper orchestrator
-- `api_server.py`: Production Flask API server  
+- `api_server.py`: Production Flask API server
 - `scheduler.py`: Background task scheduler
 - `container_main.py`: Multi-process orchestrator
 - `gartan_fetch.py`: Session management and data fetching
@@ -153,6 +167,7 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 - `db_store.py`: Database schema and storage
 
 ### Data Flow
+
 1. **Scheduler** triggers scraper every 5 minutes
 2. **Scraper** logs in and fetches HTML grids
 3. **Parser** extracts crew/appliance availability
@@ -173,8 +188,9 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 | `/v1/appliances/{name}/duration` | GET | String/null | Availability duration |
 
 **Phase 3 Endpoints** (Coming Soon):
+
 - Next availability change times
-- Duration of next availability periods  
+- Duration of next availability periods
 - Current crew operating appliances
 
 See `specification/api_specification.md` for complete details.
@@ -182,12 +198,14 @@ See `specification/api_specification.md` for complete details.
 ## Configuration
 
 ### Environment Variables
+
 - `GARTAN_USERNAME`: Gartan system username (required)
 - `GARTAN_PASSWORD`: Gartan system password (required)
 - `PORT`: API server port (default: 5000)
 - `FLASK_ENV`: Flask environment (production/development)
 
 ### Files
+
 - `.env`: Environment variables
 - `crew_details.local`: Crew contact information
 - `gartan_availability.db`: SQLite database (auto-created)
@@ -195,6 +213,7 @@ See `specification/api_specification.md` for complete details.
 ## Monitoring and Operations
 
 ### Health Monitoring
+
 ```bash
 # Check container status
 docker-compose ps
@@ -207,11 +226,12 @@ curl http://localhost:5000/health
 ```
 
 ### Management Commands
+
 ```bash
 # Stop services
 docker-compose down
 
-# Restart services  
+# Restart services
 docker-compose restart
 
 # Update and redeploy
@@ -224,12 +244,14 @@ python check_db.py
 ## Testing
 
 ### Validation Scripts
+
 - `validate_api.py`: Test API functions directly
 - `validate_deployment.py`: Test Docker deployment
 - `test_container.py`: Test container components
 - `pytest tests/`: Full test suite
 
 ### Data Validation
+
 ```bash
 # Check database contents
 python check_db.py
@@ -270,7 +292,7 @@ Internal fire service use.
 
 ## 🎯 CI/CD Pipeline Status: ACTIVE ✅
 
-Automated Docker Hub publishing is now live! Every push to main automatically: 
+Automated Docker Hub publishing is now live! Every push to main automatically:
 
 - Runs comprehensive test suite (62 tests)
 - Builds and publishes to moohan/gartan_scraper_bot

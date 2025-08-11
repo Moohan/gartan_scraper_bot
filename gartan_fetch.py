@@ -116,9 +116,24 @@ def fetch_and_cache_grid_html(
 
 
 def _is_cache_valid(cache_file: str, cache_minutes: int) -> bool:
-    """Check if the cache file exists and is not expired."""
+    """
+    Check if the cache file exists and is not expired.
+    
+    Args:
+        cache_file: Path to cache file
+        cache_minutes: Cache expiry in minutes (-1 = infinite cache for historic data)
+        
+    Returns:
+        True if cache is valid and should be used
+    """
     if not os.path.exists(cache_file):
         return False
+    
+    # Historic data with infinite cache
+    if cache_minutes == -1:
+        return True
+    
+    # Time-based cache expiry for current/future data
     mtime = os.path.getmtime(cache_file)
     if (dt.now() - dt.fromtimestamp(mtime)).total_seconds() / 60 < cache_minutes:
         return True
