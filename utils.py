@@ -38,14 +38,20 @@ def get_week_aligned_date_range(max_days: int) -> Tuple[datetime, int]:
 
     # Ensure we cover at least through next Sunday
     total_days_needed = days_from_monday_to_today + days_from_today_forward
-    min_days_for_full_week = days_since_monday + (7 - days_since_monday)  # To next Sunday
+    min_days_for_full_week = days_since_monday + (
+        7 - days_since_monday
+    )  # To next Sunday
 
     effective_max_days = max(total_days_needed, min_days_for_full_week)
 
-    logger.info(f"Week-aligned fetching: Start from {week_start.strftime('%Y-%m-%d')} (Monday), "
-                f"fetch {effective_max_days} days total")
-    logger.info(f"This covers {days_from_monday_to_today} historic days + "
-                f"{effective_max_days - days_from_monday_to_today} future days")
+    logger.info(
+        f"Week-aligned fetching: Start from {week_start.strftime('%Y-%m-%d')} (Monday), "
+        f"fetch {effective_max_days} days total"
+    )
+    logger.info(
+        f"This covers {days_from_monday_to_today} historic days + "
+        f"{effective_max_days - days_from_monday_to_today} future days"
+    )
 
     return week_start, effective_max_days
 

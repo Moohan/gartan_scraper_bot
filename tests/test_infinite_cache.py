@@ -49,6 +49,7 @@ class TestInfiniteCache:
 
     def test_week_aligned_cache_strategy(self):
         from utils import get_week_aligned_date_range
+
         today = datetime.now()
         start_date, effective_max_days = get_week_aligned_date_range(3)
         hist = cur = fut = 0
