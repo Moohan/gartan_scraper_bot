@@ -5,16 +5,18 @@ Test weekly availability API endpoints
 Tests the new weekly availability hour tracking endpoints
 """
 
-import pytest
+import os
 import sqlite3
 import tempfile
-import os
 from datetime import datetime, timedelta
+
+import pytest
+
 from api_server import (
-    get_crew_hours_this_week_data,
+    DB_PATH,
     get_crew_hours_planned_week_data,
+    get_crew_hours_this_week_data,
     get_week_boundaries,
-    DB_PATH
 )
 
 

@@ -5,14 +5,14 @@ Container orchestrator for Gartan Scraper Bot
 Runs both the periodic scheduler and API server in a single container
 """
 
+import logging
 import os
-import sys
 import signal
+import subprocess
+import sys
 import threading
 import time
-import logging
 from multiprocessing import Process
-import subprocess
 
 # Configure logging
 logging.basicConfig(

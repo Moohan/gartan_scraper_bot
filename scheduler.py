@@ -5,15 +5,16 @@ Background scheduler for periodic data collection
 Runs the Gartan scraper every 5 minutes using intelligent cache rules
 """
 
-import time
-import schedule
 import logging
+import os
+import sqlite3
 import subprocess
 import sys
-import os
+import time
 from datetime import datetime, timezone
 from typing import Optional
-import sqlite3
+
+import schedule
 
 # Configure logging
 logging.basicConfig(

@@ -15,8 +15,9 @@ CREATE TABLE IF NOT EXISTS appliance (
 );
 """
 import sqlite3
-from typing import List, Dict, Any
 from datetime import datetime, timedelta
+from typing import Any, Dict, List
+
 from config import config
 
 DB_PATH = config.db_path

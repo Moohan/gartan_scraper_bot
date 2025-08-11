@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime as dt
+
 from utils import log_debug
 
 
@@ -425,9 +426,10 @@ def aggregate_crew_availability(daily_crew_lists):
     return list(crew_dict.values())
 
 
+import json
+
 # parse_grid.py: provides parse_grid_html(grid_html, date=None)
 from bs4 import BeautifulSoup, Tag
-import json
 
 
 def parse_grid_html(grid_html, date=None):

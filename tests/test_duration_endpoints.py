@@ -1,8 +1,12 @@
-import sqlite3, tempfile, os, sys
+import os
+import sqlite3
+import sys
+import tempfile
 from datetime import datetime, timedelta
+
 sys.path.insert(0, '.')
 import api_server
-from api_server import get_crew_duration_data, get_appliance_duration_data
+from api_server import get_appliance_duration_data, get_crew_duration_data
 
 
 def setup_temp_db():

@@ -13,29 +13,21 @@ fi
 # Create hooks directory if it doesn't exist
 mkdir -p .git/hooks
 
-# Copy hooks and make them executable
-hooks=("pre-commit" "pre-push")
+echo "Setting up git hooks..."
+chmod +x .githooks/pre-commit .githooks/pre-push || true
 
-for hook in "${hooks[@]}"; do
-    if [ -f ".githooks/$hook" ]; then
-        cp ".githooks/$hook" ".git/hooks/$hook"
-        chmod +x ".git/hooks/$hook"
-        echo "✅ Installed $hook hook"
+# Prefer symlinks; if filesystem blocks them (Windows with git config), fallback to copy
+link_or_copy() {
+    local src="$1" dst="$2"
+    if ln -sf "$src" "$dst" 2>/dev/null; then
+        echo "Linked $dst -> $src"
     else
-        echo "❌ Hook file not found: .githooks/$hook"
-        exit 1
+        cp "$src" "$dst"
+        echo "Copied $src -> $dst (symlink fallback)"
     fi
-done
+}
 
-# Configure git to use the hooks directory
-git config core.hooksPath .githooks
-
-echo "🎉 Git hooks setup complete!"
-echo ""
-echo "Hooks installed:"
-echo "  - pre-commit: Runs syntax checks, tests, and validations"
-echo "  - pre-push: Runs comprehensive tests and Docker build"
-echo ""
-echo "To bypass hooks temporarily, use:"
-echo "  git commit --no-verify"
-echo "  git push --no-verify"
+mkdir -p .git/hooks
+link_or_copy .githooks/pre-commit .git/hooks/pre-commit
+link_or_copy .githooks/pre-push .git/hooks/pre-push
+echo "Git hooks installed."

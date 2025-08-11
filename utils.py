@@ -1,9 +1,10 @@
 """Utility functions for Gartan Scraper Bot."""
 
-import time
 import random
-from typing import Optional, Union, Tuple
+import time
 from datetime import datetime, timedelta
+from typing import Optional, Tuple, Union
+
 from logging_config import get_logger
 
 logger = get_logger()
