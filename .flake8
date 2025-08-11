@@ -1,11 +1,12 @@
 [flake8]
 max-line-length = 88
-extend-ignore = 
-    E203,  # whitespace before ':'
-    E501,  # line too long (handled by black)
-    W503,  # line break before binary operator
-    E704,  # multiple statements on one line (handled by black)
-exclude = 
+# Codes ignored because Black/formatting decisions supersede them
+extend-ignore =
+    E203
+    E501
+    W503
+    E704
+exclude =
     .git,
     __pycache__,
     .venv,
