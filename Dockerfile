@@ -1,5 +1,5 @@
 # Multi-stage Docker build for Gartan Scraper Bot
-FROM python:3.13-slim as builder
+FROM python:3.13-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -16,7 +16,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Production stage
-FROM python:3.13-slim as production
+FROM python:3.13-slim AS production
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
