@@ -12,40 +12,40 @@ logger = get_logger()
 def get_week_aligned_date_range(max_days: int) -> Tuple[datetime, int]:
     """
     Calculate week-aligned date range for data fetching.
-    
+
     Ensures we always fetch from Monday of current week onwards,
     which is required for weekly availability tracking.
-    
+
     Args:
         max_days: Maximum days to fetch from command line
-        
+
     Returns:
         Tuple of (start_date, effective_max_days) where:
         - start_date: Monday of current week at 00:00:00
         - effective_max_days: Adjusted max_days to cover full period
     """
     now = datetime.now()
-    
+
     # Get Monday of current week (weekday 0=Monday, 6=Sunday)
     days_since_monday = now.weekday()
     monday_start = now - timedelta(days=days_since_monday)
     week_start = monday_start.replace(hour=0, minute=0, second=0, microsecond=0)
-    
+
     # Calculate how many days we need to fetch
     days_from_monday_to_today = days_since_monday
     days_from_today_forward = max_days
-    
+
     # Ensure we cover at least through next Sunday
     total_days_needed = days_from_monday_to_today + days_from_today_forward
     min_days_for_full_week = days_since_monday + (7 - days_since_monday)  # To next Sunday
-    
+
     effective_max_days = max(total_days_needed, min_days_for_full_week)
-    
+
     logger.info(f"Week-aligned fetching: Start from {week_start.strftime('%Y-%m-%d')} (Monday), "
                 f"fetch {effective_max_days} days total")
     logger.info(f"This covers {days_from_monday_to_today} historic days + "
                 f"{effective_max_days - days_from_monday_to_today} future days")
-    
+
     return week_start, effective_max_days
 
 

@@ -74,7 +74,9 @@ if __name__ == "__main__":
     logger.info(f"Fetching {effective_max_days} days of availability (week-aligned)...")
     start_time = time.time()
 
-    db_conn = init_db()
+    # Preserve history unless explicit reset requested
+    reset = os.environ.get("RESET_DB", "false").lower() == "true"
+    db_conn = init_db(reset=reset)
     try:
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=config.max_workers
@@ -91,7 +93,7 @@ if __name__ == "__main__":
                 current_date = start_date + timedelta(days=day_offset)
                 days_from_today = (current_date.date() - today.date()).days
                 cache_minutes = config.get_cache_minutes(days_from_today)
-                
+
                 # Log cache strategy
                 if cache_minutes == -1:
                     logger.debug(f"Using infinite cache for historic date: {booking_date}")

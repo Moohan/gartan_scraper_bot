@@ -9,13 +9,13 @@ class CliArgs:
         self.max_days: int = 3
         self.cache_mode: str = "cache-preferred"
         self.force_scrape: bool = False
-    
+
     @classmethod
     def from_args(cls, args):
         """Create CliArgs from parsed arguments."""
         cli_args = cls()
         cli_args.max_days = args.max_days
-        
+
         # Set cache mode based on flags
         if hasattr(args, 'cache_only') and args.cache_only:
             cli_args.cache_mode = "cache-only"
@@ -25,7 +25,7 @@ class CliArgs:
             cli_args.cache_mode = args.cache_mode
         else:
             cli_args.cache_mode = "cache-preferred"
-            
+
         cli_args.force_scrape = getattr(args, 'force_scrape', False)
         return cli_args
 
@@ -33,7 +33,7 @@ class CliArgs:
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create argument parser for the scraper bot."""
     parser = argparse.ArgumentParser(description="Gartan Scraper Bot")
-    
+
     parser.add_argument(
         "--max-days",
         type=int,
@@ -41,7 +41,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Days to fetch forward from today (default: 3). "
              "Note: Always starts from Monday of current week for weekly availability tracking."
     )
-    
+
     # Cache mode options
     cache_group = parser.add_mutually_exclusive_group()
     cache_group.add_argument(
@@ -60,13 +60,13 @@ def create_argument_parser() -> argparse.ArgumentParser:
         default="cache-preferred",
         help="Cache behavior mode"
     )
-    
+
     parser.add_argument(
         "--force-scrape",
         action="store_true",
         help="Force scrape even if cache is fresh"
     )
-    
+
     return parser
 
 
