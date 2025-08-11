@@ -60,10 +60,13 @@ def get_crew_available_data(crew_id: int) -> Dict[str, Any]:
 
             # Check current availability
             now = datetime.now()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT COUNT(*) as count FROM crew_availability
                 WHERE crew_id = ? AND start_time <= ? AND end_time > ?
-            """, (crew_id, now, now))
+            """,
+                (crew_id, now, now),
+            )
 
             result = cursor.fetchone()
             is_available = result["count"] > 0
@@ -100,17 +103,24 @@ def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
 
             # Get next availability block
             now = datetime.now()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT start_time, end_time FROM crew_availability
                 WHERE crew_id = ? AND start_time <= ? AND end_time > ?
                 ORDER BY start_time LIMIT 1
-            """, (crew_id, now, now))
+            """,
+                (crew_id, now, now),
+            )
 
             result = cursor.fetchone()
             if result:
                 end_time = datetime.fromisoformat(result[1])
                 duration_minutes = int((end_time - now).total_seconds() / 60)
-                return {"duration": _format_duration_minutes_to_hours_string(max(0, duration_minutes))}
+                return {
+                    "duration": _format_duration_minutes_to_hours_string(
+                        max(0, duration_minutes)
+                    )
+                }
             else:
                 return {"duration": None}
     except Exception as e:
@@ -149,11 +159,14 @@ def get_crew_hours_this_week_data(crew_id: int) -> Dict[str, Any]:
             now = datetime.now()
 
             # Get all availability blocks from Monday to now
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT start_time, end_time FROM crew_availability
                 WHERE crew_id = ? AND end_time > ? AND start_time < ?
                 ORDER BY start_time
-            """, (crew_id, week_start, now))
+            """,
+                (crew_id, week_start, now),
+            )
 
             blocks = cursor.fetchall()
             total_hours = 0.0
@@ -192,11 +205,14 @@ def get_crew_hours_planned_week_data(crew_id: int) -> Dict[str, Any]:
             week_start, week_end = get_week_boundaries()
 
             # Get all availability blocks for the entire week
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT start_time, end_time FROM crew_availability
                 WHERE crew_id = ? AND end_time > ? AND start_time < ?
                 ORDER BY start_time
-            """, (crew_id, week_start, week_end))
+            """,
+                (crew_id, week_start, week_end),
+            )
 
             blocks = cursor.fetchall()
             total_hours = 0.0
@@ -236,10 +252,13 @@ def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
 
             # Check current availability
             now = datetime.now()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT COUNT(*) as count FROM appliance_availability
                 WHERE appliance_id = ? AND start_time <= ? AND end_time > ?
-            """, (appliance_id, now, now))
+            """,
+                (appliance_id, now, now),
+            )
 
             result = cursor.fetchone()
             is_available = result[0] > 0  # count is first column
@@ -266,22 +285,30 @@ def get_appliance_duration_data(appliance_name: str) -> Dict[str, Any]:
 
             # Get next availability block
             now = datetime.now()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT start_time, end_time FROM appliance_availability
                 WHERE appliance_id = ? AND start_time <= ? AND end_time > ?
                 ORDER BY start_time LIMIT 1
-            """, (appliance_id, now, now))
+            """,
+                (appliance_id, now, now),
+            )
 
             result = cursor.fetchone()
             if result:
                 end_time = datetime.fromisoformat(result[1])
                 duration_minutes = int((end_time - now).total_seconds() / 60)
-                return {"duration": _format_duration_minutes_to_hours_string(max(0, duration_minutes))}
+                return {
+                    "duration": _format_duration_minutes_to_hours_string(
+                        max(0, duration_minutes)
+                    )
+                }
             else:
                 return {"duration": None}
     except Exception as e:
         logger.error(f"Error getting appliance duration: {e}")
         return {"error": "Internal server error"}
+
 
 # Database configuration
 DB_PATH = "gartan_availability.db"

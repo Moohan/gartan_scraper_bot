@@ -174,12 +174,13 @@ def test_fetch_and_cache_grid_html_corrupt_cache(tmp_path, monkeypatch):
     cache_file = os.path.join(cache_dir, f"grid_{date.replace('/', '-')}.html")
     with open(cache_file, "wb") as f:
         f.write(b"\x00\x01\x02")
-    
+
     # Make the cache file appear old so it will be considered expired
     import time
+
     old_time = time.time() - 3600  # 1 hour ago
     os.utime(cache_file, (old_time, old_time))
-    
+
     monkeypatch.setattr(
         "gartan_fetch.fetch_grid_html_for_date",
         lambda session, date: "<html>recovered</html>",
@@ -273,6 +274,10 @@ def test_fetch_and_cache_grid_html_empty_html(tmp_path, monkeypatch):
         "gartan_fetch.fetch_grid_html_for_date", lambda session, date: ""
     )
     html = fetch_and_cache_grid_html(
-        session, date, cache_dir=str(tmp_path), cache_minutes=1, cache_mode="cache-preferred"
+        session,
+        date,
+        cache_dir=str(tmp_path),
+        cache_minutes=1,
+        cache_mode="cache-preferred",
     )
     assert html == ""
