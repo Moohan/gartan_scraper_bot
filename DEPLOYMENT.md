@@ -21,7 +21,7 @@
 The service will be available at:
 - **API Server**: http://localhost:5000
 - **Container Name**: `gartan-scrape`
-- **Image**: `moohan/gartan_scraper_bot:latest`
+- **Image**: `${DOCKER_USERNAME}/gartan_scraper_bot:latest` (e.g. `jamesmcmahon0/gartan_scraper_bot:latest`)
 
 ## Docker Compose Configuration
 
@@ -31,7 +31,7 @@ Your docker-compose.yml now uses the published image:
 services:
   gartan-scraper:
     container_name: gartan-scrape
-    image: moohan/gartan_scraper_bot:latest
+  image: ${DOCKER_IMAGE:-jamesmcmahon0/gartan_scraper_bot:latest}
     ports:
       - "5000:5000"
     environment:
@@ -46,8 +46,8 @@ services:
 ## Automated Publishing
 
 The Docker image is automatically published to Docker Hub via GitHub Actions:
-- **Push to main**: Publishes `moohan/gartan_scraper_bot:latest`
-- **Version tags**: Publishes `moohan/gartan_scraper_bot:v1.x.x`
-- **Commits**: Publishes `moohan/gartan_scraper_bot:sha-abcd123`
+- **Push to main**: Publishes `${DOCKER_USERNAME}/gartan_scraper_bot:latest`
+- **Version tags**: Publishes `${DOCKER_USERNAME}/gartan_scraper_bot:v1.x.x`
+- **Commits**: Publishes `${DOCKER_USERNAME}/gartan_scraper_bot:sha-abcd123`
 
 No manual building required!

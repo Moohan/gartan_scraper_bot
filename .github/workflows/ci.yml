@@ -106,10 +106,10 @@ jobs:
           context: .
           push: true
           tags: |
-            moohan/gartan_scraper_bot:latest
-            moohan/gartan_scraper_bot:${{ github.sha }}
-          cache-from: type=registry,ref=moohan/gartan_scraper_bot:buildcache
-          cache-to: type=registry,ref=moohan/gartan_scraper_bot:buildcache,mode=max
+            ${{ secrets.DOCKER_USERNAME }}/gartan_scraper_bot:latest
+            ${{ secrets.DOCKER_USERNAME }}/gartan_scraper_bot:${{ github.sha }}
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/gartan_scraper_bot:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/gartan_scraper_bot:buildcache,mode=max
       - name: Smoke test container
         run: |
-          docker run --rm moohan/gartan_scraper_bot:latest python --version
+          docker run --rm ${{ secrets.DOCKER_USERNAME }}/gartan_scraper_bot:latest python --version

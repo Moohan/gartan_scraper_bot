@@ -27,9 +27,9 @@ To enable automated Docker Hub publishing, add these secrets to your GitHub repo
 
 The CI/CD pipeline will automatically:
 
-- **On every push to main**: Build and publish `moohan/gartan_scraper_bot:latest`
-- **On every commit**: Build and publish `moohan/gartan_scraper_bot:sha-abcd123`
-- **On version tags**: Create releases and publish `moohan/gartan_scraper_bot:v1.x.x`
+- **On every push to main**: Build and publish `${DOCKER_USERNAME}/gartan_scraper_bot:latest`
+- **On every commit**: Build and publish `${DOCKER_USERNAME}/gartan_scraper_bot:sha-abcd123`
+- **On version tags**: Create releases and publish `${DOCKER_USERNAME}/gartan_scraper_bot:v1.x.x`
 
 ## Deployment Commands
 
@@ -42,7 +42,7 @@ docker run -d \
   -e GARTAN_USERNAME=your_username \
   -e GARTAN_PASSWORD=your_password \
   --name gartan-scrape \
-  moohan/gartan_scraper_bot:latest
+  ${DOCKER_USERNAME}/gartan_scraper_bot:latest
 
 # Or with docker-compose
 docker-compose up -d
