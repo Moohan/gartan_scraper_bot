@@ -31,10 +31,11 @@ def test_cleanup_cache_files(tmp_path):
 
     files = []
 
-    # Create one old file (from 30 days ago)
+    # Create one file and force its mtime to 30 days ago
     old_date = datetime.now() - timedelta(days=30)
     f1 = tmp_path / f"grid_{old_date.strftime('%d-%m-%Y')}.html"
     f1.write_text("test")
+    os.utime(str(f1), (old_date.timestamp(), old_date.timestamp()))
     files.append(str(f1))
 
     # Create two recent files (today and tomorrow)
