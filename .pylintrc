@@ -9,7 +9,6 @@ disable=
 	C0114,  # missing-module-docstring (add gradually)
 	C0115,  # missing-class-docstring
 	C0116,  # missing-function-docstring
-	C0301,  # line-too-long (temporarily disabled; will enforce later)
 	R0801,  # duplicate-code (phase in later)
 	R0902,  # too-many-instance-attributes
 	R0903,  # too-few-public-methods
@@ -21,6 +20,7 @@ disable=
 
 [REPORTS]
 score=yes
+fail-under=8.0
 
 [BASIC]
 good-names=i,j,k,ex,Run,_,db
