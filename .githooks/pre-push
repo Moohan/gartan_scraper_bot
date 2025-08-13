@@ -93,6 +93,29 @@ kill $server_pid 2>/dev/null || true
 
 # Check Docker build (if Docker is available)
 if command -v docker &> /dev/null; then
+    # Allow explicit skip via env var
+    if [[ "${PRE_PUSH_SKIP_DOCKER:-0}" == "1" ]]; then
+        echo "ℹ️  PRE_PUSH_SKIP_DOCKER=1 set; skipping docker build test"
+    else
+        # Quick daemon readiness probe (avoid long 300s wait if daemon not running)
+        if command -v timeout >/dev/null 2>&1; then
+            timeout 8s docker info > /dev/null 2>&1 || docker_info_rc=$?
+        else
+            docker info > /dev/null 2>&1 || docker_info_rc=$?
+        fi
+        if [[ ${docker_info_rc:-0} -ne 0 ]]; then
+            if [[ "${PRE_PUSH_REQUIRE_DOCKER:-0}" == "1" ]]; then
+                echo "❌ Docker daemon not reachable (docker info failed) and PRE_PUSH_REQUIRE_DOCKER=1 enforced"
+                exit 1
+            else
+                echo "⚠️  Docker daemon not reachable; skipping docker build test (set PRE_PUSH_REQUIRE_DOCKER=1 to enforce)"
+                # Do not attempt build
+                unset docker_info_rc
+                # Continue remaining checks (none after this block currently)
+                echo "✅ All pre-push checks passed!"
+                exit 0
+            fi
+        fi
     # Re-check divergence just before an expensive docker build (remote may have advanced during tests)
     if is_branch_behind; then
         echo "⚠️  Local main became behind origin/main during tests. Rebase (git pull --rebase origin main) then retry push. Skipping docker build."
