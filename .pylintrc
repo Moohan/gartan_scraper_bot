@@ -37,8 +37,6 @@ max-locals=25
 max-returns=12
 max-statements=80
 
-[TYPECHECK]
-ignore-missing-imports=yes
 
 [SIMILARITIES]
 min-similarity-lines=8
@@ -64,4 +62,4 @@ max-nested-blocks=6
 defining-attr-methods=__init__,__new__,setUp
 
 [EXCEPTIONS]
-overgeneral-exceptions=Exception
+overgeneral-exceptions=builtins.Exception
