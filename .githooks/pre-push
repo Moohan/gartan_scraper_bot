@@ -18,6 +18,9 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# Ensure logs directory exists early for redirections
+mkdir -p logs
+
 # Run all tests including integration tests
 echo "🧪 Running comprehensive test suite..."
 python -m pytest tests/ -v --cov=. --cov-report=term-missing || {
@@ -27,19 +30,31 @@ python -m pytest tests/ -v --cov=. --cov-report=term-missing || {
 
 # Check that API server can start
 echo "🌐 Testing API server startup (timeout ${API_START_TIMEOUT}s)..."
-if command -v timeout >/dev/null 2>&1; then
-    timeout ${API_START_TIMEOUT}s python api_server.py > logs/prepush_api_start.log 2>&1 &
-else
-    python api_server.py > logs/prepush_api_start.log 2>&1 &
-fi
+python api_server.py > logs/prepush_api_start.log 2>&1 &
 server_pid=$!
-sleep 2
 
-# Test if server is responsive
-if curl -f http://localhost:5000/health > /dev/null 2>&1; then
-    echo "✅ API server starts successfully"
+# Poll /health until success or timeout
+start_ts=$(date +%s)
+health_ok=0
+while true; do
+    if curl -fsS http://localhost:5000/health > /dev/null 2>&1; then
+        health_ok=1
+        break
+    fi
+    now=$(date +%s)
+    elapsed=$(( now - start_ts ))
+    if (( elapsed >= API_START_TIMEOUT )); then
+        break
+    fi
+    sleep 1
+done
+
+if [[ $health_ok -eq 1 ]]; then
+    echo "✅ API server starts successfully (ready in ${elapsed}s)"
 else
-    echo "❌ API server failed to start or respond"
+    echo "❌ API server failed to become ready within ${API_START_TIMEOUT}s"
+    echo "---- api_server log (last 60 lines) ----"
+    tail -n 60 logs/prepush_api_start.log 2>/dev/null || echo "(no log captured)"
     kill $server_pid 2>/dev/null || true
     exit 1
 fi
@@ -52,21 +67,28 @@ if command -v docker &> /dev/null; then
     echo "🐳 Testing Docker build (timeout ${DOCKER_BUILD_TIMEOUT}s)..."
     build_log="logs/prepush_docker_build.log"
     mkdir -p logs
-    if command -v timeout >/dev/null 2>&1; then
-        if ! timeout ${DOCKER_BUILD_TIMEOUT}s docker build --progress=plain -t gartan-scraper-test . > "$build_log" 2>&1; then
-            status=$?
-            echo "❌ Docker build failed or timed out (exit=$status). Last 40 lines:" >&2
-            tail -n 40 "$build_log" || true
-            exit 1
+        # Use timeout if available; otherwise manual elapsed check
+        if command -v timeout >/dev/null 2>&1; then
+                if ! timeout ${DOCKER_BUILD_TIMEOUT}s docker build --pull --progress=plain -t gartan-scraper-test . > "$build_log" 2>&1; then
+                    status=$?
+                    echo "❌ Docker build failed or timed out (exit=$status). Last 60 lines:" >&2
+                    tail -n 60 "$build_log" || true
+                    exit 1
+                fi
+        else
+                build_start=$(date +%s)
+                if ! docker build --pull --progress=plain -t gartan-scraper-test . > "$build_log" 2>&1; then
+                    status=$?
+                    echo "❌ Docker build failed (exit=$status). Last 60 lines:" >&2
+                    tail -n 60 "$build_log" || true
+                    exit 1
+                fi
+                build_end=$(date +%s)
+                build_elapsed=$(( build_end - build_start ))
+                if (( build_elapsed > DOCKER_BUILD_TIMEOUT )); then
+                    echo "⚠️  Docker build exceeded suggested timeout (${build_elapsed}s > ${DOCKER_BUILD_TIMEOUT}s)" >&2
+                fi
         fi
-    else
-        if ! docker build --progress=plain -t gartan-scraper-test . > "$build_log" 2>&1; then
-            status=$?
-            echo "❌ Docker build failed (exit=$status). Last 40 lines:" >&2
-            tail -n 40 "$build_log" || true
-            exit 1
-        fi
-    fi
     echo "✅ Docker build successful"
     docker rmi gartan-scraper-test > /dev/null 2>&1 || true
 else
