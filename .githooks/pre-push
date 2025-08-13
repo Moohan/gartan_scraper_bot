@@ -36,10 +36,13 @@ server_pid=$!
 # Poll /health until success or timeout
 start_ts=$(date +%s)
 health_ok=0
+elapsed=0
 while true; do
     if curl -fsS http://localhost:5000/health > /dev/null 2>&1; then
-        health_ok=1
-        break
+    health_ok=1
+    now=$(date +%s)
+    elapsed=$(( now - start_ts ))
+    break
     fi
     now=$(date +%s)
     elapsed=$(( now - start_ts ))
