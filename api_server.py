@@ -349,7 +349,7 @@ def health_check():
             jsonify(
                 {
                     "status": "unhealthy",
-                    "error": "Internal server error",
+                    "error": "Health check failed",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
             ),
