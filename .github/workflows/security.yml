@@ -10,6 +10,11 @@ on:
       - 'requirements.txt'
       - 'Dockerfile'
 
+permissions:
+  contents: read           # For actions/checkout
+  actions: write           # For uploading artifacts
+  security-events: write   # For uploading SARIF results to Security tab
+
 jobs:
   dependency-check:
     name: Security & Dependency Audit
