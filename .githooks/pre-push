@@ -93,9 +93,11 @@ kill $server_pid 2>/dev/null || true
 
 # Check Docker build (if Docker is available)
 if command -v docker &> /dev/null; then
+    DO_DOCKER_BUILD=1
     # Allow explicit skip via env var
     if [[ "${PRE_PUSH_SKIP_DOCKER:-0}" == "1" ]]; then
         echo "ℹ️  PRE_PUSH_SKIP_DOCKER=1 set; skipping docker build test"
+        DO_DOCKER_BUILD=0
     else
         # Quick daemon readiness probe (avoid long 300s wait if daemon not running)
         if command -v timeout >/dev/null 2>&1; then
@@ -109,45 +111,44 @@ if command -v docker &> /dev/null; then
                 exit 1
             else
                 echo "⚠️  Docker daemon not reachable; skipping docker build test (set PRE_PUSH_REQUIRE_DOCKER=1 to enforce)"
-                # Do not attempt build
-                unset docker_info_rc
-                # Continue remaining checks (none after this block currently)
-                echo "✅ All pre-push checks passed!"
-                exit 0
+                DO_DOCKER_BUILD=0
             fi
         fi
-    # Re-check divergence just before an expensive docker build (remote may have advanced during tests)
-    if is_branch_behind; then
-        echo "⚠️  Local main became behind origin/main during tests. Rebase (git pull --rebase origin main) then retry push. Skipping docker build."
-        exit 1
     fi
-    echo "🐳 Testing Docker build (timeout ${DOCKER_BUILD_TIMEOUT}s)..."
-    build_log="logs/prepush_docker_build.log"
-    mkdir -p logs
-    build_rc=0
-    if command -v timeout >/dev/null 2>&1; then
-        timeout ${DOCKER_BUILD_TIMEOUT}s docker build --pull --progress=plain -t gartan-scraper-test . >"$build_log" 2>&1 || build_rc=$?
-        if [[ $build_rc -eq 124 ]]; then
-            echo "❌ Docker build timed out after ${DOCKER_BUILD_TIMEOUT}s. Last 60 lines:" >&2
+    if [[ $DO_DOCKER_BUILD -eq 1 ]]; then
+        # Re-check divergence just before an expensive docker build (remote may have advanced during tests)
+        if is_branch_behind; then
+            echo "⚠️  Local main became behind origin/main during tests. Rebase (git pull --rebase origin main) then retry push. Skipping docker build."
+            exit 1
+        fi
+        echo "🐳 Testing Docker build (timeout ${DOCKER_BUILD_TIMEOUT}s)..."
+        build_log="logs/prepush_docker_build.log"
+        mkdir -p logs
+        build_rc=0
+        if command -v timeout >/dev/null 2>&1; then
+            timeout ${DOCKER_BUILD_TIMEOUT}s docker build --pull --progress=plain -t gartan-scraper-test . >"$build_log" 2>&1 || build_rc=$?
+            if [[ $build_rc -eq 124 ]]; then
+                echo "❌ Docker build timed out after ${DOCKER_BUILD_TIMEOUT}s. Last 60 lines:" >&2
+                tail -n 60 "$build_log" || true
+                exit 1
+            fi
+        else
+            build_start=$(date +%s)
+            docker build --pull --progress=plain -t gartan-scraper-test . >"$build_log" 2>&1 || build_rc=$?
+            build_end=$(date +%s)
+            build_elapsed=$(( build_end - build_start ))
+            if (( build_elapsed > DOCKER_BUILD_TIMEOUT )); then
+                echo "⚠️  Docker build exceeded suggested timeout (${build_elapsed}s > ${DOCKER_BUILD_TIMEOUT}s)" >&2
+            fi
+        fi
+        if [[ $build_rc -ne 0 ]]; then
+            echo "❌ Docker build failed (exit=$build_rc). Last 60 lines:" >&2
             tail -n 60 "$build_log" || true
             exit 1
         fi
-    else
-        build_start=$(date +%s)
-        docker build --pull --progress=plain -t gartan-scraper-test . >"$build_log" 2>&1 || build_rc=$?
-        build_end=$(date +%s)
-        build_elapsed=$(( build_end - build_start ))
-        if (( build_elapsed > DOCKER_BUILD_TIMEOUT )); then
-            echo "⚠️  Docker build exceeded suggested timeout (${build_elapsed}s > ${DOCKER_BUILD_TIMEOUT}s)" >&2
-        fi
+        echo "✅ Docker build successful"
+        docker rmi gartan-scraper-test > /dev/null 2>&1 || true
     fi
-    if [[ $build_rc -ne 0 ]]; then
-        echo "❌ Docker build failed (exit=$build_rc). Last 60 lines:" >&2
-        tail -n 60 "$build_log" || true
-        exit 1
-    fi
-    echo "✅ Docker build successful"
-    docker rmi gartan-scraper-test > /dev/null 2>&1 || true
 else
     echo "ℹ️  Docker not found; skipping image build test"
 fi
