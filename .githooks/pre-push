@@ -10,15 +10,30 @@ API_START_TIMEOUT=${API_START_TIMEOUT:-10}
 
 echo "🚀 Running pre-push checks (timeouts: docker=${DOCKER_BUILD_TIMEOUT}s api=${API_START_TIMEOUT}s)..."
 
-# Quick divergence check so we fail fast if local main is behind remote
-if git rev-parse --abbrev-ref HEAD >/dev/null 2>&1; then
-    current_branch=$(git rev-parse --abbrev-ref HEAD)
-    if [[ "$current_branch" == "main" ]] && git fetch -q origin main; then
-        if git merge-base --is-ancestor HEAD origin/main && [[ $(git rev-parse HEAD) != $(git rev-parse origin/main) ]]; then
-            echo "⚠️  Local main is behind origin/main. Please: git pull --rebase origin main (or fetch/rebase) then push again. Aborting early to save time."
-            exit 1
-        fi
+# Function: returns 0 if branch is behind its remote tracking ref, 1 otherwise
+is_branch_behind() {
+    local branch remote_ref
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "") || return 1
+    [[ -z "$branch" ]] && return 1
+    # Only handle main explicitly for now
+    if [[ "$branch" != "main" ]]; then
+        return 1
     fi
+    git fetch -q origin main || return 1
+    # Count commits: origin/main..HEAD are commits ahead; HEAD..origin/main are behind
+    read -r ahead behind < <(git rev-list --left-right --count origin/main...HEAD 2>/dev/null | awk '{print $2,$1}')
+    # above awk prints ahead behind (swap because --left-right puts left=origin/main right=HEAD)
+    # If behind > 0 and ahead == 0 (purely behind) OR behind > 0 with mixed divergence treat as behind
+    if [[ ${behind:-0} -gt 0 ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Early divergence fail-fast
+if is_branch_behind; then
+    echo "⚠️  Local main is behind origin/main. Please rebase (git pull --rebase origin main) then push again. Aborting before long-running checks."
+    exit 1
 fi
 
 # Ensure cleanup always happens
@@ -78,6 +93,11 @@ kill $server_pid 2>/dev/null || true
 
 # Check Docker build (if Docker is available)
 if command -v docker &> /dev/null; then
+    # Re-check divergence just before an expensive docker build (remote may have advanced during tests)
+    if is_branch_behind; then
+        echo "⚠️  Local main became behind origin/main during tests. Rebase (git pull --rebase origin main) then retry push. Skipping docker build."
+        exit 1
+    fi
     echo "🐳 Testing Docker build (timeout ${DOCKER_BUILD_TIMEOUT}s)..."
     build_log="logs/prepush_docker_build.log"
     mkdir -p logs
