@@ -40,6 +40,22 @@ python -m pytest tests/ -q || {
     exit 1
 }
 
+# Pylint on staged Python files (excluding tests for speed initially)
+echo "🔎 Running pylint on staged files..."
+if command -v pylint >/dev/null 2>&1; then
+    staged_py=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' | grep -v '^tests/' || true)
+    if [ -n "$staged_py" ]; then
+        pylint --errors-only $staged_py || {
+           echo "❌ Pylint (errors-only) failed"
+           exit 1
+        }
+    else
+        echo "No staged Python files to lint"
+    fi
+else
+    echo "Pylint not installed; skipping (install with 'pip install pylint' for local checks)"
+fi
+
 # Check for TODO/FIXME comments in staged files
 echo "📝 Checking for TODO/FIXME comments..."
 staged_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(py|md)$' || true)
