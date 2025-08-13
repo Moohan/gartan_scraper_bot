@@ -246,14 +246,17 @@ def gartan_login_and_get_session():
         return _authenticated_session
 
     # Create new authenticated session
-    try:
-        session_manager = get_session_manager()
-        session = session_manager.get_session()
-    except Exception:
-        # Fallback to basic session for testing compatibility
-        import requests
+    # Obtain a session; support both a manager object with get_session() or a plain Session
+    session_candidate = get_session_manager()
+    if hasattr(session_candidate, "get_session"):
+        try:
+            session = session_candidate.get_session()
+        except Exception:  # pragma: no cover - defensive
+            import requests
 
-        session = requests.Session()
+            session = requests.Session()
+    else:
+        session = session_candidate
 
     log_debug("session", "Creating new authenticated session")
 
@@ -303,6 +306,8 @@ def _build_login_payload(form, username, password):
     """
     Build the payload dictionary for the login POST request.
     """
+    # TODO: Refactor to reduce complexity (pylint R0912/R0915)
+    # pylint: disable=too-many-branches,too-many-statements
     payload = {}
     try:
         input_tags = list(form.find_all("input"))
@@ -372,8 +377,6 @@ def fetch_grid_html_for_date(session, booking_date):
     Given an authenticated session and a booking_date (str, dd/mm/yyyy), fetch the grid HTML for that date.
     Returns grid_html or None.
     """
-    import json
-
     schedule_url = "https://grampianrds.firescotland.gov.uk/GartanAvailability/Availability/Schedule/AvailabilityMain1.aspx/GetSchedule"
     payload = _build_schedule_payload(booking_date)
     headers = _get_schedule_headers()
