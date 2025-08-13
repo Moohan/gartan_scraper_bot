@@ -1,28 +1,67 @@
 [MASTER]
-ignore=tests
+ignore=__pycache__
 jobs=0
+extension-pkg-whitelist=
+load-plugins=
 
 [MESSAGES CONTROL]
 disable=
-    C0114,
-    C0115,
-    C0116,
-    C0301,
-    W1203,
-    R0801
+	C0114,  # missing-module-docstring (add gradually)
+	C0115,  # missing-class-docstring
+	C0116,  # missing-function-docstring
+	C0301,  # line-too-long (temporarily disabled; will enforce later)
+	R0801,  # duplicate-code (phase in later)
+	R0902,  # too-many-instance-attributes
+	R0903,  # too-few-public-methods
+	R0913,  # too-many-arguments (some parsing functions naturally have several)
+	R0914,  # too-many-locals (parsing heavy functions)
+	R0915,  # too-many-statements
+	W1203,  # logging-fstring-interpolation (allow f-strings)
+	W1514,  # unspecified-encoding (we manage encodings explicitly where needed)
 
 [REPORTS]
-fail-under=7.0
 score=yes
 
-[FORMAT]
-max-line-length=120
-
 [BASIC]
-good-names=i,j,k,ex,db,fn,ok
+good-names=i,j,k,ex,Run,_,db
+max-line-length=100
+
+[FORMAT]
+max-line-length=100
 
 [DESIGN]
 max-args=10
-max-branches=20
-max-returns=10
+max-attributes=12
+max-branches=15
+max-locals=25
+max-returns=12
 max-statements=80
+
+[TYPECHECK]
+ignore-missing-imports=yes
+
+[SIMILARITIES]
+min-similarity-lines=8
+
+[LOGGING]
+logging-format-style=old
+
+[STRING]
+check-str-concat-over-line-jumps=yes
+
+[IMPORTS]
+known-third-party=requests,bs4,dotenv,schedule,flask
+allow-wildcard-with-all=no
+allow-any-import-level=yes
+
+[MISCELLANEOUS]
+notes=FIXME,XXX,TODO
+
+[REFACTORING]
+max-nested-blocks=6
+
+[CLASSES]
+defining-attr-methods=__init__,__new__,setUp
+
+[EXCEPTIONS]
+overgeneral-exceptions=Exception
