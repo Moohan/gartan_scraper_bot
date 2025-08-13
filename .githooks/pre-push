@@ -10,6 +10,17 @@ API_START_TIMEOUT=${API_START_TIMEOUT:-10}
 
 echo "🚀 Running pre-push checks (timeouts: docker=${DOCKER_BUILD_TIMEOUT}s api=${API_START_TIMEOUT}s)..."
 
+# Quick divergence check so we fail fast if local main is behind remote
+if git rev-parse --abbrev-ref HEAD >/dev/null 2>&1; then
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    if [[ "$current_branch" == "main" ]] && git fetch -q origin main; then
+        if git merge-base --is-ancestor HEAD origin/main && [[ $(git rev-parse HEAD) != $(git rev-parse origin/main) ]]; then
+            echo "⚠️  Local main is behind origin/main. Please: git pull --rebase origin main (or fetch/rebase) then push again. Aborting early to save time."
+            exit 1
+        fi
+    fi
+fi
+
 # Ensure cleanup always happens
 cleanup() {
     if [[ -n "${server_pid:-}" ]]; then
@@ -70,28 +81,28 @@ if command -v docker &> /dev/null; then
     echo "🐳 Testing Docker build (timeout ${DOCKER_BUILD_TIMEOUT}s)..."
     build_log="logs/prepush_docker_build.log"
     mkdir -p logs
-        # Use timeout if available; otherwise manual elapsed check
-        if command -v timeout >/dev/null 2>&1; then
-                if ! timeout ${DOCKER_BUILD_TIMEOUT}s docker build --pull --progress=plain -t gartan-scraper-test . > "$build_log" 2>&1; then
-                    status=$?
-                    echo "❌ Docker build failed or timed out (exit=$status). Last 60 lines:" >&2
-                    tail -n 60 "$build_log" || true
-                    exit 1
-                fi
-        else
-                build_start=$(date +%s)
-                if ! docker build --pull --progress=plain -t gartan-scraper-test . > "$build_log" 2>&1; then
-                    status=$?
-                    echo "❌ Docker build failed (exit=$status). Last 60 lines:" >&2
-                    tail -n 60 "$build_log" || true
-                    exit 1
-                fi
-                build_end=$(date +%s)
-                build_elapsed=$(( build_end - build_start ))
-                if (( build_elapsed > DOCKER_BUILD_TIMEOUT )); then
-                    echo "⚠️  Docker build exceeded suggested timeout (${build_elapsed}s > ${DOCKER_BUILD_TIMEOUT}s)" >&2
-                fi
+    build_rc=0
+    if command -v timeout >/dev/null 2>&1; then
+        timeout ${DOCKER_BUILD_TIMEOUT}s docker build --pull --progress=plain -t gartan-scraper-test . >"$build_log" 2>&1 || build_rc=$?
+        if [[ $build_rc -eq 124 ]]; then
+            echo "❌ Docker build timed out after ${DOCKER_BUILD_TIMEOUT}s. Last 60 lines:" >&2
+            tail -n 60 "$build_log" || true
+            exit 1
         fi
+    else
+        build_start=$(date +%s)
+        docker build --pull --progress=plain -t gartan-scraper-test . >"$build_log" 2>&1 || build_rc=$?
+        build_end=$(date +%s)
+        build_elapsed=$(( build_end - build_start ))
+        if (( build_elapsed > DOCKER_BUILD_TIMEOUT )); then
+            echo "⚠️  Docker build exceeded suggested timeout (${build_elapsed}s > ${DOCKER_BUILD_TIMEOUT}s)" >&2
+        fi
+    fi
+    if [[ $build_rc -ne 0 ]]; then
+        echo "❌ Docker build failed (exit=$build_rc). Last 60 lines:" >&2
+        tail -n 60 "$build_log" || true
+        exit 1
+    fi
     echo "✅ Docker build successful"
     docker rmi gartan-scraper-test > /dev/null 2>&1 || true
 else
