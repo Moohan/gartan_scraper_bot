@@ -73,7 +73,9 @@ def _calculate_availability_summary(
     }
 
 
-def aggregate_appliance_availability(daily_appliance_lists, crew_list_agg=None):  # pylint: disable=too-complex
+def aggregate_appliance_availability(
+    daily_appliance_lists, crew_list_agg=None
+):  # pylint: disable=too-complex
     """
     Aggregate appliance availability across multiple days, calculate next_available, next_available_until, available_now, available_for.
     Also add a 'crew' entry: list of crew available during the next available period for the appliance.
