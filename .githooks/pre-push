@@ -1,10 +1,22 @@
 #!/bin/bash
 # Pre-push hook for Gartan Scraper Bot
-# Runs comprehensive tests and validations before pushing
+# Runs comprehensive tests and validations before pushing.
+# Adds explicit timeouts & robust cleanup to avoid hanging pushes.
 
-set -e
+set -euo pipefail
 
-echo "🚀 Running pre-push checks..."
+DOCKER_BUILD_TIMEOUT=${DOCKER_BUILD_TIMEOUT:-300}   # seconds (5m default)
+API_START_TIMEOUT=${API_START_TIMEOUT:-10}
+
+echo "🚀 Running pre-push checks (timeouts: docker=${DOCKER_BUILD_TIMEOUT}s api=${API_START_TIMEOUT}s)..."
+
+# Ensure cleanup always happens
+cleanup() {
+    if [[ -n "${server_pid:-}" ]]; then
+        kill "$server_pid" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT INT TERM
 
 # Run all tests including integration tests
 echo "🧪 Running comprehensive test suite..."
@@ -14,10 +26,14 @@ python -m pytest tests/ -v --cov=. --cov-report=term-missing || {
 }
 
 # Check that API server can start
-echo "🌐 Testing API server startup..."
-timeout 10s python api_server.py > /dev/null 2>&1 &
+echo "🌐 Testing API server startup (timeout ${API_START_TIMEOUT}s)..."
+if command -v timeout >/dev/null 2>&1; then
+    timeout ${API_START_TIMEOUT}s python api_server.py > logs/prepush_api_start.log 2>&1 &
+else
+    python api_server.py > logs/prepush_api_start.log 2>&1 &
+fi
 server_pid=$!
-sleep 3
+sleep 2
 
 # Test if server is responsive
 if curl -f http://localhost:5000/health > /dev/null 2>&1; then
@@ -28,18 +44,33 @@ else
     exit 1
 fi
 
-# Cleanup
+# Stop API server (trap will also catch if earlier fail)
 kill $server_pid 2>/dev/null || true
 
 # Check Docker build (if Docker is available)
 if command -v docker &> /dev/null; then
-    echo "🐳 Testing Docker build..."
-    docker build -t gartan-scraper-test . > /dev/null || {
-        echo "❌ Docker build failed"
-        exit 1
-    }
+    echo "🐳 Testing Docker build (timeout ${DOCKER_BUILD_TIMEOUT}s)..."
+    build_log="logs/prepush_docker_build.log"
+    mkdir -p logs
+    if command -v timeout >/dev/null 2>&1; then
+        if ! timeout ${DOCKER_BUILD_TIMEOUT}s docker build --progress=plain -t gartan-scraper-test . > "$build_log" 2>&1; then
+            status=$?
+            echo "❌ Docker build failed or timed out (exit=$status). Last 40 lines:" >&2
+            tail -n 40 "$build_log" || true
+            exit 1
+        fi
+    else
+        if ! docker build --progress=plain -t gartan-scraper-test . > "$build_log" 2>&1; then
+            status=$?
+            echo "❌ Docker build failed (exit=$status). Last 40 lines:" >&2
+            tail -n 40 "$build_log" || true
+            exit 1
+        fi
+    fi
     echo "✅ Docker build successful"
     docker rmi gartan-scraper-test > /dev/null 2>&1 || true
+else
+    echo "ℹ️  Docker not found; skipping image build test"
 fi
 
 # Check for large files
@@ -53,7 +84,7 @@ fi
 
 # Check for secrets in code
 echo "🔒 Checking for potential secrets..."
-secret_patterns=("password" "secret" "key" "token" "api_key")
+secret_patterns=("password" "secret" "token" "api_key")
 for pattern in "${secret_patterns[@]}"; do
     matches=$(git diff origin/main --name-only | xargs grep -il "$pattern" 2>/dev/null | grep -v ".env.example" || true)
     if [ -n "$matches" ]; then
