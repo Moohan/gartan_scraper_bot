@@ -64,19 +64,16 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
           mypy --ignore-missing-imports *.py || true
-      - name: Pylint
+      - name: Pylint (full)
         run: |
-          # Install pylint if not already present (could be added to requirements/dev extras later)
           pip install --disable-pip-version-check --quiet pylint
-          echo "Running pylint (excluding tests to phase in gradually)..."
-          # Find project python files excluding tests directory and generated cache / build dirs
+          echo "Running full pylint (excluding tests for now)..."
           PY_FILES=$(git ls-files '*.py' | grep -v '^tests/' || true)
           if [ -z "$PY_FILES" ]; then
             echo "No Python files detected for pylint run"
             exit 0
           fi
-          # Run pylint errors-only for initial adoption phase (will widen categories later)
-          pylint --errors-only $PY_FILES
+          pylint $PY_FILES
       - name: Security scan (bandit)
         run: |
           bandit -r . -f txt || true
