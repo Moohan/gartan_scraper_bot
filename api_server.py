@@ -1,8 +1,20 @@
 #!/usr/bin/env python3
-"""
-Production Flask API Server for Gartan Availability System
+"""Production Flask API server exposing availability endpoints.
 
-Serves REST API endpoints for crew and appliance availability data
+Endpoints (v1):
+    /health                               — service + DB status
+    /v1/crew                              — list crew ids/names
+    /v1/crew/<id>/available               — boolean current availability
+    /v1/crew/<id>/duration                — remaining duration string or null
+    /v1/crew/<id>/hours-this-week         — hours available since Monday
+    /v1/crew/<id>/hours-planned-week      — total planned hours this week
+    /v1/appliances/<name>/available       — appliance availability
+    /v1/appliances/<name>/duration        — appliance availability duration
+
+Design notes:
+    * Database reads are short-lived connections (no global pool needed yet).
+    * Business logic is delegated to helper functions for testability.
+    * Responses conform to simple spec: primitives or small JSON objects.
 """
 
 import logging
@@ -11,7 +23,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 
 from config import config
 

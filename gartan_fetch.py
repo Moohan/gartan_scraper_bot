@@ -1,9 +1,17 @@
+"""HTTP fetching and caching layer for Gartan schedule HTML.
+
+Core responsibilities:
+ - Manage authenticated session lifecycle (reuse within timeout)
+ - Fetch daily schedule HTML via AJAX endpoint
+ - Provide intelligent cache modes (default, no-cache, cache-first, cache-only)
+ - Persist raw HTML to disk with pluggable cache expiry minutes
+"""
+
 import os
 from datetime import datetime as dt
-from datetime import timedelta
 
-from bs4 import BeautifulSoup
-from dotenv import load_dotenv
+from bs4 import BeautifulSoup  # type: ignore
+from dotenv import load_dotenv  # type: ignore
 
 from connection_manager import get_session_manager
 from utils import log_debug
@@ -19,14 +27,20 @@ def fetch_and_cache_grid_html(
     base=1.5,
     cache_mode=None,
 ):
-    """
-    Fetch grid HTML for a given date, using cache if available and fresh.
-    Handles exponential backoff between fetches.
-    Returns grid_html (str or None).
-    cache_mode: None (default), 'no-cache', 'cache-first', 'cache-only'
+    """Return raw grid HTML for booking_date using local cache strategy.
+
+    Parameters:
+        session: authenticated requests-like session.
+        booking_date (str): Date in dd/mm/yyyy format.
+        cache_dir (str): Directory for cache files.
+        cache_minutes (int): Freshness window ( -1 = infinite ).
+        min_delay/max_delay/base: Delay parameters for polite backoff after network fetch.
+        cache_mode (str|None): Override strategy ('no-cache','cache-first','cache-only').
+
+    Returns:
+        str|None: HTML string if retrieved, else None when cache-only miss or fetch failure.
     """
     import os
-    import random
 
     cache_file = os.path.join(cache_dir, f"grid_{booking_date.replace('/', '-')}.html")
     cache_exists = os.path.exists(cache_file)
@@ -307,7 +321,7 @@ def _build_login_payload(form, username, password):
     Build the payload dictionary for the login POST request.
     """
     # TODO: Refactor to reduce complexity (pylint R0912/R0915)
-    # pylint: disable=too-many-branches,too-many-statements
+    # pylint: disable=too-many-branches,too-many-statements,too-complex
     payload = {}
     try:
         input_tags = list(form.find_all("input"))
