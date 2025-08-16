@@ -89,37 +89,46 @@ jobs:
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:
-          files: ./coverage.xml
-          flags: unittests
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   docker:
-    name: Build & Push Docker
+    name: Build & Push Multi-Arch Docker
     runs-on: ubuntu-latest
     needs: quality
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build image
-        uses: docker/build-push-action@v6
+          
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/gartan_scraper_bot
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            
+      - name: Build and push multi-platform
+        uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/gartan_scraper_bot:latest
-            ${{ secrets.DOCKER_USERNAME }}/gartan_scraper_bot:${{ github.sha }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/gartan_scraper_bot:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/gartan_scraper_bot:buildcache,mode=max
-      - name: Smoke test container
-        run: |
-          docker run --rm ${{ secrets.DOCKER_USERNAME }}/gartan_scraper_bot:latest python --version
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
