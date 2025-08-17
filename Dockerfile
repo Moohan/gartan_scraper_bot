@@ -1,10 +1,12 @@
 # Multi-stage Docker build for Gartan Scraper Bot
 FROM python:3.13-alpine AS builder
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies for Alpine
+RUN apk add --no-cache --virtual .build-deps \
+    gcc \
+    musl-dev \
+    linux-headers \
+    && apk add --no-cache git
 
 # Set working directory
 WORKDIR /app
@@ -15,17 +17,21 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Production stage
-FROM python:3.13-slim AS production
+# Clean up build dependencies to reduce layer size
+RUN apk del .build-deps
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    sqlite3 \
+# Production stage - Use same Alpine base for consistency
+FROM python:3.13-alpine AS production
+
+# Install runtime dependencies for Alpine
+RUN apk add --no-cache \
+    sqlite \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates
 
-# Create non-root user
-RUN groupadd -r gartan && useradd --no-log-init -r -g gartan gartan
+# Create non-root user (Alpine style)
+RUN addgroup -g 1001 -S gartan && \
+    adduser -u 1001 -S gartan -G gartan
 
 # Set working directory
 WORKDIR /app
@@ -33,12 +39,13 @@ WORKDIR /app
 # Copy Python dependencies from builder
 COPY --from=builder /root/.local /home/gartan/.local
 
-# Copy application code
-COPY . .
-
 # Create directories for data persistence
 RUN mkdir -p /app/data /app/_cache /app/logs && \
     chown -R gartan:gartan /app
+
+# Copy application code (do this after creating directories for better caching)
+COPY --chown=gartan:gartan *.py ./
+COPY --chown=gartan:gartan specification/ ./specification/
 
 # Set environment variables
 ENV PATH=/home/gartan/.local/bin:$PATH
