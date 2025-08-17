@@ -76,7 +76,6 @@ def run_scraper(max_days: int = 3) -> bool:
             "run_bot.py",
             "--max-days",
             str(max_days),
-            "--cache-first",
         ]
 
         # Run the scraper
