@@ -167,8 +167,8 @@ if __name__ == "__main__":
 
         # Read crew contact info from crew_details.local
         contact_map = {}
-        if os.path.exists("crew_details.local"):
-            with open("crew_details.local", "r", encoding="utf-8") as f:
+        if os.path.exists(config.crew_details_file):
+            with open(config.crew_details_file, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line or line.startswith("#"):

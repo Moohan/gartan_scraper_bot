@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   gartan-scraper:
-  image: ${DOCKER_IMAGE:-jamesmcmahon0/gartan_scraper_bot:latest}
+    image: ${DOCKER_IMAGE:-jamesmcmahon0/gartan_scraper_bot:latest}
     container_name: gartan-scrape
     ports:
       - "${PORT:-5000}:5000"
@@ -11,14 +11,12 @@ services:
       - GARTAN_PASSWORD=${GARTAN_PASSWORD}
       - PORT=5000
       - FLASK_ENV=production
+      - MEDIA=/app/data
     volumes:
-      # Persist database and cache
+      # Persist all bot data in a single volume using MEDIA environment variable
       - gartan_data:/app/data
-      - gartan_cache:/app/_cache
-      - gartan_logs:/app/logs
-      # Mount database to host directory for easy access
-      - ./gartan_availability.db:/app/gartan_availability.db
-      - ./crew_details.local:/app/crew_details.local:ro
+      # Optional: Mount local crew details file if it exists
+      - ./crew_details.local:/app/data/crew_details.local:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
@@ -34,8 +32,4 @@ services:
 
 volumes:
   gartan_data:
-    driver: local
-  gartan_cache:
-    driver: local
-  gartan_logs:
     driver: local

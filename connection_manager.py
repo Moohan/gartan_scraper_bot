@@ -6,7 +6,9 @@ from typing import Generator
 
 import requests
 
-DB_PATH = "gartan_availability.db"
+from config import config
+
+DB_PATH = config.db_path
 
 
 @contextmanager

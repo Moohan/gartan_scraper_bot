@@ -51,6 +51,7 @@ ENV PATH=/home/gartan/.local/bin:$PATH
 ENV PYTHONPATH=/app
 ENV FLASK_ENV=production
 ENV PORT=5000
+ENV MEDIA=/app/data
 
 # Switch to non-root user
 USER gartan

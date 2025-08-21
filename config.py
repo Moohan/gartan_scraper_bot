@@ -8,12 +8,24 @@ class Config:
 
     def __init__(self):
         self.log_level = "DEBUG"
-        self.db_path = "gartan_availability.db"
-        self.cache_dir = "_cache"
+        
+        # Get media directory from environment, default to current directory
+        self.media_dir = os.environ.get("MEDIA", ".")
+        
+        # Ensure media directory exists
+        if not os.path.exists(self.media_dir):
+            os.makedirs(self.media_dir, exist_ok=True)
+        
+        # Configure all persistent file paths relative to media directory
+        self.db_path = os.path.join(self.media_dir, "gartan_availability.db")
+        self.cache_dir = os.path.join(self.media_dir, "_cache")
+        self.log_file = os.path.join(self.media_dir, "gartan_debug.log")
+        self.crew_details_file = os.path.join(self.media_dir, "crew_details.local")
+        
+        # Other configuration
         self.max_cache_minutes = 60 * 24 * 7  # 1 week
         self.gartan_username = os.environ.get("GARTAN_USERNAME", "")
         self.gartan_password = os.environ.get("GARTAN_PASSWORD", "")
-        self.log_file = "gartan_debug.log"
         self.max_log_size = 10 * 1024 * 1024  # 10MB
         self.max_workers = 4  # For concurrent processing
 

@@ -83,14 +83,15 @@ def run_api_server():
 def wait_for_database():
     """Wait for initial database to be populated"""
     import sqlite3
+    from config import config
 
     max_wait = 300  # 5 minutes
     wait_time = 0
 
     while wait_time < max_wait and not shutdown_flag.is_set():
         try:
-            if os.path.exists("gartan_availability.db"):
-                conn = sqlite3.connect("gartan_availability.db")
+            if os.path.exists(config.db_path):
+                conn = sqlite3.connect(config.db_path)
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) FROM crew")
                 crew_count = cursor.fetchone()[0]

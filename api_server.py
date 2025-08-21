@@ -27,6 +27,8 @@ from flask import Flask, jsonify
 
 from config import config
 
+DB_PATH = config.db_path
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -26,7 +26,7 @@ def test_run_bot_cli(tmp_path):
         cwd=project_root,
         capture_output=True,
         text=True,
-        env=_subprocess_env(),
+        env=_subprocess_env({"MEDIA": str(tmp_path)}),
     )
     assert result.returncode == 0
     assert (
@@ -44,7 +44,7 @@ def test_run_bot_cli_cache_preferred(tmp_path):
         cwd=project_root,
         capture_output=True,
         text=True,
-        env=_subprocess_env(),
+        env=_subprocess_env({"MEDIA": str(tmp_path)}),
     )
     assert result.returncode == 0
     assert (
@@ -62,7 +62,7 @@ def test_run_bot_cli_cache_off(tmp_path):
         cwd=project_root,
         capture_output=True,
         text=True,
-        env=_subprocess_env(),
+        env=_subprocess_env({"MEDIA": str(tmp_path)}),
     )
     assert result.returncode == 0
     assert (
@@ -78,7 +78,7 @@ def test_run_bot_cli_missing_crew_details(tmp_path):
         cwd=project_root,
         capture_output=True,
         text=True,
-        env=_subprocess_env(),
+        env=_subprocess_env({"MEDIA": str(tmp_path)}),
     )
     # Should fallback to default/test crew details or print a warning
     assert result.returncode == 0
