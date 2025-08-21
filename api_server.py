@@ -36,9 +36,6 @@ logger = logging.getLogger(__name__)
 # Create Flask app
 app = Flask(__name__)
 
-# Database path
-DB_PATH = config.db_path
-
 
 def get_db_connection():
     """Get database connection with row factory."""
@@ -322,10 +319,6 @@ def get_appliance_duration_data(appliance_name: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error getting appliance duration: {e}")
         return {"error": "Internal server error"}
-
-
-# Database configuration
-DB_PATH = "gartan_availability.db"
 
 
 def db_exists():
