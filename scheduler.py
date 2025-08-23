@@ -16,13 +16,17 @@ from typing import Optional
 
 import schedule
 
+from config import Config
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-DB_PATH = "gartan_availability.db"
+# Initialize configuration
+config = Config()
+DB_PATH = config.db_path
 
 
 def check_database_health() -> bool:
