@@ -33,9 +33,11 @@ jobs:
       run: |
         python -m pytest tests/ -v
 
-    - name: Build Docker image
-      run: |
-        docker build -t gartan-scraper:${{ github.ref_name }} .
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
     - name: Login to Docker Hub
       uses: docker/login-action@v3
@@ -43,55 +45,18 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Tag and Push to Docker Hub
-      run: |
-        docker tag gartan-scraper:${{ github.ref_name }} jamesmcmahon0/gartan_scraper_bot:${{ github.ref_name }}
-        docker tag gartan-scraper:${{ github.ref_name }} jamesmcmahon0/gartan_scraper_bot:latest
-        docker push jamesmcmahon0/gartan_scraper_bot:${{ github.ref_name }}
-        docker push jamesmcmahon0/gartan_scraper_bot:latest
-      env:
-        DOCKER_BUILDKIT: 1
-
-    - name: Verify Docker Image
-      run: |
-        docker pull jamesmcmahon0/gartan_scraper_bot:${{ github.ref_name }}
-        docker run -d --rm --name verify-image \
-          -e GARTAN_USERNAME=${{ secrets.GARTAN_USERNAME }} \
-          -e GARTAN_PASSWORD=${{ secrets.GARTAN_PASSWORD }} \
+    - name: Build and push Multi-Arch image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
           jamesmcmahon0/gartan_scraper_bot:${{ github.ref_name }}
-        sleep 10
-        docker logs verify-image
+          jamesmcmahon0/gartan_scraper_bot:latest
 
     - name: Create GitHub Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
       with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
-        body: |
-          ## Changes in ${{ github.ref_name }}
-
-          ### 🚀 Features
-          - Docker image available as `${{ secrets.DOCKER_USERNAME }}/gartan-scraper:${{ github.ref_name }}`
-
-          ### 🐳 Docker Deployment
-          ```bash
-          docker pull jamesmcmahon0/gartan_scraper_bot:${{ github.ref_name }}
-          docker run -d --name gartan-scraper \
-            -e GARTAN_USERNAME=your_username \
-            -e GARTAN_PASSWORD=your_password \
-            -p 5000:5000 \
-            jamesmcmahon0/gartan_scraper_bot:${{ github.ref_name }}
-          ```
-
-          ### 📋 Requirements
-          - Python 3.13+
-          - Docker (optional)
-          - Valid Gartan system credentials
-
-          ### 🔗 Links
-          - [Docker Hub](https://hub.docker.com/r/jamesmcmahon0/gartan_scraper_bot)
-          - [Documentation](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md)
-        draft: false
-        prerelease: false
+        generate_release_notes: true
