@@ -17,8 +17,6 @@ services:
       - /media/elements/gartan/data:/app/data
       - /media/elements/gartan/cache:/app/_cache
       - /media/elements/gartan/logs:/app/logs
-      # Mount database to host directory for easy access
-      - /media/elements/gartan/gartan_availability.db:/app/gartan_availability.db
       - ./crew_details.local:/app/crew_details.local:ro
     restart: unless-stopped
     healthcheck:
