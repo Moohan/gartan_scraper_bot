@@ -323,7 +323,6 @@ def get_appliance_duration_data(appliance_name: str) -> Dict[str, Any]:
 
 
 # Database configuration
-DB_PATH = "gartan_availability.db"
 
 
 def db_exists():
