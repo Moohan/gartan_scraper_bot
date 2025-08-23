@@ -14,7 +14,7 @@ import threading
 import time
 from multiprocessing import Process
 
-from config import ScraperConfig
+from config import Config
 
 # Configure logging
 logging.basicConfig(
@@ -23,7 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Initialize configuration
-config = ScraperConfig()
+config = Config()
 
 # Global process tracking
 processes = []
