@@ -334,11 +334,13 @@ def db_exists():
 
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        
+
         # Check if crew table exists (basic structure check)
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='crew'")
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='crew'"
+        )
         has_crew_table = cursor.fetchone() is not None
-        
+
         # If table exists, we consider the database ready even if no data yet
         conn.close()
         return has_crew_table
@@ -375,21 +377,23 @@ def health_check():
 @app.route("/", methods=["GET"])
 def root():
     """Root endpoint - API information"""
-    return jsonify({
-        "service": "Gartan Scraper Bot API",
-        "version": "1.0",
-        "endpoints": {
-            "health": "/health",
-            "crew": "/v1/crew",
-            "crew_available": "/v1/crew/<id>/available",
-            "crew_duration": "/v1/crew/<id>/duration",
-            "crew_hours_week": "/v1/crew/<id>/hours-this-week",
-            "crew_planned_week": "/v1/crew/<id>/hours-planned-week",
-            "appliance_available": "/v1/appliances/<name>/available",
-            "appliance_duration": "/v1/appliances/<name>/duration"
-        },
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    })
+    return jsonify(
+        {
+            "service": "Gartan Scraper Bot API",
+            "version": "1.0",
+            "endpoints": {
+                "health": "/health",
+                "crew": "/v1/crew",
+                "crew_available": "/v1/crew/<id>/available",
+                "crew_duration": "/v1/crew/<id>/duration",
+                "crew_hours_week": "/v1/crew/<id>/hours-this-week",
+                "crew_planned_week": "/v1/crew/<id>/hours-planned-week",
+                "appliance_available": "/v1/appliances/<name>/available",
+                "appliance_duration": "/v1/appliances/<name>/duration",
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
 
 
 @app.route("/v1/crew", methods=["GET"])
