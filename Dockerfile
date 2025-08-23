@@ -15,7 +15,7 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Clean up build dependencies to reduce layer size
 RUN apk del .build-deps
@@ -30,15 +30,14 @@ RUN apk add --no-cache \
     ca-certificates
 
 # Create non-root user (Alpine style)
-RUN addgroup -g 1001 -S gartan && \
-    adduser -u 1001 -S gartan -G gartan
+RUN addgroup -g 1000 -S gartan && \
+    adduser -u 1000 -S gartan -G gartan
 
 # Set working directory
 WORKDIR /app
 
 # Copy Python dependencies from builder
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /root/.local /home/gartan/.local
 
 # Create directories for data persistence
 RUN mkdir -p /app/data /app/_cache /app/logs && \
@@ -48,6 +47,7 @@ RUN mkdir -p /app/data /app/_cache /app/logs && \
 COPY --chown=gartan:gartan *.py ./
 
 # Set environment variables
+ENV PATH=/home/gartan/.local/bin:$PATH
 ENV PYTHONPATH=/app
 ENV FLASK_ENV=production
 ENV PORT=5000
