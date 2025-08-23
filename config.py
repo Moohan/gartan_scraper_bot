@@ -13,7 +13,11 @@ class Config:
         self.max_cache_minutes = 60 * 24 * 7  # 1 week
         self.gartan_username = os.environ.get("GARTAN_USERNAME", "")
         self.gartan_password = os.environ.get("GARTAN_PASSWORD", "")
-        self.log_file = "gartan_debug.log"
+        # Use container path if running in container, local path otherwise
+        if os.path.exists("/app"):
+            self.log_file = "/app/logs/gartan_debug.log"
+        else:
+            self.log_file = "gartan_debug.log"
         self.max_log_size = 10 * 1024 * 1024  # 10MB
         self.max_workers = 4  # For concurrent processing
 
