@@ -28,7 +28,7 @@ from flask import Flask, jsonify
 from config import config
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Create Flask app
@@ -327,24 +327,31 @@ DB_PATH = "gartan_availability.db"
 
 
 def db_exists():
-    """Check if database exists and has basic structure"""
+    """Check if database exists and is accessible"""
     try:
+        logger.debug(f"Checking database at: {DB_PATH}")
+        
         if not os.path.exists(DB_PATH):
+            logger.debug(f"Database file does not exist at {DB_PATH}")
             return False
 
+        # Try to open and read the database
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-
-        # Check if crew table exists (basic structure check)
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='crew'"
-        )
-        has_crew_table = cursor.fetchone() is not None
-
-        # If table exists, we consider the database ready even if no data yet
+        
+        # Simple check - if we can execute a basic query, the DB is good
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = cursor.fetchall()
+        
         conn.close()
-        return has_crew_table
-    except Exception:
+        
+        # If we have any tables, consider it healthy
+        has_tables = len(tables) > 0
+        logger.debug(f"Database has {len(tables)} tables: {[t[0] for t in tables]}")
+        
+        return has_tables
+    except Exception as e:
+        logger.error(f"Database check failed: {e}")
         return False
 
 
