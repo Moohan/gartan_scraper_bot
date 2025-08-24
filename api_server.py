@@ -28,7 +28,9 @@ from flask import Flask, jsonify
 from config import config
 
 
-def merge_time_periods(periods: List[Tuple[datetime, datetime]]) -> List[Tuple[datetime, datetime]]:
+def merge_time_periods(
+    periods: List[Tuple[datetime, datetime]],
+) -> List[Tuple[datetime, datetime]]:
     """Merge overlapping time periods to avoid double-counting hours."""
     if not periods:
         return []
@@ -49,6 +51,7 @@ def merge_time_periods(periods: List[Tuple[datetime, datetime]]) -> List[Tuple[d
             merged.append((current_start, current_end))
 
     return merged
+
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
