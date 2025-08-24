@@ -31,7 +31,7 @@ curl http://localhost:5000/health
 # List all crew (with display names)
 curl http://localhost:5000/v1/crew
 
-# Check availability  
+# Check availability
 curl http://localhost:5000/v1/crew/1/available
 
 # Get duration remaining
