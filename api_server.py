@@ -52,19 +52,19 @@ def get_crew_list_data() -> List[Dict[str, Any]]:
             cursor = conn.cursor()
             cursor.execute("SELECT id, name, contact FROM crew ORDER BY name")
             rows = cursor.fetchall()
-            
+
             crew_list = []
             for row in rows:
                 crew_data = {"id": row["id"], "name": row["name"]}
-                
+
                 # Extract display name from contact field if available
                 if row["contact"]:
                     contact_parts = row["contact"].split("|")
                     if len(contact_parts) >= 1 and contact_parts[0]:
                         crew_data["display_name"] = contact_parts[0]
-                
+
                 crew_list.append(crew_data)
-            
+
             return crew_list
     except Exception as e:
         logger.error(f"Error getting crew list: {e}")
