@@ -174,9 +174,14 @@ if __name__ == "__main__":
                     if not line or line.startswith("#"):
                         continue
                     parts = line.split("|")
-                    if len(parts) == 3:
-                        crew_id, display_name, phone = parts
-                        contact_map[crew_id] = f"{display_name}|{phone}"
+                    if len(parts) >= 3:  # Support both old format (3 parts) and new format (5 parts)
+                        crew_id = parts[0]
+                        display_name = parts[1]
+                        phone = parts[2]
+                        email = parts[3] if len(parts) > 3 else ""
+                        position = parts[4] if len(parts) > 4 else ""
+                        # Store enhanced contact info
+                        contact_map[crew_id] = f"{display_name}|{phone}|{email}|{position}"
         from db_store import (
             insert_appliance_availability,
             insert_crew_availability,
