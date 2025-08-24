@@ -159,12 +159,34 @@ This Python bot logs in to the Gartan Availability system, retrieves and parses 
 - `DEPLOYMENT.md`: Quick deployment guide for published images
 - `GITHUB_SETUP.md`: Repository secrets and CI/CD configuration guide
 
+## Business Rules & Data Validation
+
+### Critical Business Rules (Must Be Enforced)
+1. **Appliance TTR Dependency**: P22P6 appliance can only be available if James Coutie (TTR skill) is available
+2. **Appliance LGV Dependency**: P22P6 appliance requires at least one of Chris Casely, Jane Saba, or Olly Gibb (LGV skill) available  
+3. **Minimum Crew Requirement**: P22P6 appliance can only be available if at least 4 total crew members are available
+4. **Daily Hour Limits**: No crew member or appliance can exceed 24 hours availability in a single day
+5. **Weekly Hour Limits**: No crew member or appliance can exceed 168 hours availability in a single week
+6. **Data Quality Filters**: API applies duration ≤1 day and recency ≥7 days filters to exclude corrupted data
+
+### Crew Skill Mapping
+- **TTR Skill**: James Coutie (ID: 1) - Required for appliance operation
+- **LGV Skill**: Chris Casely (ID: 2), Olly Gibb (ID: 3), Jane Saba (ID: 7) - At least one required for appliance
+- **All Crew**: 7 total members, minimum 4 must be available for appliance operation
+
+### API Protection Mechanisms
+- **Overlap Merging**: `merge_time_periods()` function prevents double-counting of overlapping availability blocks
+- **Quality Filters**: SQL queries filter out impossible durations and old data
+- **Boundary Clamping**: Week calculations properly bounded to prevent future time inclusion
+- **Business Rule Validation**: Real-time compliance checking for appliance availability dependencies
+
 ## Extensibility
 
 - New features should use the established dataclass + function modularity patterns
 - Container changes require updating both local and CI/CD Docker configurations
 - API changes must include specification updates and comprehensive testing
 - Always maintain backward compatibility with DB schema unless specified in `specification/database_schema.md`
+- **Business rules must be preserved**: Any API changes must maintain enforcement of the 6 critical business rules
 
 ## AI Agent Instructions
 
