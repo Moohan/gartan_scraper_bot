@@ -1,4 +1,4 @@
-# Development override for docker-compose.yml  
+# Development override for docker-compose.yml
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 #
 # Enables hot-reload by mounting source code and sets development environment

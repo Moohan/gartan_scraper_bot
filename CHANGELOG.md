@@ -7,7 +7,7 @@
 - **📧 Contact Info**: Full contact format with emails and positions
 - **🐳 Auto-Built Images**: Docker images auto-published to `jamesmcmahon0/gartan_scraper_bot:latest`
 
-### Changed  
+### Changed
 - **📚 Simplified Docs**: Streamlined documentation focused on Pi deployment and API usage
 - **🔧 Unified Config**: Single docker-compose.yml with intelligent defaults
 
@@ -24,7 +24,7 @@
 
 ### Added
 - **� Container Deployment**: Full Docker containerization with health checks
-- **� REST API**: 6 core endpoints for crew and appliance availability  
+- **� REST API**: 6 core endpoints for crew and appliance availability
 - **⚡ Automated Scheduling**: Data collection every 5 minutes
 
 ### Changed

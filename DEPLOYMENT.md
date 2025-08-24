@@ -36,7 +36,7 @@ curl http://localhost:5000/v1/crew
 docker-compose ps
 docker-compose logs -f
 
-# Update 
+# Update
 docker-compose pull && docker-compose up -d
 
 # Stop

@@ -47,12 +47,21 @@ trap cleanup EXIT INT TERM
 # Ensure logs directory exists early for redirections
 mkdir -p logs
 
-# Run all tests including integration tests
+# Run all tests including integration tests (with parallel execution if available)
 echo "🧪 Running comprehensive test suite..."
-python -m pytest tests/ -v --cov=. --cov-report=term-missing || {
-    echo "❌ Comprehensive tests failed"
-    exit 1
-}
+if python -c "import pytest_xdist" 2>/dev/null; then
+    echo "Using parallel test execution..."
+    python -m pytest tests/ -n auto --quiet --tb=short || {
+        echo "❌ Comprehensive tests failed"
+        exit 1
+    }
+else
+    echo "Running tests sequentially (install pytest-xdist for parallel execution)..."
+    python -m pytest tests/ --quiet --tb=short || {
+        echo "❌ Comprehensive tests failed"
+        exit 1
+    }
+fi
 
 # Check that API server can start
 echo "🌐 Testing API server startup (timeout ${API_START_TIMEOUT}s)..."

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Pre-commit hook for Gartan Scraper Bot
-# Runs tests, linting, and validation before allowing commits
+# Fast pre-commit hook for Gartan Scraper Bot
+# Minimal checks for immediate feedback - full validation done in pre-push
 
 set -e
 
-echo "🔍 Running pre-commit checks..."
+echo "🔍 Running fast pre-commit checks..."
 
 # Check if we're in the right directory
 if [ ! -f "run_bot.py" ]; then
@@ -12,92 +12,55 @@ if [ ! -f "run_bot.py" ]; then
     exit 1
 fi
 
-# Check Python syntax
+# Check Python syntax (only staged files)
 echo "🐍 Checking Python syntax..."
-python -m py_compile *.py || {
-    echo "❌ Python syntax errors found"
-    exit 1
-}
-
-# Auto-format with Black & isort (only changed/staged files to speed up)
-echo "🧹 Auto-formatting (black & isort)..."
-if command -v black >/dev/null 2>&1; then
-    black . >/dev/null 2>&1 || true
-fi
-if command -v isort >/dev/null 2>&1; then
-    isort . >/dev/null 2>&1 || true
-fi
-
-# Re-stage any formatting changes
-if [ -n "$(git diff --name-only --diff-filter=ACM)" ]; then
-    git add .
-fi
-
-# Run core tests (fast feedback)
-echo "🧪 Running core tests..."
-python -m pytest tests/ -q || {
-    echo "❌ Tests failed"
-    exit 1
-}
-
-# Pylint on staged Python files (excluding tests for speed initially)
-echo "🔎 Running pylint on staged files..."
-if command -v pylint >/dev/null 2>&1; then
-    staged_py=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' | grep -v '^tests/' || true)
-    if [ -n "$staged_py" ]; then
-        pylint --errors-only $staged_py || {
-           echo "❌ Pylint (errors-only) failed"
-           exit 1
-        }
-    else
-        echo "No staged Python files to lint"
-    fi
-else
-    echo "Pylint not installed; skipping (install with 'pip install pylint' for local checks)"
-fi
-
-# Check for TODO/FIXME comments in staged files
-echo "📝 Checking for TODO/FIXME comments..."
-staged_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(py|md)$' || true)
-if [ -n "$staged_files" ]; then
-    todo_count=$(grep -n -i "TODO\|FIXME" $staged_files | wc -l || true)
-    if [ "$todo_count" -gt 0 ]; then
-        echo "⚠️  Warning: Found $todo_count TODO/FIXME comments in staged files"
-        grep -n -i "TODO\|FIXME" $staged_files || true
-        echo "Consider addressing these before committing"
-    fi
-fi
-
-# Check that required files exist
-echo "📂 Checking required files..."
-required_files=("requirements.txt" "Dockerfile" "docker-compose.yml" ".env.example")
-for file in "${required_files[@]}"; do
-    if [ ! -f "$file" ]; then
-        echo "❌ Required file missing: $file"
-        exit 1
-    fi
-done
-
-# Validate database schema if database exists
-if [ -f "gartan_availability.db" ]; then
-    echo "🗄️  Validating database schema..."
-    python -c "
-import sqlite3
-conn = sqlite3.connect('gartan_availability.db')
-cursor = conn.cursor()
-# Check required tables exist
-tables = ['crew', 'appliance', 'crew_availability', 'appliance_availability']
-for table in tables:
-    cursor.execute(\"SELECT name FROM sqlite_master WHERE type='table' AND name=?\", (table,))
-    if not cursor.fetchone():
-        print(f'❌ Required table missing: {table}')
-        exit(1)
-print('✅ Database schema validation passed')
-conn.close()
-" || {
-        echo "❌ Database schema validation failed"
+staged_py=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' || true)
+if [ -n "$staged_py" ]; then
+    echo "$staged_py" | xargs python -m py_compile || {
+        echo "❌ Python syntax errors found"
         exit 1
     }
 fi
 
-echo "✅ All pre-commit checks passed!"
+# Auto-format with Black & isort (only staged files for speed)
+echo "🧹 Auto-formatting (black & isort)..."
+if [ -n "$staged_py" ]; then
+    if command -v black >/dev/null 2>&1; then
+        echo "$staged_py" | xargs black --quiet 2>/dev/null || true
+    fi
+    if command -v isort >/dev/null 2>&1; then
+        echo "$staged_py" | xargs isort --quiet 2>/dev/null || true
+    fi
+    
+    # Re-stage any formatting changes
+    if [ -n "$(git diff --name-only $staged_py 2>/dev/null || true)" ]; then
+        git add $staged_py
+    fi
+fi
+
+# Quick core tests (only if core files changed)
+core_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '(run_bot|api_server|db_store|parse_grid|gartan_fetch)\.py$' || true)
+if [ -n "$core_files" ]; then
+    echo "🧪 Running core tests (core files modified)..."
+    python -m pytest tests/test_db_store.py tests/test_parse_grid.py -q || {
+        echo "❌ Core tests failed"
+        exit 1
+    }
+else
+    echo "✅ No core files modified, skipping tests"
+fi
+
+# Check that required files exist (only if they might be affected)
+modified_files=$(git diff --cached --name-only --diff-filter=D || true)
+if echo "$modified_files" | grep -qE '(requirements\.txt|Dockerfile|docker-compose\.yml|\.env\.example)'; then
+    echo "📂 Checking required files..."
+    required_files=("requirements.txt" "Dockerfile" "docker-compose.yml" ".env.example")
+    for file in "${required_files[@]}"; do
+        if [ ! -f "$file" ]; then
+            echo "❌ Required file missing: $file"
+            exit 1
+        fi
+    done
+fi
+
+echo "✅ Fast pre-commit checks passed!"
