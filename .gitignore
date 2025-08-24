@@ -22,3 +22,11 @@ docker-compose.production.yml
 
 # Recreated documentation
 DOCKER_COMPOSE_GUIDE.md
+
+# Local validation documentation (keep local only)
+API_VALIDATION_*.md
+BUSINESS_RULES_VALIDATION_*.md
+VALIDATION_*.md
+business_rules_validation.py
+test_api_validation.py
+run_api_test.py
