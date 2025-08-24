@@ -214,13 +214,13 @@ def get_crew_hours_this_week_data(crew_id: int) -> Dict[str, Any]:
             week_start, _ = get_week_boundaries()
             now = datetime.now()
 
-            # Get all availability blocks from Monday to now with quality filters
+            # Get all availability blocks from Monday to now with relaxed filters for weekly calculations
             cursor.execute(
                 """
                 SELECT start_time, end_time FROM crew_availability
                 WHERE crew_id = ? AND end_time > ? AND start_time < ?
-                AND (julianday(end_time) - julianday(start_time)) <= 1.0
-                AND date(start_time) >= date('now', '-7 days')
+                AND (julianday(end_time) - julianday(start_time)) <= 14.0
+                AND date(start_time) >= date('now', '-30 days')
                 ORDER BY start_time
             """,
                 (crew_id, week_start, now),
@@ -274,13 +274,13 @@ def get_crew_hours_planned_week_data(crew_id: int) -> Dict[str, Any]:
 
             week_start, week_end = get_week_boundaries()
 
-            # Get all availability blocks for the entire week with quality filters
+            # Get all availability blocks for the entire week with relaxed filters for weekly calculations
             cursor.execute(
                 """
                 SELECT start_time, end_time FROM crew_availability
                 WHERE crew_id = ? AND end_time > ? AND start_time < ?
-                AND (julianday(end_time) - julianday(start_time)) <= 1.0
-                AND date(start_time) >= date('now', '-7 days')
+                AND (julianday(end_time) - julianday(start_time)) <= 14.0
+                AND date(start_time) >= date('now', '-30 days')
                 ORDER BY start_time
             """,
                 (crew_id, week_start, week_end),
