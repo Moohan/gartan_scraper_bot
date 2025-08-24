@@ -1,15 +1,17 @@
+# Development override for docker-compose.yml  
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Enables hot-reload by mounting source code and sets development environment
+
 version: '3.8'
 
 services:
   gartan-scraper:
     environment:
-      - GARTAN_USERNAME=${GARTAN_USERNAME}
-      - GARTAN_PASSWORD=${GARTAN_PASSWORD}
-      - PORT=5000
       - FLASK_ENV=development
       - FLASK_DEBUG=true
     volumes:
-      # Mount source code for development hot-reload
+      # Mount source code for development hot-reload (overrides volume mounts)
       - .:/app
     command: ["python", "container_main.py"]
     # Override restart policy for development

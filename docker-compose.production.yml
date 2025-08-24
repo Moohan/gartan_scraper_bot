@@ -1,0 +1,19 @@
+# Production override for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+#
+# For Raspberry Pi deployment, create a .env file with:
+# DATA_PATH=/media/elements/gartan/data
+# CACHE_PATH=/media/elements/gartan/cache  
+# LOGS_PATH=/media/elements/gartan/logs
+# USER_ID=1000
+# GROUP_ID=1000
+
+version: '3.8'
+
+services:
+  gartan-scraper:
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=false
+    # Production restart policy
+    restart: unless-stopped

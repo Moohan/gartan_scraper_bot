@@ -2,26 +2,27 @@ version: '3.8'
 
 services:
   gartan-scraper:
-  image: ${DOCKER_IMAGE:-jamesmcmahon0/gartan_scraper_bot:latest}
+    image: ${DOCKER_IMAGE:-jamesmcmahon0/gartan_scraper_bot:latest}
     container_name: gartan-scrape
+    user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
     ports:
       - "${PORT:-5000}:5000"
     environment:
       - GARTAN_USERNAME=${GARTAN_USERNAME}
       - GARTAN_PASSWORD=${GARTAN_PASSWORD}
       - PORT=5000
-      - FLASK_ENV=production
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - FLASK_DEBUG=${FLASK_DEBUG:-false}
     volumes:
-      # Persist database and cache
-      - gartan_data:/app/data
-      - gartan_cache:/app/_cache
-      - gartan_logs:/app/logs
-      # Mount database to host directory for easy access
-      - ./gartan_availability.db:/app/gartan_availability.db
+      # Production: Use Docker volumes or specific host paths
+      # Development: Mount source code (override in docker-compose.override.yml)
+      - ${DATA_PATH:-gartan_data}:/app/data
+      - ${CACHE_PATH:-gartan_cache}:/app/_cache
+      - ${LOGS_PATH:-gartan_logs}:/app/logs
       - ./crew_details.local:/app/crew_details.local:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
       interval: 30s
       timeout: 10s
       retries: 3
