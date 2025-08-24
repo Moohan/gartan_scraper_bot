@@ -21,11 +21,34 @@ import logging
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from flask import Flask, jsonify
 
 from config import config
+
+
+def merge_time_periods(periods: List[Tuple[datetime, datetime]]) -> List[Tuple[datetime, datetime]]:
+    """Merge overlapping time periods to avoid double-counting hours."""
+    if not periods:
+        return []
+
+    # Sort periods by start time
+    sorted_periods = sorted(periods, key=lambda x: x[0])
+    merged = [sorted_periods[0]]
+
+    for current_start, current_end in sorted_periods[1:]:
+        last_start, last_end = merged[-1]
+
+        # If current period overlaps with the last merged period
+        if current_start <= last_end:
+            # Merge by extending the end time if necessary
+            merged[-1] = (last_start, max(last_end, current_end))
+        else:
+            # No overlap, add as new period
+            merged.append((current_start, current_end))
+
+    return merged
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -83,12 +106,16 @@ def get_crew_available_data(crew_id: int) -> Dict[str, Any]:
             if not crew:
                 return {"error": f"Crew ID {crew_id} not found"}
 
-            # Check current availability
+            # Check current availability with data quality filters
             now = datetime.now()
             cursor.execute(
                 """
                 SELECT COUNT(*) as count FROM crew_availability
-                WHERE crew_id = ? AND start_time <= ? AND end_time > ?
+                WHERE crew_id = ?
+                AND datetime(start_time) <= datetime(?)
+                AND datetime(end_time) > datetime(?)
+                AND (julianday(end_time) - julianday(start_time)) <= 1.0
+                AND date(start_time) >= date('now', '-7 days')
             """,
                 (crew_id, now, now),
             )
@@ -126,12 +153,16 @@ def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
             if not crew:
                 return {"error": f"Crew ID {crew_id} not found"}
 
-            # Get next availability block
+            # Get next availability block with data quality filters
             now = datetime.now()
             cursor.execute(
                 """
                 SELECT start_time, end_time FROM crew_availability
-                WHERE crew_id = ? AND start_time <= ? AND end_time > ?
+                WHERE crew_id = ?
+                AND datetime(start_time) <= datetime(?)
+                AND datetime(end_time) > datetime(?)
+                AND (julianday(end_time) - julianday(start_time)) <= 1.0
+                AND date(start_time) >= date('now', '-7 days')
                 ORDER BY start_time LIMIT 1
             """,
                 (crew_id, now, now),
@@ -183,19 +214,22 @@ def get_crew_hours_this_week_data(crew_id: int) -> Dict[str, Any]:
             week_start, _ = get_week_boundaries()
             now = datetime.now()
 
-            # Get all availability blocks from Monday to now
+            # Get all availability blocks from Monday to now with quality filters
             cursor.execute(
                 """
                 SELECT start_time, end_time FROM crew_availability
                 WHERE crew_id = ? AND end_time > ? AND start_time < ?
+                AND (julianday(end_time) - julianday(start_time)) <= 1.0
+                AND date(start_time) >= date('now', '-7 days')
                 ORDER BY start_time
             """,
                 (crew_id, week_start, now),
             )
 
             blocks = cursor.fetchall()
-            total_hours = 0.0
 
+            # Convert to datetime objects and clamp to boundaries
+            time_periods = []
             for block in blocks:
                 block_start = datetime.fromisoformat(block[0])
                 block_end = datetime.fromisoformat(block[1])
@@ -204,10 +238,21 @@ def get_crew_hours_this_week_data(crew_id: int) -> Dict[str, Any]:
                 effective_start = max(block_start, week_start)
                 effective_end = min(block_end, now)
 
-                # Only count if there's actual overlap
+                # Only include if there's actual overlap
                 if effective_end > effective_start:
-                    duration = effective_end - effective_start
-                    total_hours += duration.total_seconds() / 3600
+                    time_periods.append((effective_start, effective_end))
+
+            # Merge overlapping periods to avoid double-counting
+            if not time_periods:
+                return {"hours_this_week": 0.0}
+
+            merged_periods = merge_time_periods(time_periods)
+
+            # Calculate total hours from merged periods
+            total_hours = 0.0
+            for start, end in merged_periods:
+                duration = end - start
+                total_hours += duration.total_seconds() / 3600
 
             return {"hours_this_week": round(total_hours, 2)}
     except Exception as e:
@@ -229,19 +274,22 @@ def get_crew_hours_planned_week_data(crew_id: int) -> Dict[str, Any]:
 
             week_start, week_end = get_week_boundaries()
 
-            # Get all availability blocks for the entire week
+            # Get all availability blocks for the entire week with quality filters
             cursor.execute(
                 """
                 SELECT start_time, end_time FROM crew_availability
                 WHERE crew_id = ? AND end_time > ? AND start_time < ?
+                AND (julianday(end_time) - julianday(start_time)) <= 1.0
+                AND date(start_time) >= date('now', '-7 days')
                 ORDER BY start_time
             """,
                 (crew_id, week_start, week_end),
             )
 
             blocks = cursor.fetchall()
-            total_hours = 0.0
 
+            # Convert to datetime objects and clamp to boundaries
+            time_periods = []
             for block in blocks:
                 block_start = datetime.fromisoformat(block[0])
                 block_end = datetime.fromisoformat(block[1])
@@ -250,10 +298,21 @@ def get_crew_hours_planned_week_data(crew_id: int) -> Dict[str, Any]:
                 effective_start = max(block_start, week_start)
                 effective_end = min(block_end, week_end)
 
-                # Only count if there's actual overlap
+                # Only include if there's actual overlap
                 if effective_end > effective_start:
-                    duration = effective_end - effective_start
-                    total_hours += duration.total_seconds() / 3600
+                    time_periods.append((effective_start, effective_end))
+
+            # Merge overlapping periods to avoid double-counting
+            if not time_periods:
+                return {"hours_planned_week": 0.0}
+
+            merged_periods = merge_time_periods(time_periods)
+
+            # Calculate total hours from merged periods
+            total_hours = 0.0
+            for start, end in merged_periods:
+                duration = end - start
+                total_hours += duration.total_seconds() / 3600
 
             return {"hours_planned_week": round(total_hours, 2)}
     except Exception as e:
@@ -275,12 +334,16 @@ def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
 
             appliance_id = appliance[0]  # id is first column
 
-            # Check current availability
+            # Check current availability with data quality filters
             now = datetime.now()
             cursor.execute(
                 """
                 SELECT COUNT(*) as count FROM appliance_availability
-                WHERE appliance_id = ? AND start_time <= ? AND end_time > ?
+                WHERE appliance_id = ?
+                AND datetime(start_time) <= datetime(?)
+                AND datetime(end_time) > datetime(?)
+                AND (julianday(end_time) - julianday(start_time)) <= 1.0
+                AND date(start_time) >= date('now', '-7 days')
             """,
                 (appliance_id, now, now),
             )
@@ -308,12 +371,16 @@ def get_appliance_duration_data(appliance_name: str) -> Dict[str, Any]:
 
             appliance_id = appliance[0]  # id is first column
 
-            # Get next availability block
+            # Get next availability block with data quality filters
             now = datetime.now()
             cursor.execute(
                 """
                 SELECT start_time, end_time FROM appliance_availability
-                WHERE appliance_id = ? AND start_time <= ? AND end_time > ?
+                WHERE appliance_id = ?
+                AND datetime(start_time) <= datetime(?)
+                AND datetime(end_time) > datetime(?)
+                AND (julianday(end_time) - julianday(start_time)) <= 1.0
+                AND date(start_time) >= date('now', '-7 days')
                 ORDER BY start_time LIMIT 1
             """,
                 (appliance_id, now, now),
