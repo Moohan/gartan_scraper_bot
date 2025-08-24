@@ -4,13 +4,14 @@ This project uses a unified `docker-compose.yml` configuration with environment-
 
 ## Configuration Files
 
-### 🏠 **docker-compose.yml** (Base Configuration)
-- **Purpose**: Main configuration used by all environments
+### 🏠 **docker-compose.yml** (Main Configuration)
+- **Purpose**: Primary configuration for all environments
 - **Features**: 
   - Environment variable driven (configurable via `.env`)
   - Health checks using root endpoint `/`
   - Proper user permissions for volume mounts
   - JSON file logging with rotation
+  - Production defaults (can be overridden via environment variables)
 
 ### 🛠️ **docker-compose.dev.yml** (Development Override)
 - **Purpose**: Development-specific settings
@@ -19,14 +20,6 @@ This project uses a unified `docker-compose.yml` configuration with environment-
   - Hot-reload by mounting source code
   - Development Flask environment
   - No automatic restart (for debugging)
-
-### 🚀 **docker-compose.production.yml** (Production Override)
-- **Purpose**: Production hardening
-- **Usage**: `docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d`
-- **Features**:
-  - Production Flask environment
-  - Automatic restart policy
-  - Optimized for stability
 
 ## Environment Configuration
 
@@ -93,8 +86,8 @@ ssh pi@your-pi "cd gartan && docker-compose up -d"
 cp .env.example .env
 # Edit .env with production values
 
-# 2. Deploy with production overrides
-docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+# 2. Deploy in production mode
+docker-compose up -d
 
 # 3. Monitor health
 curl http://localhost:5000/health
@@ -202,7 +195,7 @@ docker-compose restart
 
 ### 📦 **Old Files → New Structure**
 
-- ❌ `docker-compose.prod.yml` → ✅ `docker-compose.production.yml`
+- ❌ `docker-compose.prod.yml` → ✅ `docker-compose.yml` (unified configuration)
 - ❌ `deploy/pi-docker-compose.yml` → ✅ `docker-compose.yml` + `.env`
 - ❌ Hardcoded paths → ✅ Environment variables
 
@@ -213,8 +206,8 @@ docker-compose restart
    # Old
    docker-compose -f docker-compose.prod.yml up -d
    
-   # New
-   docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+   # New (production defaults)
+   docker-compose up -d
    ```
 
 2. **Convert environment configuration**:
