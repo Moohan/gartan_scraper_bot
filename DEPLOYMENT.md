@@ -1,53 +1,44 @@
-# Quick Docker Deployment
+# Pi Deployment Guide
 
-## Using Published Image (Recommended)
+## Quick Setup
 
-1. **Create environment file:**
-   ```bash
-   echo "GARTAN_USERNAME=your_username" > .env
-   echo "GARTAN_PASSWORD=your_password" >> .env
-   ```
+**1. Create .env file:**
 
-2. **Deploy with docker-compose:**
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **Verify deployment:**
-   ```bash
-   curl http://localhost:5000/health
-   ```
-
-The service will be available at:
-- **API Server**: http://localhost:5000
-- **Container Name**: `gartan-scrape`
-- **Image**: `${DOCKER_USERNAME}/gartan_scraper_bot:latest` (e.g. `jamesmcmahon0/gartan_scraper_bot:latest`)
-
-## Docker Compose Configuration
-
-Your docker-compose.yml now uses the published image:
-
-```yaml
-services:
-  gartan-scraper:
-    container_name: gartan-scrape
-  image: ${DOCKER_IMAGE:-jamesmcmahon0/gartan_scraper_bot:latest}
-    ports:
-      - "5000:5000"
-    environment:
-      - GARTAN_USERNAME=${GARTAN_USERNAME}
-      - GARTAN_PASSWORD=${GARTAN_PASSWORD}
-    volumes:
-      - gartan_data:/app/data
-      - gartan_cache:/app/_cache
-    restart: unless-stopped
+```bash
+echo "GARTAN_USERNAME=your_username" > .env
+echo "GARTAN_PASSWORD=your_password" >> .env
 ```
 
-## Automated Publishing
+**2. Deploy:**
 
-The Docker image is automatically published to Docker Hub via GitHub Actions:
-- **Push to main**: Publishes `${DOCKER_USERNAME}/gartan_scraper_bot:latest`
-- **Version tags**: Publishes `${DOCKER_USERNAME}/gartan_scraper_bot:v1.x.x`
-- **Commits**: Publishes `${DOCKER_USERNAME}/gartan_scraper_bot:sha-abcd123`
+```bash
+docker-compose up -d
+```
 
-No manual building required!
+**3. Test:**
+
+```bash
+curl http://localhost:5000/health
+curl http://localhost:5000/v1/crew
+```
+
+## Container Details
+
+- **Image**: `jamesmcmahon0/gartan_scraper_bot:latest` (auto-built)
+- **Port**: 5000
+- **Data**: Persisted in Docker volumes
+- **Restart**: Automatic unless stopped
+
+## Management
+
+```bash
+# Check status
+docker-compose ps
+docker-compose logs -f
+
+# Update 
+docker-compose pull && docker-compose up -d
+
+# Stop
+docker-compose down
+```

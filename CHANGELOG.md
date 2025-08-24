@@ -1,53 +1,34 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+## [1.3.0] - 2025-08-24
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+### Added
+- **👥 Display Names**: Enhanced crew API with friendly display names from contact data
+- **📧 Contact Info**: Full contact format with emails and positions
+- **🐳 Auto-Built Images**: Docker images auto-published to `jamesmcmahon0/gartan_scraper_bot:latest`
 
-## [Unreleased]
+### Changed  
+- **📚 Simplified Docs**: Streamlined documentation focused on Pi deployment and API usage
+- **🔧 Unified Config**: Single docker-compose.yml with intelligent defaults
 
 ## [1.2.1] - 2025-08-11
 
 ### Added
-- **📅 Weekly Hours Endpoints**: Added `/hours-this-week` and `/hours-planned-week` for per‑crew aggregation
-- **🗄 Persistent DB Init**: Database initialization is now non‑destructive by default; set `RESET_DB=1` env var to force a rebuild
+- **📅 Weekly Hours**: `/hours-this-week` and `/hours-planned-week` endpoints
+- **� Persistent DB**: Non-destructive database initialization
 
 ### Changed
-- **⏱ Duration Format**: `/duration` endpoints now return an hours string (e.g. `"3.25h"`) or `null` (was previously minutes JSON). Keeps API concise & spec-aligned
-
-### Testing
-- **🧪 Tests**: 77 tests passing; legacy demo test scripts moved under `examples/` or deprecated
+- **⏱ Duration Format**: API returns hours string (e.g., `"3.25h"`) or `null`
 
 ## [1.2.0] - 2025-08-08
 
 ### Added
-- **🔧 Core Focus**: Streamlined to 6 essential components (read, process, store, serve, containerize, test)
-- **📦 Minimal Config**: Lightweight configuration management with environment variable support
+- **� Container Deployment**: Full Docker containerization with health checks
+- **� REST API**: 6 core endpoints for crew and appliance availability  
+- **⚡ Automated Scheduling**: Data collection every 5 minutes
 
 ### Changed
-- **🧹 Major Cleanup**: Reduced codebase by 40% (removed ~20 non-essential files)
-
-### Fixed
-- **🚀 API Fixes**: All 6 REST endpoints working correctly
-
-### Removed
-**Files Removed**: test_compatibility.py, test_direct_api.py, validate_*.py, check_db.py, improvements/ directory
-
-**Files Created**: Minimal config.py, connection_manager.py, cli.py replacements
-
-### Testing
-- **✅ Validation**: All 62 core tests passing, real data integration confirmed
-
-## CI/CD Pipeline Activation
-
-### 🎯 CI/CD Pipeline Status: ACTIVE ✅
-
-Automated Docker Hub publishing is now live! Every push to main automatically:
-
-- Runs comprehensive test suite (62 tests)
-- Builds and publishes to ${DOCKER_USERNAME}/gartan_scraper_bot (configured via secrets, default jamesmcmahon0)
-- Creates versioned releases and security scans
+- **🧹 Streamlined**: 40% code reduction, focused on core functionality
 
 Deploy anywhere with: `docker-compose up -d`
 
