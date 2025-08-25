@@ -469,10 +469,40 @@ def parse_grid_html(grid_html, date=None):  # pylint: disable=too-complex
     return merged
 
 
+def _is_crew_available_in_cell(cell):
+    """
+    Determine if a crew member is available based on cell content and styling.
+    Returns True if available, False if unavailable.
+    """
+    style = cell.get("style", "")
+    cell_text = cell.get_text(strip=True)
+    
+    # Check for specific unavailable reason codes
+    if cell_text == "O":  # Off
+        return False
+    elif cell_text == "W":  # Working (often means unavailable for additional duties)
+        return False
+    elif cell_text in ["S", "SL", "AL", "H"]:  # Sick, Sick Leave, Annual Leave, Holiday
+        return False
+    elif cell_text in ["T", "TR", "C"]:  # Training, Course - usually unavailable for ops
+        return False
+    elif isinstance(style, str) and "background-color" in style.lower():
+        # Background color present - check if it's a specific unavailable state
+        style_str = style.replace(" ", "").lower()
+        # Red/pink backgrounds typically indicate unavailable
+        if any(color in style_str for color in ["#ff0000", "#ff6666", "#ffcccc", "red"]):
+            return False
+        # Gray backgrounds might indicate off/unavailable
+        elif any(color in style_str for color in ["#cccccc", "#999999", "gray", "grey"]):
+            return False
+    
+    return True  # Default to available
+
+
 def _parse_availability_cells(avail_cells, time_slots, date_prefix, entity_type="crew"):
     """
     Parse availability cells for a crew or appliance row.
-    - For 'crew', availability is the default state (no background style).
+    - For 'crew', availability is determined by specific unavailable states
     - For 'appliance', availability is explicitly marked by a green background.
     """
     availability = {}
@@ -480,18 +510,13 @@ def _parse_availability_cells(avail_cells, time_slots, date_prefix, entity_type=
         slot = time_slots[i]
         slot_key = f"{date_prefix} {slot}"
 
-        style = cell.get("style", "")
         is_available = False  # Default to not available
 
         if entity_type == "crew":
-            # For crew, a slot is available if it does NOT have a background-color style.
-            # The presence of 'background-color' indicates a special state (off, etc.).
-            if isinstance(style, str) and "background-color" in style.lower():
-                is_available = False
-            else:
-                is_available = True
+            is_available = _is_crew_available_in_cell(cell)
         elif entity_type == "appliance":
             # For appliances, a slot is available if it has the specific green background color.
+            style = cell.get("style", "")
             if isinstance(style, str):
                 style_str = style.replace(" ", "").lower()
                 if "background-color:#009933" in style_str:
@@ -499,6 +524,87 @@ def _parse_availability_cells(avail_cells, time_slots, date_prefix, entity_type=
 
         availability[slot_key] = is_available
     return availability
+
+
+def parse_skills_table(grid_html, date=None):
+    """
+    Parse the skills/rules table to extract BA, LGV, Total Crew counts for validation.
+    Returns dict with skill availability data for cross-checking computed values.
+    """
+    from bs4 import BeautifulSoup, Tag
+    
+    log_debug("skills", "Parsing skills/rules table...")
+    soup = BeautifulSoup(grid_html, "html.parser")
+    tables = [t for t in soup.find_all("table") if isinstance(t, Tag)]
+    
+    skills_table = None
+    for table in tables:
+        # Look for table with "Rules" header
+        rows = table.find_all("tr")
+        for row in rows:
+            cells = row.find_all("td")
+            if cells and cells[0].get_text(strip=True).lower() == "rules":
+                skills_table = table
+                break
+        if skills_table:
+            break
+    
+    if not skills_table:
+        log_debug("skills", "No skills/rules table found")
+        return {}
+    
+    # Extract time slots from header
+    header_row = None
+    rows = skills_table.find_all("tr")
+    for i, row in enumerate(rows):
+        cells = row.find_all("td")
+        if cells and cells[0].get_text(strip=True).lower() == "rules":
+            if i + 1 < len(rows):
+                header_row = rows[i + 1]
+            break
+    
+    if not header_row:
+        log_debug("skills", "No header row found after 'Rules'")
+        return {}
+    
+    time_slots = []
+    header_cells = header_row.find_all("td")[1:]  # Skip first merged cell
+    for cell in header_cells:
+        time_text = cell.get_text(strip=True)
+        if time_text.isdigit() and len(time_text) == 4:
+            time_slots.append(time_text)
+    
+    # Parse skill rows (BA, LGV, Total Crew, etc.)
+    skills_data = {}
+    date_prefix = _normalize_date(date)
+    
+    for row in rows:
+        cells = row.find_all("td")
+        if len(cells) < 2:
+            continue
+            
+        skill_name = cells[0].get_text(strip=True)
+        if skill_name in ["BA", "LGV", "Total Crew", "MGR"]:
+            # This should be a "Req"/"Avail" pair
+            if len(cells) > len(time_slots):
+                # Parse available numbers for each time slot
+                avail_data = {}
+                for i, time_slot in enumerate(time_slots):
+                    slot_key = f"{date_prefix} {time_slot}"
+                    # Cells might be offset - need to find the right index
+                    cell_idx = i + 1
+                    if cell_idx < len(cells):
+                        avail_text = cells[cell_idx].get_text(strip=True)
+                        try:
+                            avail_count = int(avail_text) if avail_text.isdigit() else 0
+                            avail_data[slot_key] = avail_count
+                        except ValueError:
+                            avail_data[slot_key] = 0
+                
+                skills_data[skill_name] = avail_data
+    
+    log_debug("skills", f"Parsed skills data: {skills_data}")
+    return {"skills_availability": skills_data}
 
 
 def _normalize_date(date):
