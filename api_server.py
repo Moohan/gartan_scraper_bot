@@ -135,8 +135,9 @@ def get_crew_available_data(crew_id: int) -> Dict[str, Any]:
             )
 
             result = cursor.fetchone()
-            is_available = result["count"] > 0
-
+            count = result["count"]
+            is_available = count > 0
+            
             return {"available": is_available}
     except Exception as e:
         logger.error(f"Error checking crew availability: {e}")
