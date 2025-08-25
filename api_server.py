@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """Production Flask API server exposing availability endpoints.
 
-Endpoints (v1):
+Endpoints:
     /health                               — service + DB status
-    /v1/crew                              — list crew ids/names
-    /v1/crew/<id>/available               — boolean current availability
-    /v1/crew/<id>/duration                — remaining duration string or null
-    /v1/crew/<id>/hours-this-week         — hours available since Monday
-    /v1/crew/<id>/hours-planned-week      — total planned hours this week
-    /v1/crew/<id>/contract-hours          — contract hours info (e.g., "61 (159)")
-    /v1/crew/<id>/hours-achieved          — hours worked so far this week
-    /v1/crew/<id>/hours-remaining         — hours remaining to fulfill contract
-    /v1/appliances/<name>/available       — appliance availability
-    /v1/appliances/<name>/duration        — appliance availability duration
+    /crew                                 — list crew ids/names
+    /crew/<id>/available                  — boolean current availability
+    /crew/<id>/duration                   — remaining duration string or null
+    /crew/<id>/hours-this-week            — hours available since Monday
+    /crew/<id>/hours-planned-week         — total planned hours this week
+    /crew/<id>/contract-hours             — contract hours info (e.g., "61 (159)")
+    /crew/<id>/hours-achieved             — hours worked so far this week
+    /crew/<id>/hours-remaining            — hours remaining to fulfill contract
+    /appliances/<name>/available          — appliance availability
+    /appliances/<name>/duration           — appliance availability duration
 
 Design notes:
     * Database reads are short-lived connections (no global pool needed yet).
@@ -26,7 +26,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template_string
 
 from config import config
 
@@ -187,13 +187,24 @@ def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
             if result:
                 end_time = datetime.fromisoformat(result[1])
                 duration_minutes = int((end_time - now).total_seconds() / 60)
+                
+                # Format end time for display
+                end_time_str = end_time.strftime('%H:%M')
+                if end_time.date() == now.date():
+                    end_time_display = f"{end_time_str} today"
+                elif end_time.date() == (now + timedelta(days=1)).date():
+                    end_time_display = f"{end_time_str} tomorrow"
+                else:
+                    end_time_display = end_time.strftime('%H:%M on %d/%m')
+                
                 return {
                     "duration": _format_duration_minutes_to_hours_string(
                         max(0, duration_minutes)
-                    )
+                    ),
+                    "end_time_display": end_time_display
                 }
             else:
-                return {"duration": None}
+                return {"duration": None, "end_time_display": None}
     except Exception as e:
         logger.error(f"Error getting crew duration: {e}")
         return {"error": "Internal server error"}
@@ -583,30 +594,416 @@ def health_check():
 
 @app.route("/", methods=["GET"])
 def root():
-    """Root endpoint - API information"""
-    return jsonify(
-        {
-            "service": "Gartan Scraper Bot API",
-            "version": "1.0",
-            "endpoints": {
-                "health": "/health",
-                "crew": "/v1/crew",
-                "crew_available": "/v1/crew/<id>/available",
-                "crew_duration": "/v1/crew/<id>/duration",
-                "crew_hours_week": "/v1/crew/<id>/hours-this-week",
-                "crew_planned_week": "/v1/crew/<id>/hours-planned-week",
-                "crew_contract_hours": "/v1/crew/<id>/contract-hours",
-                "crew_hours_achieved": "/v1/crew/<id>/hours-achieved",
-                "crew_hours_remaining": "/v1/crew/<id>/hours-remaining",
-                "appliance_available": "/v1/appliances/<name>/available",
-                "appliance_duration": "/v1/appliances/<name>/duration",
-            },
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+    """Root endpoint - Visual dashboard of all API data"""
+    try:
+        # Get all crew data
+        crew_list = get_crew_list_data()
+        current_time = datetime.now()
+        
+        # Collect all crew availability and duration data
+        crew_data = []
+        for crew in crew_list:
+            if isinstance(crew, dict) and 'id' in crew:
+                crew_id = crew['id']
+                availability_data = get_crew_available_data(crew_id)
+                duration_data = get_crew_duration_data(crew_id)
+                
+                crew_info = {
+                    'id': crew_id,
+                    'name': crew.get('name', 'Unknown'),
+                    'display_name': crew.get('display_name', crew.get('name', 'Unknown')),
+                    'role': crew.get('role', 'Unknown'),
+                    'skills': crew.get('skills', 'None'),
+                    'available': availability_data.get('available', False) if 'available' in availability_data else False,
+                    'duration': duration_data.get('duration') if 'duration' in duration_data else None,
+                    'end_time_display': duration_data.get('end_time_display') if 'end_time_display' in duration_data else None,
+                    'contract_hours': crew.get('contract_hours', 'Unknown')
+                }
+                crew_data.append(crew_info)
+        
+        # Sort crew data: 1st by availability (available first), 2nd by role, 3rd by surname
+        def sort_crew_key(crew):
+            # Extract surname from name (format: "SURNAME, INITIALS")
+            surname = crew['name'].split(',')[0] if ',' in crew['name'] else crew['name']
+            # Define role hierarchy for sorting (higher rank = lower sort value)
+            role_hierarchy = {'WC': 1, 'CM': 2, 'CC': 3, 'FFC': 4, 'FFD': 5, 'FFT': 6}
+            role_sort = role_hierarchy.get(crew['role'], 99)
+            
+            # Sort tuple: available (False=0, True=1, but we want available first so negate), role rank, surname
+            return (not crew['available'], role_sort, surname)
+        
+        crew_data.sort(key=sort_crew_key)
+        
+        # Get appliance data
+        p22p6_available_data = get_appliance_available_data('P22P6')
+        p22p6_duration_data = get_appliance_duration_data('P22P6')
+        
+        appliance_data = {
+            'available': p22p6_available_data.get('available', False) if 'available' in p22p6_available_data else False,
+            'duration': p22p6_duration_data.get('duration') if 'duration' in p22p6_duration_data else None
         }
-    )
+        
+        # Count skills for available crew
+        available_crew = [c for c in crew_data if c['available']]
+        skill_counts = {'TTR': 0, 'LGV': 0, 'BA': 0}
+        for crew in available_crew:
+            skills = crew['skills'].split() if crew['skills'] and crew['skills'] != 'None' else []
+            for skill in skills:
+                if skill in skill_counts:
+                    skill_counts[skill] += 1
+        
+        # Business rules check
+        total_available = len(available_crew)
+        ttr_present = skill_counts['TTR'] > 0
+        lgv_present = skill_counts['LGV'] > 0
+        ba_non_ttr = sum(1 for c in available_crew if 'BA' in (c['skills'] or '') and 'TTR' not in (c['skills'] or ''))
+        ffc_with_ba = any(c['role'] in ['FFC', 'CC', 'WC', 'CM'] and 'BA' in (c['skills'] or '') for c in available_crew)
+        
+        business_rules = {
+            'total_crew_ok': total_available >= 4,
+            'ttr_present': ttr_present,
+            'lgv_present': lgv_present,
+            'ba_non_ttr_ok': ba_non_ttr >= 2,
+            'ffc_with_ba': ffc_with_ba
+        }
+        
+        all_rules_pass = all(business_rules.values())
+        
+        html_template = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gartan Scraper Bot - Crew Availability Dashboard</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            padding: 30px;
+        }
+        .header { 
+            text-align: center; 
+            margin-bottom: 30px; 
+            padding-bottom: 20px; 
+            border-bottom: 2px solid #eee;
+        }
+        .header h1 { 
+            color: #2c3e50; 
+            margin: 0; 
+            font-size: 2.5em;
+        }
+        .timestamp { 
+            color: #7f8c8d; 
+            font-size: 0.9em; 
+            margin-top: 10px;
+        }
+        .section { 
+            margin-bottom: 30px; 
+        }
+        .section h2 { 
+            color: #34495e; 
+            border-left: 4px solid #3498db; 
+            padding-left: 15px;
+            margin-bottom: 20px;
+        }
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+            gap: 15px; 
+        }
+        .card { 
+            border: 1px solid #ddd; 
+            border-radius: 6px; 
+            padding: 15px; 
+            background: #fafafa;
+        }
+        .available { 
+            background: #d4edda; 
+            border-color: #c3e6cb; 
+        }
+        .unavailable { 
+            background: #f8d7da; 
+            border-color: #f5c6cb; 
+        }
+        .crew-name { 
+            font-weight: bold; 
+            font-size: 1.1em; 
+            margin-bottom: 5px;
+        }
+        .crew-details { 
+            font-size: 0.9em; 
+            color: #666; 
+        }
+        .status { 
+            display: inline-block; 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            font-weight: bold; 
+            font-size: 0.8em;
+        }
+        .status.yes { 
+            background: #28a745; 
+            color: white; 
+        }
+        .status.no { 
+            background: #dc3545; 
+            color: white; 
+        }
+        .appliance-section { 
+            text-align: center; 
+            background: #e8f4fd; 
+            border: 2px solid #3498db; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin: 20px 0;
+        }
+        .appliance-status { 
+            font-size: 2em; 
+            font-weight: bold; 
+            margin: 10px 0;
+        }
+        .appliance-status.operational { 
+            color: #28a745; 
+        }
+        .appliance-status.unavailable { 
+            color: #dc3545; 
+        }
+        .business-rules { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 10px; 
+            margin: 20px 0;
+        }
+        .rule { 
+            background: #f8f9fa; 
+            padding: 10px; 
+            border-radius: 4px; 
+            border-left: 4px solid #6c757d;
+        }
+        .rule.pass { 
+            border-left-color: #28a745; 
+        }
+        .rule.fail { 
+            border-left-color: #dc3545; 
+        }
+        .summary-stats { 
+            display: flex; 
+            justify-content: space-around; 
+            background: #e9ecef; 
+            padding: 15px; 
+            border-radius: 6px; 
+            margin: 20px 0;
+        }
+        .stat { 
+            text-align: center; 
+        }
+        .stat-number { 
+            font-size: 2em; 
+            font-weight: bold; 
+            color: #495057;
+        }
+        .stat-label { 
+            font-size: 0.9em; 
+            color: #6c757d;
+        }
+        .refresh-note { 
+            text-align: center; 
+            color: #6c757d; 
+            font-style: italic; 
+            margin-top: 30px;
+        }
+        @media (max-width: 768px) {
+            .summary-stats { 
+                flex-direction: column; 
+                gap: 10px; 
+            }
+            .header h1 { 
+                font-size: 2em; 
+            }
+        }
+    </style>
+    <script>
+        // Auto-refresh every 30 seconds
+        setTimeout(() => window.location.reload(), 30000);
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚒 Gartan Crew Availability Dashboard</h1>
+            <div class="timestamp">Last updated: {{ current_time.strftime('%H:%M:%S on %d/%m/%Y') }}</div>
+        </div>
+        
+        <div class="summary-stats">
+            <div class="stat">
+                <div class="stat-number">{{ total_available }}</div>
+                <div class="stat-label">Available Crew</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">{{ skill_counts.TTR }}</div>
+                <div class="stat-label">Officer(s)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">{{ skill_counts.LGV }}</div>
+                <div class="stat-label">Driver(s)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">{{ skill_counts.BA }}</div>
+                <div class="stat-label">BA Qualified</div>
+            </div>
+        </div>
+        
+        <div class="appliance-section">
+            <h2>🚒 P22P6 Fire Appliance</h2>
+            <div class="appliance-status {{ 'operational' if appliance_data.available else 'unavailable' }}">
+                {{ 'OPERATIONAL' if appliance_data.available else 'NOT AVAILABLE' }}
+            </div>
+            {% if appliance_data.duration %}
+            <div>Available for: {{ appliance_data.duration }}</div>
+            {% endif %}
+            
+            <div class="business-rules">
+                <div class="rule {{ 'pass' if business_rules.total_crew_ok else 'fail' }}">
+                    <strong>Minimum Crew (≥4):</strong> 
+                    <span class="status {{ 'yes' if business_rules.total_crew_ok else 'no' }}">
+                        {{ 'PASS' if business_rules.total_crew_ok else 'FAIL' }}
+                    </span>
+                    <br><small>{{ total_available }} crew available</small>
+                </div>
+                <div class="rule {{ 'pass' if business_rules.ttr_present else 'fail' }}">
+                    <strong>Officer available:</strong> 
+                    <span class="status {{ 'yes' if business_rules.ttr_present else 'no' }}">
+                        {{ 'PASS' if business_rules.ttr_present else 'FAIL' }}
+                    </span>
+                    <br><small>{{ skill_counts.TTR }} officer(s) available</small>
+                </div>
+                <div class="rule {{ 'pass' if business_rules.lgv_present else 'fail' }}">
+                    <strong>Driver available:</strong> 
+                    <span class="status {{ 'yes' if business_rules.lgv_present else 'no' }}">
+                        {{ 'PASS' if business_rules.lgv_present else 'FAIL' }}
+                    </span>
+                    <br><small>{{ skill_counts.LGV }} driver(s) available</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>👥 Individual Crew Status</h2>
+            <div class="grid">
+                {% for crew in crew_data %}
+                <div class="card {{ 'available' if crew.available else 'unavailable' }}">
+                    <div class="crew-name">{{ crew.display_name }}</div>
+                    <div class="crew-details">
+                        <strong>Role:</strong> {{ crew.role }}<br>
+                        <strong>Skills:</strong> {{ crew.skills }}<br>
+                        <strong>Status:</strong> 
+                        <span class="status {{ 'yes' if crew.available else 'no' }}">
+                            {{ 'AVAILABLE' if crew.available else 'UNAVAILABLE' }}
+                        </span><br>
+                        {% if crew.available and crew.duration %}
+                        <strong>Duration:</strong> {{ crew.duration }}{% if crew.end_time_display %} ({{ crew.end_time_display }}){% endif %}<br>
+                        {% endif %}
+                        <strong>Contract:</strong> {{ crew.contract_hours }} hours
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="refresh-note">
+            This page automatically refreshes every 30 seconds
+        </div>
+        
+        <div class="section">
+            <h2>🔗 API Endpoints</h2>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 15px;">
+                    <div>
+                        <h3 style="margin-top: 0; color: #495057;">Service Information</h3>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin: 8px 0;"><a href="/health" style="text-decoration: none; color: #007bff;">/health</a> - Service and database status</li>
+                        </ul>
+                        
+                        <h3 style="color: #495057;">Crew Information</h3>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin: 8px 0;"><a href="/crew" style="text-decoration: none; color: #007bff;">/crew</a> - List all crew members with details</li>
+                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/available</span> - Check if crew member is available now</li>
+                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/duration</span> - How long crew member is available for</li>
+                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/hours-this-week</span> - Hours available since Monday</li>
+                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/contract-hours</span> - Contract hours information</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 style="margin-top: 0; color: #495057;">Appliance Information</h3>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin: 8px 0;"><a href="/appliances/P22P6/available" style="text-decoration: none; color: #007bff;">/appliances/P22P6/available</a> - Check if P22P6 is operational</li>
+                            <li style="margin: 8px 0;"><a href="/appliances/P22P6/duration" style="text-decoration: none; color: #007bff;">/appliances/P22P6/duration</a> - How long P22P6 is available for</li>
+                        </ul>
+                        
+                        <h3 style="color: #495057;">Weekly Hours Tracking</h3>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/hours-planned-week</span> - Total planned hours this week</li>
+                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/hours-achieved</span> - Hours worked so far this week</li>
+                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/hours-remaining</span> - Hours remaining to fulfill contract</li>
+                        </ul>
+                        
+                        <p style="margin-top: 15px; font-size: 0.9em; color: #6c757d;">
+                            <strong>Note:</strong> Replace {id} with actual crew member ID (e.g., /crew/1/available)
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+        """
+        
+        return render_template_string(
+            html_template,
+            crew_data=crew_data,
+            appliance_data=appliance_data,
+            current_time=current_time,
+            total_available=total_available,
+            skill_counts=skill_counts,
+            business_rules=business_rules,
+            ba_non_ttr=ba_non_ttr,
+            all_rules_pass=all_rules_pass
+        )
+        
+    except Exception as e:
+        logger.error(f"Error generating dashboard: {e}")
+        # Fallback to JSON response
+        return jsonify(
+            {
+                "service": "Gartan Scraper Bot API",
+                "version": "1.0",
+                "error": "Dashboard temporarily unavailable",
+                "endpoints": {
+                    "health": "/health",
+                    "crew": "/crew",
+                    "crew_available": "/crew/<id>/available",
+                    "crew_duration": "/crew/<id>/duration",
+                    "appliance_available": "/appliances/<name>/available",
+                    "appliance_duration": "/appliances/<name>/duration",
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
 
-@app.route("/v1/crew", methods=["GET"])
+@app.route("/crew", methods=["GET"])
 def get_crew():
     """Get list of all crew members"""
     try:
@@ -617,7 +1014,7 @@ def get_crew():
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route("/v1/crew/<int:crew_id>/available", methods=["GET"])
+@app.route("/crew/<int:crew_id>/available", methods=["GET"])
 def get_crew_available(crew_id: int):
     """Check if crew member is available right now"""
     try:
@@ -635,7 +1032,7 @@ def get_crew_available(crew_id: int):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route("/v1/crew/<int:crew_id>/duration", methods=["GET"])
+@app.route("/crew/<int:crew_id>/duration", methods=["GET"])
 def get_crew_duration(crew_id: int):
     """Get crew member's current availability duration"""
     try:
@@ -653,7 +1050,7 @@ def get_crew_duration(crew_id: int):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route("/v1/crew/<int:crew_id>/hours-this-week", methods=["GET"])
+@app.route("/crew/<int:crew_id>/hours-this-week", methods=["GET"])
 def get_crew_hours_this_week(crew_id: int):
     """Get crew member's availability hours since Monday"""
     try:
@@ -670,7 +1067,7 @@ def get_crew_hours_this_week(crew_id: int):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route("/v1/crew/<int:crew_id>/hours-planned-week", methods=["GET"])
+@app.route("/crew/<int:crew_id>/hours-planned-week", methods=["GET"])
 def get_crew_hours_planned_week(crew_id: int):
     """Get crew member's total planned weekly availability hours"""
     try:
@@ -687,7 +1084,7 @@ def get_crew_hours_planned_week(crew_id: int):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route("/v1/crew/<int:crew_id>/contract-hours", methods=["GET"])
+@app.route("/crew/<int:crew_id>/contract-hours", methods=["GET"])
 def get_crew_contract_hours(crew_id: int):
     """Get crew member's contract hours information"""
     try:
@@ -704,7 +1101,7 @@ def get_crew_contract_hours(crew_id: int):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route("/v1/crew/<int:crew_id>/hours-achieved", methods=["GET"])
+@app.route("/crew/<int:crew_id>/hours-achieved", methods=["GET"])
 def get_crew_hours_achieved(crew_id: int):
     """Get hours worked by crew member so far this week"""
     try:
@@ -721,7 +1118,7 @@ def get_crew_hours_achieved(crew_id: int):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route("/v1/crew/<int:crew_id>/hours-remaining", methods=["GET"])
+@app.route("/crew/<int:crew_id>/hours-remaining", methods=["GET"])
 def get_crew_hours_remaining(crew_id: int):
     """Get hours remaining for crew member to fulfill contract this week"""
     try:
@@ -738,7 +1135,7 @@ def get_crew_hours_remaining(crew_id: int):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route("/v1/appliances/<appliance_name>/available", methods=["GET"])
+@app.route("/appliances/<appliance_name>/available", methods=["GET"])
 def get_appliance_available(appliance_name: str):
     """Check if appliance is available right now"""
     try:
@@ -758,7 +1155,7 @@ def get_appliance_available(appliance_name: str):
         return jsonify({"error": "Internal server error"}), 500
 
 
-@app.route("/v1/appliances/<appliance_name>/duration", methods=["GET"])
+@app.route("/appliances/<appliance_name>/duration", methods=["GET"])
 def get_appliance_duration(appliance_name: str):
     """Get appliance's current availability duration"""
     try:
