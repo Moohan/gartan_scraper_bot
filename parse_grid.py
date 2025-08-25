@@ -205,18 +205,18 @@ def _extract_crew_rows(table):
 
 def _parse_crew_row(tr, time_slots, date_prefix, now):
     tds = tr.find_all("td")
-    name = tds[0].get_text(strip=True)
-    role = tds[0].attrs.get("data-role")
-    if not role and len(tds) > 1:
-        role = tds[1].get_text(strip=True)
+    
+    # Parse crew metadata from the structured columns
+    name = tds[0].get_text(strip=True)  # Employee name (colspan=2)
+    role = tds[1].get_text(strip=True) if len(tds) > 1 else None  # Role column
+    contract_hours = tds[2].get_text(strip=True) if len(tds) > 2 else None  # Contract Hours column
     skills = None
 
-    # Find the index of the first time slot column by looking for the 'skillCol'
-    # and starting from the next cell.
+    # Find the skills column (class="skillCol") and time slot start
     slot_start_idx = -1
     for i, td in enumerate(tds):
         if "skillCol" in td.get("class", []):
-            skills = td.get_text(strip=True)
+            skills = td.get_text(strip=True).replace("&nbsp;", " ").strip()
             slot_start_idx = i + 1
             break
 
@@ -244,6 +244,7 @@ def _parse_crew_row(tr, time_slots, date_prefix, now):
     return {
         "name": name,
         "role": role,
+        "contract_hours": contract_hours,
         "skills": skills,
         "availability": availability,
         **summary,
@@ -406,7 +407,14 @@ def aggregate_crew_availability(daily_crew_lists):
         for crew in crew_list:
             name = crew["name"]
             if name not in crew_dict:
-                crew_dict[name] = {"name": name, "availability": {}, "_all_slots": []}
+                crew_dict[name] = {
+                    "name": name, 
+                    "role": crew.get("role"),
+                    "skills": crew.get("skills"),
+                    "contract_hours": crew.get("contract_hours"),
+                    "availability": {}, 
+                    "_all_slots": []
+                }
             for slot, avail in crew["availability"].items():
                 crew_dict[name]["availability"][slot] = avail
                 crew_dict[name]["_all_slots"].append((slot, avail))

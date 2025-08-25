@@ -126,8 +126,8 @@ def test_aggregate_appliance_availability_empty():
 def test_parse_grid_html_missing_columns():
     html = """
     <table id='gridAvail'>
-      <tr class='gridheader'><td>Role</td></tr>
-      <tr class='employee'><td data-role='Firefighter'>Jane</td></tr>
+      <tr class='gridheader'><td>Employee</td><td>Role</td></tr>
+      <tr class='employee'><td>Jane</td><td>Firefighter</td></tr>
     </table>
     """
     result = parse_grid_html(html, "2025-08-05")
@@ -139,14 +139,14 @@ def test_parse_grid_html_missing_columns():
 def test_parse_grid_html_extra_columns():
     html = """
     <table id='gridAvail'>
-      <tr class='gridheader'><td>Role</td><td>Name</td><td>Skill</td><td>Extra</td><td>0800</td></tr>
-      <tr class='employee'><td data-role='Officer'>Alex</td><td>Alex</td><td class='skillCol'>Skill</td><td>Extra</td><td data-comment='1'></td></tr>
+      <tr class='gridheader'><td>Employee</td><td>Role</td><td>Contract Hours</td><td>Skills</td><td>Extra</td><td>0800</td></tr>
+      <tr class='employee'><td>Alex</td><td>Officer</td><td>91 (168)</td><td class='skillCol'>BA LGV</td><td>Extra</td><td data-comment='1'></td></tr>
     </table>
     """
     result = parse_grid_html(html, "2025-08-05")
     crew_list = result["crew_availability"]
     assert crew_list[0]["role"] == "Officer"  # type: ignore
-    assert crew_list[0]["skills"] == "Skill"  # type: ignore
+    assert crew_list[0]["skills"] == "BA LGV"  # type: ignore
 
 
 def test_parse_grid_html_slot_alignment():

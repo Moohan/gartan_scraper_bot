@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS crew (
     name TEXT NOT NULL UNIQUE,
     role TEXT,
     contact TEXT,
-    skills TEXT
+    skills TEXT,
+    contract_hours TEXT
 );
 """
 
@@ -134,10 +135,10 @@ def insert_crew_details(
     crew_list: list, contact_map: dict = None, db_conn: sqlite3.Connection = None
 ):
     """
-    Insert or update crew details (name, role, contact) into crew table.
+    Insert or update crew details (name, role, contract_hours, contact, skills) into crew table.
     Uses optimized batch operations and connection pooling.
 
-    crew_list: list of dicts with 'name' and 'role' keys
+    crew_list: list of dicts with 'name', 'role', 'contract_hours', and 'skills' keys
     contact_map: dict mapping name to contact info
     db_conn: an existing database connection to use (connection object, not path)
     """
@@ -156,17 +157,18 @@ def insert_crew_details(
         for crew in crew_list:
             name = crew.get("name")
             role = crew.get("role")
+            contract_hours = crew.get("contract_hours")
             skills = crew.get("skills")
             contact = None
             if contact_map and name in contact_map:
                 contact = contact_map[name]
-            crew_data.append((name, role, contact, skills))
+            crew_data.append((name, role, contact, skills, contract_hours))
 
         # Use executemany for batch operations
         c.executemany(
             """
-            INSERT INTO crew (name, role, contact, skills) VALUES (?, ?, ?, ?)
-            ON CONFLICT(name) DO UPDATE SET role=excluded.role, contact=excluded.contact, skills=excluded.skills
+            INSERT INTO crew (name, role, contact, skills, contract_hours) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(name) DO UPDATE SET role=excluded.role, contact=excluded.contact, skills=excluded.skills, contract_hours=excluded.contract_hours
             """,
             crew_data,
         )
