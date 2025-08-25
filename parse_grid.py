@@ -476,7 +476,7 @@ def _is_crew_available_in_cell(cell):
     """
     style = cell.get("style", "")
     cell_text = cell.get_text(strip=True)
-    
+
     # Check for specific unavailable reason codes
     if cell_text == "O":  # Off
         return False
@@ -484,18 +484,26 @@ def _is_crew_available_in_cell(cell):
         return False
     elif cell_text in ["S", "SL", "AL", "H"]:  # Sick, Sick Leave, Annual Leave, Holiday
         return False
-    elif cell_text in ["T", "TR", "C"]:  # Training, Course - usually unavailable for ops
+    elif cell_text in [
+        "T",
+        "TR",
+        "C",
+    ]:  # Training, Course - usually unavailable for ops
         return False
     elif isinstance(style, str) and "background-color" in style.lower():
         # Background color present - check if it's a specific unavailable state
         style_str = style.replace(" ", "").lower()
         # Red/pink backgrounds typically indicate unavailable
-        if any(color in style_str for color in ["#ff0000", "#ff6666", "#ffcccc", "red"]):
+        if any(
+            color in style_str for color in ["#ff0000", "#ff6666", "#ffcccc", "red"]
+        ):
             return False
         # Gray backgrounds might indicate off/unavailable
-        elif any(color in style_str for color in ["#cccccc", "#999999", "gray", "grey"]):
+        elif any(
+            color in style_str for color in ["#cccccc", "#999999", "gray", "grey"]
+        ):
             return False
-    
+
     return True  # Default to available
 
 
@@ -532,11 +540,11 @@ def parse_skills_table(grid_html, date=None):
     Returns dict with skill availability data for cross-checking computed values.
     """
     from bs4 import BeautifulSoup, Tag
-    
+
     log_debug("skills", "Parsing skills/rules table...")
     soup = BeautifulSoup(grid_html, "html.parser")
     tables = [t for t in soup.find_all("table") if isinstance(t, Tag)]
-    
+
     skills_table = None
     for table in tables:
         # Look for table with "Rules" header
@@ -548,11 +556,11 @@ def parse_skills_table(grid_html, date=None):
                 break
         if skills_table:
             break
-    
+
     if not skills_table:
         log_debug("skills", "No skills/rules table found")
         return {}
-    
+
     # Extract time slots from header
     header_row = None
     rows = skills_table.find_all("tr")
@@ -562,27 +570,27 @@ def parse_skills_table(grid_html, date=None):
             if i + 1 < len(rows):
                 header_row = rows[i + 1]
             break
-    
+
     if not header_row:
         log_debug("skills", "No header row found after 'Rules'")
         return {}
-    
+
     time_slots = []
     header_cells = header_row.find_all("td")[1:]  # Skip first merged cell
     for cell in header_cells:
         time_text = cell.get_text(strip=True)
         if time_text.isdigit() and len(time_text) == 4:
             time_slots.append(time_text)
-    
+
     # Parse skill rows (BA, LGV, Total Crew, etc.)
     skills_data = {}
     date_prefix = _normalize_date(date)
-    
+
     for row in rows:
         cells = row.find_all("td")
         if len(cells) < 2:
             continue
-            
+
         skill_name = cells[0].get_text(strip=True)
         if skill_name in ["BA", "LGV", "Total Crew", "MGR"]:
             # This should be a "Req"/"Avail" pair
@@ -600,9 +608,9 @@ def parse_skills_table(grid_html, date=None):
                             avail_data[slot_key] = avail_count
                         except ValueError:
                             avail_data[slot_key] = 0
-                
+
                 skills_data[skill_name] = avail_data
-    
+
     log_debug("skills", f"Parsed skills data: {skills_data}")
     return {"skills_availability": skills_data}
 
