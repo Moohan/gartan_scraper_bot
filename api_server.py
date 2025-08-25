@@ -191,21 +191,21 @@ def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
             if result:
                 end_time = datetime.fromisoformat(result[1])
                 duration_minutes = int((end_time - now).total_seconds() / 60)
-                
+
                 # Format end time for display
-                end_time_str = end_time.strftime('%H:%M')
+                end_time_str = end_time.strftime("%H:%M")
                 if end_time.date() == now.date():
                     end_time_display = f"{end_time_str} today"
                 elif end_time.date() == (now + timedelta(days=1)).date():
                     end_time_display = f"{end_time_str} tomorrow"
                 else:
-                    end_time_display = end_time.strftime('%H:%M on %d/%m')
-                
+                    end_time_display = end_time.strftime("%H:%M on %d/%m")
+
                 return {
                     "duration": _format_duration_minutes_to_hours_string(
                         max(0, duration_minutes)
                     ),
-                    "end_time_display": end_time_display
+                    "end_time_display": end_time_display,
                 }
             else:
                 return {"duration": None, "end_time_display": None}
@@ -603,76 +603,111 @@ def root():
         # Get all crew data
         crew_list = get_crew_list_data()
         current_time = datetime.now()
-        
+
         # Collect all crew availability and duration data
         crew_data = []
         for crew in crew_list:
-            if isinstance(crew, dict) and 'id' in crew:
-                crew_id = crew['id']
+            if isinstance(crew, dict) and "id" in crew:
+                crew_id = crew["id"]
                 availability_data = get_crew_available_data(crew_id)
                 duration_data = get_crew_duration_data(crew_id)
-                
+
                 crew_info = {
-                    'id': crew_id,
-                    'name': crew.get('name', 'Unknown'),
-                    'display_name': crew.get('display_name', crew.get('name', 'Unknown')),
-                    'role': crew.get('role', 'Unknown'),
-                    'skills': crew.get('skills', 'None'),
-                    'available': availability_data.get('available', False) if 'available' in availability_data else False,
-                    'duration': duration_data.get('duration') if 'duration' in duration_data else None,
-                    'end_time_display': duration_data.get('end_time_display') if 'end_time_display' in duration_data else None,
-                    'contract_hours': crew.get('contract_hours', 'Unknown')
+                    "id": crew_id,
+                    "name": crew.get("name", "Unknown"),
+                    "display_name": crew.get(
+                        "display_name", crew.get("name", "Unknown")
+                    ),
+                    "role": crew.get("role", "Unknown"),
+                    "skills": crew.get("skills", "None"),
+                    "available": (
+                        availability_data.get("available", False)
+                        if "available" in availability_data
+                        else False
+                    ),
+                    "duration": (
+                        duration_data.get("duration")
+                        if "duration" in duration_data
+                        else None
+                    ),
+                    "end_time_display": (
+                        duration_data.get("end_time_display")
+                        if "end_time_display" in duration_data
+                        else None
+                    ),
+                    "contract_hours": crew.get("contract_hours", "Unknown"),
                 }
                 crew_data.append(crew_info)
-        
+
         # Sort crew data: 1st by availability (available first), 2nd by role, 3rd by surname
         def sort_crew_key(crew):
             # Extract surname from name (format: "SURNAME, INITIALS")
-            surname = crew['name'].split(',')[0] if ',' in crew['name'] else crew['name']
+            surname = (
+                crew["name"].split(",")[0] if "," in crew["name"] else crew["name"]
+            )
             # Define role hierarchy for sorting (higher rank = lower sort value)
-            role_hierarchy = {'WC': 1, 'CM': 2, 'CC': 3, 'FFC': 4, 'FFD': 5, 'FFT': 6}
-            role_sort = role_hierarchy.get(crew['role'], 99)
-            
+            role_hierarchy = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
+            role_sort = role_hierarchy.get(crew["role"], 99)
+
             # Sort tuple: available (False=0, True=1, but we want available first so negate), role rank, surname
-            return (not crew['available'], role_sort, surname)
-        
+            return (not crew["available"], role_sort, surname)
+
         crew_data.sort(key=sort_crew_key)
-        
+
         # Get appliance data
-        p22p6_available_data = get_appliance_available_data('P22P6')
-        p22p6_duration_data = get_appliance_duration_data('P22P6')
-        
+        p22p6_available_data = get_appliance_available_data("P22P6")
+        p22p6_duration_data = get_appliance_duration_data("P22P6")
+
         appliance_data = {
-            'available': p22p6_available_data.get('available', False) if 'available' in p22p6_available_data else False,
-            'duration': p22p6_duration_data.get('duration') if 'duration' in p22p6_duration_data else None
+            "available": (
+                p22p6_available_data.get("available", False)
+                if "available" in p22p6_available_data
+                else False
+            ),
+            "duration": (
+                p22p6_duration_data.get("duration")
+                if "duration" in p22p6_duration_data
+                else None
+            ),
         }
-        
+
         # Count skills for available crew
-        available_crew = [c for c in crew_data if c['available']]
-        skill_counts = {'TTR': 0, 'LGV': 0, 'BA': 0}
+        available_crew = [c for c in crew_data if c["available"]]
+        skill_counts = {"TTR": 0, "LGV": 0, "BA": 0}
         for crew in available_crew:
-            skills = crew['skills'].split() if crew['skills'] and crew['skills'] != 'None' else []
+            skills = (
+                crew["skills"].split()
+                if crew["skills"] and crew["skills"] != "None"
+                else []
+            )
             for skill in skills:
                 if skill in skill_counts:
                     skill_counts[skill] += 1
-        
+
         # Business rules check
         total_available = len(available_crew)
-        ttr_present = skill_counts['TTR'] > 0
-        lgv_present = skill_counts['LGV'] > 0
-        ba_non_ttr = sum(1 for c in available_crew if 'BA' in (c['skills'] or '') and 'TTR' not in (c['skills'] or ''))
-        ffc_with_ba = any(c['role'] in ['FFC', 'CC', 'WC', 'CM'] and 'BA' in (c['skills'] or '') for c in available_crew)
-        
+        ttr_present = skill_counts["TTR"] > 0
+        lgv_present = skill_counts["LGV"] > 0
+        ba_non_ttr = sum(
+            1
+            for c in available_crew
+            if "BA" in (c["skills"] or "") and "TTR" not in (c["skills"] or "")
+        )
+        ffc_with_ba = any(
+            c["role"] in ["FFC", "CC", "WC", "CM"] and "BA" in (c["skills"] or "")
+            for c in available_crew
+        )
+
         business_rules = {
-            'total_crew_ok': total_available >= 4,
-            'ttr_present': ttr_present,
-            'lgv_present': lgv_present,
-            'ba_non_ttr_ok': ba_non_ttr >= 2,
-            'ffc_with_ba': ffc_with_ba
+            "total_crew_ok": total_available >= 4,
+            "ttr_present": ttr_present,
+            "lgv_present": lgv_present,
+            "ba_non_ttr_ok": ba_non_ttr >= 2,
+            "ffc_with_ba": ffc_with_ba,
         }
-        
+
         all_rules_pass = all(business_rules.values())
-        
+
         html_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -973,7 +1008,7 @@ def root():
 </body>
 </html>
         """
-        
+
         return render_template_string(
             html_template,
             crew_data=crew_data,
@@ -983,9 +1018,9 @@ def root():
             skill_counts=skill_counts,
             business_rules=business_rules,
             ba_non_ttr=ba_non_ttr,
-            all_rules_pass=all_rules_pass
+            all_rules_pass=all_rules_pass,
         )
-        
+
     except Exception as e:
         logger.error(f"Error generating dashboard: {e}")
         # Fallback to JSON response
