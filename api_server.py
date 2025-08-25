@@ -8,6 +8,9 @@ Endpoints (v1):
     /v1/crew/<id>/duration                — remaining duration string or null
     /v1/crew/<id>/hours-this-week         — hours available since Monday
     /v1/crew/<id>/hours-planned-week      — total planned hours this week
+    /v1/crew/<id>/contract-hours          — contract hours info (e.g., "61 (159)")
+    /v1/crew/<id>/hours-achieved          — hours worked so far this week
+    /v1/crew/<id>/hours-remaining         — hours remaining to fulfill contract
     /v1/appliances/<name>/available       — appliance availability
     /v1/appliances/<name>/duration        — appliance availability duration
 
@@ -72,16 +75,22 @@ def get_db_connection():
 
 
 def get_crew_list_data() -> List[Dict[str, Any]]:
-    """Get list of all crew members with display names."""
+    """Get list of all crew members with display names and enhanced details."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, name, contact FROM crew ORDER BY name")
+            cursor.execute("SELECT id, name, contact, role, skills, contract_hours FROM crew ORDER BY name")
             rows = cursor.fetchall()
 
             crew_list = []
             for row in rows:
-                crew_data = {"id": row["id"], "name": row["name"]}
+                crew_data = {
+                    "id": row["id"], 
+                    "name": row["name"],
+                    "role": row["role"],
+                    "skills": row["skills"],
+                    "contract_hours": row["contract_hours"]
+                }
 
                 # Extract display name from contact field if available
                 if row["contact"]:
@@ -117,7 +126,7 @@ def get_crew_available_data(crew_id: int) -> Dict[str, Any]:
                 WHERE crew_id = ?
                 AND datetime(start_time) <= datetime(?)
                 AND datetime(end_time) > datetime(?)
-                AND (julianday(end_time) - julianday(start_time)) <= 1.0
+                AND (julianday(end_time) - julianday(start_time)) <= 7.0
                 AND date(start_time) >= date('now', '-7 days')
             """,
                 (crew_id, now, now),
@@ -164,7 +173,7 @@ def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
                 WHERE crew_id = ?
                 AND datetime(start_time) <= datetime(?)
                 AND datetime(end_time) > datetime(?)
-                AND (julianday(end_time) - julianday(start_time)) <= 1.0
+                AND (julianday(end_time) - julianday(start_time)) <= 7.0
                 AND date(start_time) >= date('now', '-7 days')
                 ORDER BY start_time LIMIT 1
             """,
@@ -345,7 +354,7 @@ def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
                 WHERE appliance_id = ?
                 AND datetime(start_time) <= datetime(?)
                 AND datetime(end_time) > datetime(?)
-                AND (julianday(end_time) - julianday(start_time)) <= 1.0
+                AND (julianday(end_time) - julianday(start_time)) <= 7.0
                 AND date(start_time) >= date('now', '-7 days')
             """,
                 (appliance_id, now, now),
@@ -382,7 +391,7 @@ def get_appliance_duration_data(appliance_name: str) -> Dict[str, Any]:
                 WHERE appliance_id = ?
                 AND datetime(start_time) <= datetime(?)
                 AND datetime(end_time) > datetime(?)
-                AND (julianday(end_time) - julianday(start_time)) <= 1.0
+                AND (julianday(end_time) - julianday(start_time)) <= 7.0
                 AND date(start_time) >= date('now', '-7 days')
                 ORDER BY start_time LIMIT 1
             """,
@@ -402,6 +411,108 @@ def get_appliance_duration_data(appliance_name: str) -> Dict[str, Any]:
                 return {"duration": None}
     except Exception as e:
         logger.error(f"Error getting appliance duration: {e}")
+        return {"error": "Internal server error"}
+
+
+def get_crew_contract_hours_data(crew_id: int) -> Dict[str, Any]:
+    """Get crew member's contract hours information."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Check if crew exists and get contract hours
+            cursor.execute("SELECT name, contract_hours FROM crew WHERE id = ?", (crew_id,))
+            crew = cursor.fetchone()
+            if not crew:
+                return {"error": f"Crew ID {crew_id} not found"}
+
+            return {"contract_hours": crew[1]}
+    except Exception as e:
+        logger.error(f"Error getting crew contract hours: {e}")
+        return {"error": "Internal server error"}
+
+
+def get_crew_hours_achieved_data(crew_id: int) -> Dict[str, Any]:
+    """Get hours worked by crew member so far this week."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Check if crew exists
+            cursor.execute("SELECT name FROM crew WHERE id = ?", (crew_id,))
+            crew = cursor.fetchone()
+            if not crew:
+                return {"error": f"Crew ID {crew_id} not found"}
+
+            # Get week boundaries
+            week_start, week_end = get_week_boundaries()
+
+            # Calculate hours achieved this week (availability periods that have ended)
+            cursor.execute(
+                """
+                SELECT start_time, end_time FROM crew_availability
+                WHERE crew_id = ?
+                AND datetime(start_time) >= datetime(?)
+                AND datetime(end_time) <= datetime(?)
+                AND datetime(end_time) <= datetime('now')
+                AND (julianday(end_time) - julianday(start_time)) <= 14.0
+                ORDER BY start_time
+            """,
+                (crew_id, week_start, week_end),
+            )
+
+            periods = []
+            for row in cursor.fetchall():
+                start_time = datetime.fromisoformat(row[0])
+                end_time = datetime.fromisoformat(row[1])
+                periods.append((start_time, end_time))
+
+            # Merge overlapping periods and calculate total hours
+            merged_periods = merge_time_periods(periods)
+            total_hours = sum(
+                (end_time - start_time).total_seconds() / 3600.0
+                for start_time, end_time in merged_periods
+            )
+
+            return {"hours_achieved": round(total_hours, 2)}
+    except Exception as e:
+        logger.error(f"Error getting crew hours achieved: {e}")
+        return {"error": "Internal server error"}
+
+
+def get_crew_hours_remaining_data(crew_id: int) -> Dict[str, Any]:
+    """Get hours remaining for crew member to fulfill contract this week."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Check if crew exists and get contract hours
+            cursor.execute("SELECT name, contract_hours FROM crew WHERE id = ?", (crew_id,))
+            crew = cursor.fetchone()
+            if not crew:
+                return {"error": f"Crew ID {crew_id} not found"}
+
+            contract_hours_str = crew[1]
+            if not contract_hours_str:
+                return {"hours_remaining": None}
+
+            # Parse contract hours (format: "61 (159)" -> extract first number)
+            try:
+                contract_hours = float(contract_hours_str.split()[0])
+            except (ValueError, IndexError):
+                return {"hours_remaining": None}
+
+            # Get hours achieved this week
+            achieved_result = get_crew_hours_achieved_data(crew_id)
+            if "error" in achieved_result:
+                return achieved_result
+            
+            hours_achieved = achieved_result.get("hours_achieved", 0)
+            hours_remaining = max(0, contract_hours - hours_achieved)
+
+            return {"hours_remaining": round(hours_remaining, 2)}
+    except Exception as e:
+        logger.error(f"Error getting crew hours remaining: {e}")
         return {"error": "Internal server error"}
 
 
@@ -477,6 +588,9 @@ def root():
                 "crew_duration": "/v1/crew/<id>/duration",
                 "crew_hours_week": "/v1/crew/<id>/hours-this-week",
                 "crew_planned_week": "/v1/crew/<id>/hours-planned-week",
+                "crew_contract_hours": "/v1/crew/<id>/contract-hours",
+                "crew_hours_achieved": "/v1/crew/<id>/hours-achieved",
+                "crew_hours_remaining": "/v1/crew/<id>/hours-remaining",
                 "appliance_available": "/v1/appliances/<name>/available",
                 "appliance_duration": "/v1/appliances/<name>/duration",
             },
@@ -563,6 +677,57 @@ def get_crew_hours_planned_week(crew_id: int):
         return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting crew {crew_id} planned weekly hours: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/v1/crew/<int:crew_id>/contract-hours", methods=["GET"])
+def get_crew_contract_hours(crew_id: int):
+    """Get crew member's contract hours information"""
+    try:
+        result = get_crew_contract_hours_data(crew_id)
+
+        if "error" in result:
+            if "not found" in result["error"]:
+                return jsonify({"error": f"Crew ID {crew_id} not found"}), 404
+            else:
+                return jsonify({"error": "Internal server error"}), 500
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error getting crew {crew_id} contract hours: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/v1/crew/<int:crew_id>/hours-achieved", methods=["GET"])
+def get_crew_hours_achieved(crew_id: int):
+    """Get hours worked by crew member so far this week"""
+    try:
+        result = get_crew_hours_achieved_data(crew_id)
+
+        if "error" in result:
+            if "not found" in result["error"]:
+                return jsonify({"error": f"Crew ID {crew_id} not found"}), 404
+            else:
+                return jsonify({"error": "Internal server error"}), 500
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error getting crew {crew_id} hours achieved: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/v1/crew/<int:crew_id>/hours-remaining", methods=["GET"])
+def get_crew_hours_remaining(crew_id: int):
+    """Get hours remaining for crew member to fulfill contract this week"""
+    try:
+        result = get_crew_hours_remaining_data(crew_id)
+
+        if "error" in result:
+            if "not found" in result["error"]:
+                return jsonify({"error": f"Crew ID {crew_id} not found"}), 404
+            else:
+                return jsonify({"error": "Internal server error"}), 500
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error getting crew {crew_id} hours remaining: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
 
