@@ -415,7 +415,7 @@ def aggregate_crew_availability(daily_crew_lists):
                     "skills": crew.get("skills"),
                     "contract_hours": crew.get("contract_hours"),
                     "availability": {},
-                    "_all_slots": []
+                    "_all_slots": [],
                 }
             for slot, avail in crew["availability"].items():
                 crew_dict[name]["availability"][slot] = avail
