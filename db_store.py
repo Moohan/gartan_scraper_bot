@@ -21,6 +21,10 @@ from typing import Any, Dict, List
 
 from config import config
 
+# Configure sqlite3 datetime adapters for Python 3.12+ compatibility
+sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
+sqlite3.register_converter("DATETIME", lambda b: datetime.fromisoformat(b.decode()))
+
 DB_PATH = config.db_path
 
 CREW_TABLE = """

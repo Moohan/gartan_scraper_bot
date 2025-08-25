@@ -30,6 +30,10 @@ from flask import Flask, jsonify, render_template_string
 
 from config import config
 
+# Configure sqlite3 datetime adapters for Python 3.12+ compatibility
+sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
+sqlite3.register_converter("DATETIME", lambda b: datetime.fromisoformat(b.decode()))
+
 
 def merge_time_periods(
     periods: List[Tuple[datetime, datetime]],
