@@ -162,17 +162,21 @@ This Python bot logs in to the Gartan Availability system, retrieves and parses 
 ## Business Rules & Data Validation
 
 ### Critical Business Rules (Must Be Enforced)
-1. **Appliance TTR Dependency**: P22P6 appliance can only be available if James Coutie (TTR skill) is available
-2. **Appliance LGV Dependency**: P22P6 appliance requires at least one of Chris Casely, Jane Saba, or Olly Gibb (LGV skill) available  
+1. **Appliance TTR Dependency**: P22P6 appliance can only be available if someone with the TTR skill is available
+2. **Appliance LGV Dependency**: P22P6 appliance requires at least one person with the LGV skill to be available
 3. **Minimum Crew Requirement**: P22P6 appliance can only be available if at least 4 total crew members are available
+   3.1. **BA Skill Requirement**: The crew of 4 must have at least 2 people with the BA skill (not including the officer - TTR skill)
+   3.2. **Rank Requirement**: At least one of the BA-skilled crew must be at least FFC (Firefighter Competent) rank
 4. **Daily Hour Limits**: No crew member or appliance can exceed 24 hours availability in a single day
 5. **Weekly Hour Limits**: No crew member or appliance can exceed 168 hours availability in a single week
-6. **Data Quality Filters**: API applies duration ≤1 day and recency ≥7 days filters to exclude corrupted data
+6. **Data Quality Filters**: API applies duration ≤7 days and recency ≥7 days filters to exclude corrupted data
 
-### Crew Skill Mapping
-- **TTR Skill**: James Coutie (ID: 1) - Required for appliance operation
-- **LGV Skill**: Chris Casely (ID: 2), Olly Gibb (ID: 3), Jane Saba (ID: 7) - At least one required for appliance
-- **All Crew**: 7 total members, minimum 4 must be available for appliance operation
+### Crew Skill & Rank Mapping
+- **TTR Skill**: Required for appliance operation (Officer role - any crew member with TTR skill)
+- **LGV Skill**: At least one required for appliance operation (Driver capability)
+- **BA Skill**: At least 2 required (excluding TTR officer) for appliance operation (Breathing Apparatus)
+- **Rank Hierarchy**: WC (Watch Commander) > CC (Crew Commander) > FFC (Firefighter Competent) > FFD (Firefighter Development) > FFT (Firefighter Trainee)
+- **Minimum Rank**: At least one FFC+ required among BA-skilled crew for appliance operation
 
 ### API Protection Mechanisms
 - **Overlap Merging**: `merge_time_periods()` function prevents double-counting of overlapping availability blocks
