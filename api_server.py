@@ -79,17 +79,19 @@ def get_crew_list_data() -> List[Dict[str, Any]]:
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, name, contact, role, skills, contract_hours FROM crew ORDER BY name")
+            cursor.execute(
+                "SELECT id, name, contact, role, skills, contract_hours FROM crew ORDER BY name"
+            )
             rows = cursor.fetchall()
 
             crew_list = []
             for row in rows:
                 crew_data = {
-                    "id": row["id"], 
+                    "id": row["id"],
                     "name": row["name"],
                     "role": row["role"],
                     "skills": row["skills"],
-                    "contract_hours": row["contract_hours"]
+                    "contract_hours": row["contract_hours"],
                 }
 
                 # Extract display name from contact field if available
@@ -421,7 +423,9 @@ def get_crew_contract_hours_data(crew_id: int) -> Dict[str, Any]:
             cursor = conn.cursor()
 
             # Check if crew exists and get contract hours
-            cursor.execute("SELECT name, contract_hours FROM crew WHERE id = ?", (crew_id,))
+            cursor.execute(
+                "SELECT name, contract_hours FROM crew WHERE id = ?", (crew_id,)
+            )
             crew = cursor.fetchone()
             if not crew:
                 return {"error": f"Crew ID {crew_id} not found"}
@@ -487,7 +491,9 @@ def get_crew_hours_remaining_data(crew_id: int) -> Dict[str, Any]:
             cursor = conn.cursor()
 
             # Check if crew exists and get contract hours
-            cursor.execute("SELECT name, contract_hours FROM crew WHERE id = ?", (crew_id,))
+            cursor.execute(
+                "SELECT name, contract_hours FROM crew WHERE id = ?", (crew_id,)
+            )
             crew = cursor.fetchone()
             if not crew:
                 return {"error": f"Crew ID {crew_id} not found"}
@@ -506,7 +512,7 @@ def get_crew_hours_remaining_data(crew_id: int) -> Dict[str, Any]:
             achieved_result = get_crew_hours_achieved_data(crew_id)
             if "error" in achieved_result:
                 return achieved_result
-            
+
             hours_achieved = achieved_result.get("hours_achieved", 0)
             hours_remaining = max(0, contract_hours - hours_achieved)
 
