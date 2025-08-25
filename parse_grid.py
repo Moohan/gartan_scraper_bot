@@ -205,11 +205,13 @@ def _extract_crew_rows(table):
 
 def _parse_crew_row(tr, time_slots, date_prefix, now):
     tds = tr.find_all("td")
-    
+
     # Parse crew metadata from the structured columns
     name = tds[0].get_text(strip=True)  # Employee name (colspan=2)
     role = tds[1].get_text(strip=True) if len(tds) > 1 else None  # Role column
-    contract_hours = tds[2].get_text(strip=True) if len(tds) > 2 else None  # Contract Hours column
+    contract_hours = (
+        tds[2].get_text(strip=True) if len(tds) > 2 else None
+    )  # Contract Hours column
     skills = None
 
     # Find the skills column (class="skillCol") and time slot start
@@ -408,12 +410,12 @@ def aggregate_crew_availability(daily_crew_lists):
             name = crew["name"]
             if name not in crew_dict:
                 crew_dict[name] = {
-                    "name": name, 
+                    "name": name,
                     "role": crew.get("role"),
                     "skills": crew.get("skills"),
                     "contract_hours": crew.get("contract_hours"),
-                    "availability": {}, 
-                    "_all_slots": []
+                    "availability": {},
+                    "_all_slots": [],
                 }
             for slot, avail in crew["availability"].items():
                 crew_dict[name]["availability"][slot] = avail
