@@ -474,6 +474,10 @@ def _is_crew_available_in_cell(cell):
     Determine if a crew member is available based on cell content and styling.
     Returns True if available, False if unavailable.
     """
+    # Handle None input
+    if cell is None:
+        return False
+
     style = cell.get("style", "")
     cell_text = cell.get_text(strip=True)
 
@@ -481,6 +485,8 @@ def _is_crew_available_in_cell(cell):
     if cell_text == "O":  # Off
         return False
     elif cell_text == "W":  # Working (often means unavailable for additional duties)
+        return False
+    elif cell_text == "F":  # Fire call (unavailable for additional duties)
         return False
     elif cell_text in ["S", "SL", "AL", "H"]:  # Sick, Sick Leave, Annual Leave, Holiday
         return False

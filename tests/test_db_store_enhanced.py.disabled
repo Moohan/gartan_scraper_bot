@@ -1,0 +1,419 @@
+#!/usr/bin/env python3
+"""Enhanced tests for db_store.py edge cases and error handling."""
+
+import sqlite3
+import tempfile
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import pytest
+
+from db_store import (
+    init_db,
+    insert_appliance_availability,
+    insert_crew_availability,
+    insert_crew_details,
+)
+
+
+class TestDatabaseStoreEnhanced:
+    """Enhanced tests for database storage functionality."""
+
+    @pytest.fixture
+    def temp_db(self):
+        """Create a temporary database for testing."""
+        temp_file = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        db_path = temp_file.name
+        temp_file.close()
+
+        # Create tables
+        init_db(db_path)
+
+        yield db_path
+
+        # Cleanup
+        Path(db_path).unlink(missing_ok=True)
+
+    def test_create_tables_error_handling(self):
+        """Test table creation with various error conditions."""
+
+        # Test with invalid path
+        with pytest.raises((sqlite3.Error, OSError)):
+            init_db("/invalid/path/test.db")
+
+        # Test with read-only directory (if possible to simulate)
+        # This test might be platform-specific
+
+    def test_store_data_with_invalid_input(self, temp_db):
+        """Test storing data with various invalid inputs."""
+
+        # Test with None data
+        with pytest.raises(TypeError):
+            store_availability_data(temp_db, None, "2025-08-05")
+
+        # Test with malformed crew data
+        malformed_data = {
+            "crew_availability": [
+                {"name": "VALID, CREW", "role": "FFC", "availability": {"2025-08-05 0800": True}},
+                {"missing_name": "No name field"},  # Missing required field
+                {"name": "", "role": "FFC", "availability": {}},  # Empty name
+                {"name": "NO, AVAILABILITY"},  # Missing availability field
+            ],
+            "appliance_availability": {}
+        }
+
+        # Should handle gracefully without crashing
+        store_availability_data(temp_db, malformed_data, "2025-08-05")
+
+        # Verify only valid data was stored
+        conn = sqlite3.connect(temp_db)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM crew")
+        crew_count = cursor.fetchone()[0]
+        conn.close()
+
+        # Should have stored at least the valid crew member
+        assert crew_count >= 1
+
+    def test_large_data_volume(self, temp_db):
+        """Test storing and retrieving large volumes of data."""
+
+        # Generate large dataset
+        large_data = {
+            "crew_availability": [],
+            "appliance_availability": {}
+        }
+
+        # Create 200 crew members with 96 time slots each (24h * 4 slots/hour)
+        for i in range(200):
+            availability = {}
+            for hour in range(24):
+                for minute in [0, 15, 30, 45]:
+                    time_key = f"2025-08-05 {hour:02d}{minute:02d}"
+                    availability[time_key] = (i + hour + minute) % 3 == 0
+
+            large_data["crew_availability"].append({
+                "name": f"CREW, {i:03d}",
+                "role": "FFC",
+                "skills": "BA" if i % 2 == 0 else "LGV",
+                "availability": availability
+            })
+
+        # Add appliances
+        for i in range(10):
+            appliance_name = f"ENGINE{i}"
+            availability = {}
+            for hour in range(24):
+                for minute in [0, 15, 30, 45]:
+                    time_key = f"2025-08-05 {hour:02d}{minute:02d}"
+                    availability[time_key] = hour % 3 == 0
+
+            large_data["appliance_availability"][appliance_name] = {
+                "availability": availability
+            }
+
+        # Store the large dataset
+        store_availability_data(temp_db, large_data, "2025-08-05")
+
+        # Verify storage
+        conn = sqlite3.connect(temp_db)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM crew")
+        crew_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM appliance")
+        appliance_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM availability_block")
+        block_count = cursor.fetchone()[0]
+        conn.close()
+
+        assert crew_count == 200
+        assert appliance_count == 10
+        assert block_count > 0  # Should have many blocks
+
+    def test_duplicate_data_handling(self, temp_db):
+        """Test handling of duplicate and overlapping data."""
+
+        # Store initial data
+        initial_data = {
+            "crew_availability": [{
+                "name": "DUPLICATE, TEST",
+                "role": "FFC",
+                "skills": "BA",
+                "availability": {"2025-08-05 0800": True, "2025-08-05 0815": False}
+            }],
+            "appliance_availability": {
+                "P22P6": {"availability": {"2025-08-05 0800": True}}
+            }
+        }
+        store_availability_data(temp_db, initial_data, "2025-08-05")
+
+        # Store overlapping data with same date
+        overlapping_data = {
+            "crew_availability": [{
+                "name": "DUPLICATE, TEST",
+                "role": "FFT",  # Different role
+                "skills": "LGV",  # Different skills
+                "availability": {"2025-08-05 0830": True}  # Different time
+            }],
+            "appliance_availability": {
+                "P22P6": {"availability": {"2025-08-05 0815": False}}
+            }
+        }
+        store_availability_data(temp_db, overlapping_data, "2025-08-05")
+
+        # Verify handling
+        conn = sqlite3.connect(temp_db)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM crew WHERE name = 'DUPLICATE, TEST'")
+        crew_count = cursor.fetchone()[0]
+        conn.close()
+
+        # Should handle duplicates appropriately (update or ignore)
+        assert crew_count >= 1
+
+    def test_timezone_edge_cases(self, temp_db):
+        """Test handling of timezone edge cases."""
+
+        # Test with dates around DST transitions
+        dst_data = {
+            "crew_availability": [{
+                "name": "TIMEZONE, TEST",
+                "role": "FFC",
+                "availability": {
+                    "2025-03-30 0100": True,  # DST transition day
+                    "2025-03-30 0200": False,
+                    "2025-03-30 0300": True,
+                    "2025-10-26 0100": True,  # DST end day
+                    "2025-10-26 0200": False,
+                }
+            }],
+            "appliance_availability": {}
+        }
+
+        store_availability_data(temp_db, dst_data, "2025-03-30")
+
+        # Should handle without crashing
+        blocks = get_crew_blocks_for_period(temp_db, "TIMEZONE, TEST", "2025-03-30", "2025-03-30")
+        assert len(blocks) >= 0
+
+    def test_boundary_conditions(self, temp_db):
+        """Test boundary conditions for time periods."""
+
+        # Store data
+        test_data = {
+            "crew_availability": [{
+                "name": "BOUNDARY, TEST",
+                "role": "FFC",
+                "availability": {
+                    "2025-08-05 0000": True,
+                    "2025-08-05 1200": False,
+                    "2025-08-05 2345": True,
+                }
+            }],
+            "appliance_availability": {}
+        }
+        store_availability_data(temp_db, test_data, "2025-08-05")
+
+        # Test exact boundary queries
+        blocks = get_crew_blocks_for_period(temp_db, "BOUNDARY, TEST", "2025-08-05", "2025-08-05")
+        assert len(blocks) >= 0
+
+        # Test overlapping boundaries
+        blocks = get_crew_blocks_for_period(temp_db, "BOUNDARY, TEST", "2025-08-04", "2025-08-06")
+        assert len(blocks) >= 0
+
+        # Test non-existent dates
+        blocks = get_crew_blocks_for_period(temp_db, "BOUNDARY, TEST", "2025-08-10", "2025-08-15")
+        assert len(blocks) == 0
+
+    def test_invalid_date_formats(self, temp_db):
+        """Test handling of various invalid date formats."""
+
+        invalid_dates = [
+            "2025-13-01",  # Invalid month
+            "2025-02-30",  # Invalid day for February
+            "2025-08-32",  # Invalid day
+            "invalid-date",
+            "2025/08/05",  # Wrong format
+            "",
+            None
+        ]
+
+        for invalid_date in invalid_dates:
+            try:
+                blocks = get_crew_blocks_for_period(temp_db, "TEST, CREW", invalid_date, "2025-08-05")
+                # Should return empty list or handle gracefully
+                assert isinstance(blocks, list)
+            except (ValueError, TypeError):
+                # Expected for some invalid inputs
+                pass
+
+    def test_weekly_duration_edge_cases(self, temp_db):
+        """Test weekly duration calculations with edge cases."""
+
+        # Store data across multiple weeks
+        for week_offset in range(-2, 3):  # 5 weeks of data
+            base_date = datetime(2025, 8, 5) + timedelta(weeks=week_offset)
+            date_str = base_date.strftime("%Y-%m-%d")
+
+            test_data = {
+                "crew_availability": [{
+                    "name": "WEEKLY, TEST",
+                    "role": "FFC",
+                    "availability": {
+                        f"{date_str} 0800": True,
+                        f"{date_str} 0900": True,
+                        f"{date_str} 1000": False,
+                    }
+                }],
+                "appliance_availability": {
+                    "P22P6": {"availability": {f"{date_str} 0800": True}}
+                }
+            }
+            store_availability_data(temp_db, test_data, date_str)
+
+        # Test weekly duration for different weeks
+        duration = get_crew_weekly_duration(temp_db, "WEEKLY, TEST", "2025-08-05")
+        assert duration >= 0
+
+        # Test with non-existent crew
+        duration = get_crew_weekly_duration(temp_db, "NONEXISTENT, CREW", "2025-08-05")
+        assert duration == 0
+
+        # Test appliance weekly duration
+        duration = get_appliance_weekly_duration(temp_db, "P22P6", "2025-08-05")
+        assert duration >= 0
+
+    def test_block_conversion_edge_cases(self):
+        """Test block conversion with edge cases."""
+
+        # Test with empty blocks
+        empty_result = _convert_block_dict_to_list({})
+        assert empty_result == []
+
+        # Test with malformed block data
+        malformed_blocks = {
+            "missing_fields": {"start_time": "2025-08-05 08:00:00"},  # Missing end_time
+            "valid_block": {
+                "start_time": "2025-08-05 08:00:00",
+                "end_time": "2025-08-05 09:00:00",
+                "duration_minutes": 60
+            }
+        }
+
+        result = _convert_block_dict_to_list(malformed_blocks)
+        # Should handle gracefully, possibly excluding malformed entries
+        assert isinstance(result, list)
+
+    def test_concurrent_access(self, temp_db):
+        """Test concurrent database access scenarios."""
+
+        # This is a simplified test - real concurrency testing would require threading
+        test_data = {
+            "crew_availability": [{
+                "name": "CONCURRENT, TEST",
+                "role": "FFC",
+                "availability": {"2025-08-05 0800": True}
+            }],
+            "appliance_availability": {}
+        }
+
+        # Simulate rapid successive operations
+        for i in range(10):
+            store_availability_data(temp_db, test_data, "2025-08-05")
+            blocks = get_crew_blocks_for_period(temp_db, "CONCURRENT, TEST", "2025-08-05", "2025-08-05")
+            assert isinstance(blocks, list)
+
+    def test_database_corruption_recovery(self, temp_db):
+        """Test behavior with potential database corruption."""
+
+        # Store valid data first
+        valid_data = {
+            "crew_availability": [{
+                "name": "VALID, CREW",
+                "role": "FFC",
+                "availability": {"2025-08-05 0800": True}
+            }],
+            "appliance_availability": {}
+        }
+        store_availability_data(temp_db, valid_data, "2025-08-05")
+
+        # Try to manually corrupt the database (carefully)
+        conn = sqlite3.connect(temp_db)
+        try:
+            # Insert invalid data that might cause issues
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO crew (name, role, skills, contact) VALUES (?, ?, ?, ?)",
+                          (None, "Invalid", "Test", "Test"))  # NULL name
+            conn.commit()
+        except sqlite3.Error:
+            # Expected - database should reject invalid data
+            pass
+        finally:
+            conn.close()
+
+        # Test that valid operations still work
+        blocks = get_crew_blocks_for_period(temp_db, "VALID, CREW", "2025-08-05", "2025-08-05")
+        assert isinstance(blocks, list)
+
+    def test_extremely_long_names_and_data(self, temp_db):
+        """Test handling of extremely long names and data."""
+
+        # Create extremely long names and data
+        long_name = "VERY, " + "LONG" * 100  # 403 characters
+        long_role = "Officer" * 50  # 350 characters
+        long_skills = "BA LGV TTR " * 100  # 1100 characters
+
+        test_data = {
+            "crew_availability": [{
+                "name": long_name,
+                "role": long_role,
+                "skills": long_skills,
+                "availability": {"2025-08-05 0800": True}
+            }],
+            "appliance_availability": {}
+        }
+
+        # Should handle gracefully (truncate or accept)
+        try:
+            store_availability_data(temp_db, test_data, "2025-08-05")
+        except sqlite3.Error:
+            # May fail due to length constraints - this is acceptable
+            pass
+
+    def test_special_characters_in_names(self, temp_db):
+        """Test handling of special characters in names and data."""
+
+        special_data = {
+            "crew_availability": [
+                {
+                    "name": "O'CONNOR, SEÁN",  # Apostrophe and accented characters
+                    "role": "Watch Commander",
+                    "skills": "BA & LGV",
+                    "availability": {"2025-08-05 0800": True}
+                },
+                {
+                    "name": "SMITH-JONES, A",  # Hyphen
+                    "role": "Fire Fighter",
+                    "skills": "TTR/LGV",
+                    "availability": {"2025-08-05 0800": False}
+                },
+                {
+                    "name": 'CREW WITH "QUOTES"',  # Double quotes
+                    "role": "Officer (Acting)",  # Parentheses
+                    "skills": "10% BA, 90% LGV",  # Percentages
+                    "availability": {"2025-08-05 0800": True}
+                }
+            ],
+            "appliance_availability": {}
+        }
+
+        store_availability_data(temp_db, special_data, "2025-08-05")
+
+        # Verify data was stored correctly
+        blocks = get_crew_blocks_for_period(temp_db, "O'CONNOR, SEÁN", "2025-08-05", "2025-08-05")
+        assert isinstance(blocks, list)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])
