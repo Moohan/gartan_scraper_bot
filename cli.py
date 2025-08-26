@@ -72,7 +72,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fresh-start",
         action="store_true",
-        help="Clear database and start fresh (forces complete rescrape)"
+        help="Clear database and start fresh (forces complete rescrape)",
     )
 
     return parser
