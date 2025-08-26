@@ -6,6 +6,8 @@ crew and appliances, plus helper summarisation (next available windows etc.).
 
 from datetime import datetime as dt
 
+from bs4 import BeautifulSoup, Tag  # type: ignore
+
 from utils import log_debug
 
 
@@ -443,7 +445,6 @@ def aggregate_crew_availability(daily_crew_lists):
 
 
 # parse_grid.py: provides parse_grid_html(grid_html, date=None)
-from bs4 import BeautifulSoup, Tag  # type: ignore
 
 
 def parse_grid_html(grid_html, date=None):  # pylint: disable=too-complex

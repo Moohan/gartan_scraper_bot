@@ -3,18 +3,21 @@
 import concurrent.futures
 import logging
 import os
-import random
 import re
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from cli import CliArgs, create_argument_parser
 from config import config
-from db_store import init_db, insert_appliance_availability, insert_crew_availability
+from db_store import (
+    init_db,
+    insert_appliance_availability,
+    insert_crew_availability,
+    insert_crew_details,
+)
 from gartan_fetch import (
     fetch_and_cache_grid_html,
-    fetch_grid_html_for_date,
     gartan_login_and_get_session,
 )
 from logging_config import get_logger, setup_logging
@@ -198,11 +201,6 @@ if __name__ == "__main__":
                         contact_map[crew_id] = (
                             f"{display_name}|{phone}|{email}|{position}"
                         )
-        from db_store import (
-            insert_appliance_availability,
-            insert_crew_availability,
-            insert_crew_details,
-        )
 
         insert_crew_details(crew_list_agg, contact_map, db_conn=db_conn)
         insert_crew_availability(crew_list_agg, db_conn=db_conn)
