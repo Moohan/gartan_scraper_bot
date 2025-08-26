@@ -762,6 +762,29 @@ def root():
             ),
         }
 
+        # Calculate dashboard statistics
+        available_crew = [crew for crew in crew_data if crew["available"]]
+        total_available = len(available_crew)
+        
+        # Count skills
+        skill_counts = {"TTR": 0, "LGV": 0, "BA": 0}
+        for crew in available_crew:
+            skills = (
+                crew["skills"].split()
+                if crew["skills"] and crew["skills"] != "None"
+                else []
+            )
+            for skill in skills:
+                if skill in skill_counts:
+                    skill_counts[skill] += 1
+
+        # Calculate BA non-TTR count
+        ba_non_ttr = sum(
+            1
+            for c in available_crew
+            if "BA" in (c["skills"] or "") and "TTR" not in (c["skills"] or "")
+        )
+
         # Get business rules results
         business_rules_result = check_p22p6_business_rules()
         business_rules = business_rules_result.get("rules", {})
