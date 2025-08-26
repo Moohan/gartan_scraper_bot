@@ -120,44 +120,40 @@ This Python bot logs in to the Gartan Availability system, retrieves and parses 
 - **Commit workflow**: Make focused commits; CI/CD validates and publishes automatically
 - **Iterative improvement**: Continue improvements automatically; only prompt for architectural decisions
 - **Docker volumes**: Understand that `/app/data`, `/app/_cache`, `/app/logs` persist across container restarts
-- **Gartan web system**: Login endpoint, AJAX `/GetSchedule` calls, session-based authentication
-- **Database**: SQLite with normalized schema, foreign key constraints enabled
-- **Environment**: `.env` file for credentials, `crew_details.local` for contact info
-- **Cache layer**: Filesystem cache in `_cache/` with intelligent expiry policies
-- **Docker Hub**: Automated publishing to `moohan/gartan_scraper_bot` via GitHub Actions
 
-### Critical Data Transformations
-1. **Raw HTML** → `parse_grid.py` → **Crew/appliance availability dicts**
-2. **Availability dicts** → `db_store.py` → **Continuous time blocks** (slot aggregation)
-3. **Time blocks** → API functions → **API responses** (duration calculations)
+## Git Workflow & Release Management
 
-### Testing Architecture
-- **Unit tests**: `tests/` directory with pytest, mocks external API calls (62 tests required)
-- **API validation**: `validate_api.py` tests actual database with real scraped data
-- **Container testing**: `validate_deployment.py` tests Docker deployment end-to-end
-- **CI validation**: GitHub Actions runs comprehensive test matrix with coverage reporting
-- **Git hooks**: Pre-commit (syntax, core tests) and pre-push (full suite, security, Docker build)
+### Commit Process (After Every Tested Change)
+1. **Test Changes**: Ensure all relevant tests pass before committing
+2. **Inspect Status**: Run `git status` to see what files have changed
+3. **Review Changes**: Use `git diff` to review specific changes before staging
+4. **Check History**: Use `git log --oneline -n 5` to understand recent commits
+5. **Stage & Commit**: `git add .` then focused commit with clear message
+6. **Verify Clean State**: Confirm `git status` shows clean working directory
 
-### Deployment Architecture
-- **Local Development**: Direct Python execution with `.env` file
-- **Production**: Docker container with `moohan/gartan_scraper_bot:latest` image
-- **CI/CD**: GitHub Actions publishes to Docker Hub on every main branch push
-- **Release Management**: Version tags create GitHub releases with documented changes
+### Push Process (For Significant Changes or Docker Updates)
+1. **Pre-Push Checks**: 
+   - `git status` to ensure local environment is clean
+   - `git log --oneline -n 3` to verify commits are ready
+2. **Update with Remote**: `git pull --rebase` to sync with remote changes
+3. **Push Changes**: `git push` (triggers CI/CD pipeline and Docker rebuild)
+4. **Create Release**: After successful CI/CD, create git tag and GitHub release:
+   ```bash
+   git tag -a v1.x.x -m "Version 1.x.x: Brief description"
+   git push origin v1.x.x
+   # Then create GitHub release via web interface
+   ```
 
-## Critical File Patterns
+### When to Push & Release
+- **Significant Features**: New CLI options, API endpoints, major fixes
+- **Docker Updates Needed**: When remote testing on Pi is required
+- **Production Deployment**: When changes need to be available on `jamesmcmahon0/gartan_scraper_bot:latest`
+- **Multiple Related Changes**: Bundle logically related commits before pushing
 
-### Configuration Files
-- `pyproject.toml`: Black, isort, mypy configuration for code quality
-- `.flake8`: Linting rules with complexity limits
-- `pytest.ini`: Test configuration and coverage settings
-- `docker-compose.yml`: Production deployment with published image
-- `.github/workflows/`: CI/CD pipeline definitions (never edit without testing)
-
-### Deployment Files
-- `Dockerfile`: Multi-stage container build with health checks
-- `deploy.sh`/`deploy.ps1`: One-command deployment scripts
-- `DEPLOYMENT.md`: Quick deployment guide for published images
-- `GITHUB_SETUP.md`: Repository secrets and CI/CD configuration guide
+### Release Naming Convention
+- **Major**: `v2.0.0` - Breaking changes, new architecture
+- **Minor**: `v1.3.0` - New features, significant enhancements  
+- **Patch**: `v1.2.1` - Bug fixes, minor improvements
 
 ## Business Rules & Data Validation
 
@@ -195,13 +191,20 @@ This Python bot logs in to the Gartan Availability system, retrieves and parses 
 ## AI Agent Instructions
 
 - **Always check specification/**: Review requirements and recent changes before making code or documentation changes
-- **Test suite is critical**: All 62 tests must pass; CI/CD will block merges on test failures
+- **Test suite is critical**: All 77 tests must pass; CI/CD will block merges on test failures
 - **Container-first development**: Test changes work in both local Python and Docker environments
 - **Documentation sync**: Update related docs in `specification/` when making significant changes
 - **Git hooks compliance**: Ensure commits pass pre-commit checks; use `git commit --no-verify` only for emergencies
 - **CI/CD awareness**: Changes to workflows require careful testing; prefer small, incremental changes
-- **Production deployment**: Use published Docker images (`moohan/gartan_scraper_bot:latest`) for deployments
+- **Production deployment**: Use published Docker images (`jamesmcmahon0/gartan_scraper_bot:latest`) for deployments
 - **Security consciousness**: Be aware of secrets scanning in git hooks and CI/CD
-- **Commit workflow**: Make sensible commits for each logical phase/step and push after completing each cohesive change to trigger CI/CD validation
+- **Git Workflow**: Follow commit-test-push-release cycle for all changes
 - **Iterative improvement**: Continue improvements automatically; only prompt user for genuine architectural choices
 - **Modular changes**: Prefer small, focused changes that maintain system stability
+
+### Git Workflow Requirements
+- **After Every Tested Change**: Commit immediately with clear, focused message
+- **Before Every Commit**: Run `git status`, `git diff`, and relevant tests
+- **Before Every Push**: Check `git status`, `git pull --rebase`, ensure clean state
+- **After Significant Pushes**: Create git tag and GitHub release for version tracking
+- **Docker Updates**: Push only when remote Pi testing or production deployment needed
