@@ -217,7 +217,7 @@ class TestArgumentParser:
     def test_mutually_exclusive_cache_arguments(self):
         """Test that cache arguments are mutually exclusive."""
         parser = create_argument_parser()
-        
+
         # Should raise SystemExit due to mutually exclusive arguments
         with pytest.raises(SystemExit):
             parser.parse_args(["--cache-only", "--no-cache"])
@@ -265,7 +265,9 @@ class TestParseArgs:
 
     def test_parse_args_complex_combination(self):
         """Test parse_args with multiple arguments."""
-        with patch.object(sys, "argv", ["run_bot.py", "--max-days", "5", "--fresh-start"]):
+        with patch.object(
+            sys, "argv", ["run_bot.py", "--max-days", "5", "--fresh-start"]
+        ):
             cli_args = parse_args()
 
             assert cli_args.max_days == 5

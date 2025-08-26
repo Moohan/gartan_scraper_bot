@@ -135,9 +135,7 @@ def _convert_slots_to_blocks(
     return blocks
 
 
-def insert_crew_details(
-    crew_list: list, contact_map: dict = None, db_conn=None
-):
+def insert_crew_details(crew_list: list, contact_map: dict = None, db_conn=None):
     """
     Insert or update crew details (name, role, contract_hours, contact, skills) into crew table.
     Uses optimized batch operations and connection pooling.
@@ -183,9 +181,7 @@ def insert_crew_details(
             conn.close()
 
 
-def insert_crew_availability(
-    crew_list: List[Dict[str, Any]], db_conn=None
-):
+def insert_crew_availability(crew_list: List[Dict[str, Any]], db_conn=None):
     """
     Converts crew availability slots into blocks and inserts them into the database.
     Cleans up overlapping blocks for the date range being processed.
@@ -209,13 +205,13 @@ def insert_crew_availability(
         all_dates = set()
         min_date = None
         max_date = None
-        
+
         for crew in crew_list:
             for slot_time in crew.get("availability", {}):
                 date_str = slot_time.split()[0]  # Extract date part
                 date_obj = datetime.strptime(date_str, "%d/%m/%Y").date()
                 all_dates.add(date_obj)
-        
+
         if all_dates:
             min_date = min(all_dates)
             max_date = max(all_dates)
@@ -236,11 +232,14 @@ def insert_crew_availability(
 
             # Clean up existing blocks that overlap with the date range being processed
             if min_date and max_date:
-                logger.debug(f"Cleaning up existing blocks for {name} in date range {min_date} to {max_date}")
+                logger.debug(
+                    f"Cleaning up existing blocks for {name} in date range {min_date} to {max_date}"
+                )
                 # Use datetime range comparison instead of SQL date() function to avoid deprecation warnings
                 min_datetime = f"{min_date} 00:00:00"
                 max_datetime = f"{max_date} 23:59:59"
-                c.execute("""
+                c.execute(
+                    """
                     DELETE FROM crew_availability
                     WHERE crew_id = ?
                     AND (
@@ -248,8 +247,18 @@ def insert_crew_availability(
                         OR end_time BETWEEN ? AND ?
                         OR (start_time <= ? AND end_time >= ?)
                     )
-                """, (crew_id, min_datetime, max_datetime, min_datetime, max_datetime, min_datetime, max_datetime))
-                
+                """,
+                    (
+                        crew_id,
+                        min_datetime,
+                        max_datetime,
+                        min_datetime,
+                        max_datetime,
+                        min_datetime,
+                        max_datetime,
+                    ),
+                )
+
                 deleted_count = c.rowcount
                 if deleted_count > 0:
                     logger.debug(f"Deleted {deleted_count} existing blocks for {name}")
@@ -288,9 +297,7 @@ def insert_crew_availability(
             conn.close()
 
 
-def insert_appliance_availability(
-    appliance_obj: Dict[str, Any], db_conn=None
-):
+def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
     """Convert appliance slot availability into blocks and insert non-duplicates."""
     if db_conn is not None:
         conn = db_conn
