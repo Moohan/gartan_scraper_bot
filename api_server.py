@@ -406,15 +406,12 @@ def check_p22p6_business_rules() -> Dict[str, Any]:
                 "total_available": total_available,
                 "skill_counts": skill_counts,
                 "ba_non_ttr": ba_non_ttr,
-                "ffc_with_ba": ffc_with_ba
-            }
+                "ffc_with_ba": ffc_with_ba,
+            },
         }
     except Exception as e:
         logger.error(f"Error checking P22P6 business rules: {e}")
-        return {
-            "rules_pass": False,
-            "error": "Error checking business rules"
-        }
+        return {"rules_pass": False, "error": "Error checking business rules"}
 
 
 def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:

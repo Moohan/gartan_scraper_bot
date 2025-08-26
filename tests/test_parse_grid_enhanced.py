@@ -363,15 +363,29 @@ class TestParseGridEdgeCases:
         assert _is_crew_available_in_cell(MockCellWithText("O")) is False  # Off
         assert _is_crew_available_in_cell(MockCellWithText("W")) is False  # Working
         assert _is_crew_available_in_cell(MockCellWithText("T")) is False  # Training
-        assert _is_crew_available_in_cell(MockCellWithText("")) is True    # Empty = available
+        assert (
+            _is_crew_available_in_cell(MockCellWithText("")) is True
+        )  # Empty = available
 
     def test_aggregation_with_conflicting_data(self):
         """Test aggregation functions with conflicting data."""
 
         # Test crew aggregation with conflicts
         conflicting_crew = [
-            [{"name": "CONFLICT, A", "role": "FFC", "availability": {"2025-08-05 0800": True}}],
-            [{"name": "CONFLICT, A", "role": "FFT", "availability": {"2025-08-05 0800": False}}]
+            [
+                {
+                    "name": "CONFLICT, A",
+                    "role": "FFC",
+                    "availability": {"2025-08-05 0800": True},
+                }
+            ],
+            [
+                {
+                    "name": "CONFLICT, A",
+                    "role": "FFT",
+                    "availability": {"2025-08-05 0800": False},
+                }
+            ],
         ]
 
         aggregated = aggregate_crew_availability(conflicting_crew)
@@ -384,7 +398,7 @@ class TestParseGridEdgeCases:
         # Test appliance aggregation with conflicts
         conflicting_appliances = [
             {"ENGINE": {"availability": {"2025-08-05 0800": True}}},
-            {"ENGINE": {"availability": {"2025-08-05 0800": False}}}
+            {"ENGINE": {"availability": {"2025-08-05 0800": False}}},
         ]
 
         aggregated_appliances = aggregate_appliance_availability(conflicting_appliances)

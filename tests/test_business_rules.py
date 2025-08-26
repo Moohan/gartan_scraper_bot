@@ -65,7 +65,7 @@ class TestP22P6BusinessRules:
         c = self.conn.cursor()
         c.execute(
             "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-            (name, role, skills, "56")
+            (name, role, skills, "56"),
         )
         crew_id = c.lastrowid
 
@@ -75,7 +75,7 @@ class TestP22P6BusinessRules:
             future = now + timedelta(hours=24)
             c.execute(
                 "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-                (crew_id, now, future)
+                (crew_id, now, future),
             )
 
         self.conn.commit()
@@ -93,7 +93,7 @@ class TestP22P6BusinessRules:
             future = now + timedelta(hours=24)
             c.execute(
                 "INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (?, ?, ?)",
-                (appliance_id, now, future)
+                (appliance_id, now, future),
             )
 
         self.conn.commit()
@@ -108,16 +108,20 @@ class TestP22P6BusinessRules:
         # - 2+ BA excluding TTR (breathing apparatus crew)
         # - 1+ FFC with BA (senior BA crew)
         self._insert_crew_member("OFFICER, A", "WC", "TTR BA")  # Officer with BA
-        self._insert_crew_member("DRIVER, B", "FFC", "LGV BA")  # Driver with BA (FFC rank)
-        self._insert_crew_member("CREW, C", "FFD", "BA")       # BA crew
-        self._insert_crew_member("CREW, D", "FFT", "BA")       # BA crew
+        self._insert_crew_member(
+            "DRIVER, B", "FFC", "LGV BA"
+        )  # Driver with BA (FFC rank)
+        self._insert_crew_member("CREW, C", "FFD", "BA")  # BA crew
+        self._insert_crew_member("CREW, D", "FFT", "BA")  # BA crew
 
         # Insert P22P6 appliance
         self._insert_appliance("P22P6")
 
         # Check appliance is available
         result = get_appliance_available_data("P22P6")
-        assert result["available"] is True, "P22P6 should be available when all business rules pass"
+        assert (
+            result["available"] is True
+        ), "P22P6 should be available when all business rules pass"
 
     def test_p22p6_insufficient_crew(self):
         """Test P22P6 unavailable with less than 4 crew members."""
@@ -131,12 +135,14 @@ class TestP22P6BusinessRules:
 
         # Check appliance is unavailable
         result = get_appliance_available_data("P22P6")
-        assert result["available"] is False, "P22P6 should be unavailable with less than 4 crew"
+        assert (
+            result["available"] is False
+        ), "P22P6 should be unavailable with less than 4 crew"
 
     def test_p22p6_no_ttr_officer(self):
         """Test P22P6 unavailable without TTR-qualified officer."""
         # 4 crew but no TTR skill
-        self._insert_crew_member("CREW, A", "WC", "BA")        # No TTR
+        self._insert_crew_member("CREW, A", "WC", "BA")  # No TTR
         self._insert_crew_member("DRIVER, B", "FFC", "LGV BA")
         self._insert_crew_member("CREW, C", "FFD", "BA")
         self._insert_crew_member("CREW, D", "FFT", "BA")
@@ -146,13 +152,15 @@ class TestP22P6BusinessRules:
 
         # Check appliance is unavailable
         result = get_appliance_available_data("P22P6")
-        assert result["available"] is False, "P22P6 should be unavailable without TTR officer"
+        assert (
+            result["available"] is False
+        ), "P22P6 should be unavailable without TTR officer"
 
     def test_p22p6_no_lgv_driver(self):
         """Test P22P6 unavailable without LGV-qualified driver."""
         # 4 crew but no LGV skill
         self._insert_crew_member("OFFICER, A", "WC", "TTR BA")
-        self._insert_crew_member("CREW, B", "FFC", "BA")       # No LGV
+        self._insert_crew_member("CREW, B", "FFC", "BA")  # No LGV
         self._insert_crew_member("CREW, C", "FFD", "BA")
         self._insert_crew_member("CREW, D", "FFT", "BA")
 
@@ -161,52 +169,64 @@ class TestP22P6BusinessRules:
 
         # Check appliance is unavailable
         result = get_appliance_available_data("P22P6")
-        assert result["available"] is False, "P22P6 should be unavailable without LGV driver"
+        assert (
+            result["available"] is False
+        ), "P22P6 should be unavailable without LGV driver"
 
     def test_p22p6_insufficient_ba_crew(self):
         """Test P22P6 unavailable with less than 2 BA crew (excluding TTR)."""
         # TTR officer has BA but only 1 additional BA crew member
-        self._insert_crew_member("OFFICER, A", "WC", "TTR BA")  # BA but has TTR (excluded)
+        self._insert_crew_member(
+            "OFFICER, A", "WC", "TTR BA"
+        )  # BA but has TTR (excluded)
         self._insert_crew_member("DRIVER, B", "FFC", "LGV BA")  # 1 BA without TTR
-        self._insert_crew_member("CREW, C", "FFD", "")          # No BA
-        self._insert_crew_member("CREW, D", "FFT", "")          # No BA
+        self._insert_crew_member("CREW, C", "FFD", "")  # No BA
+        self._insert_crew_member("CREW, D", "FFT", "")  # No BA
 
         # Insert P22P6 appliance
         self._insert_appliance("P22P6")
 
         # Check appliance is unavailable
         result = get_appliance_available_data("P22P6")
-        assert result["available"] is False, "P22P6 should be unavailable with insufficient BA crew"
+        assert (
+            result["available"] is False
+        ), "P22P6 should be unavailable with insufficient BA crew"
 
     def test_p22p6_no_senior_ba_crew(self):
         """Test P22P6 unavailable without FFC+ ranked crew with BA."""
         # All crew are FFT/FFD rank (no FFC or higher with BA)
-        self._insert_crew_member("OFFICER, A", "FFT", "TTR")    # TTR but low rank, no BA
-        self._insert_crew_member("DRIVER, B", "FFT", "LGV")     # LGV but low rank, no BA
-        self._insert_crew_member("CREW, C", "FFT", "BA")        # BA but low rank
-        self._insert_crew_member("CREW, D", "FFD", "BA")        # BA but low rank
+        self._insert_crew_member("OFFICER, A", "FFT", "TTR")  # TTR but low rank, no BA
+        self._insert_crew_member("DRIVER, B", "FFT", "LGV")  # LGV but low rank, no BA
+        self._insert_crew_member("CREW, C", "FFT", "BA")  # BA but low rank
+        self._insert_crew_member("CREW, D", "FFD", "BA")  # BA but low rank
 
         # Insert P22P6 appliance
         self._insert_appliance("P22P6")
 
         # Check appliance is unavailable
         result = get_appliance_available_data("P22P6")
-        assert result["available"] is False, "P22P6 should be unavailable without senior BA crew"
+        assert (
+            result["available"] is False
+        ), "P22P6 should be unavailable without senior BA crew"
 
     def test_p22p6_minimal_valid_configuration(self):
         """Test P22P6 available with exactly minimum required crew configuration."""
         # Exactly 4 crew with minimal qualifications to pass all rules
-        self._insert_crew_member("OFFICER, A", "FFC", "TTR")    # TTR officer (FFC rank)
-        self._insert_crew_member("DRIVER, B", "FFC", "LGV BA")  # LGV driver with BA (FFC = senior)
-        self._insert_crew_member("CREW, C", "FFT", "BA")        # BA crew member 1
-        self._insert_crew_member("CREW, D", "FFT", "BA")        # BA crew member 2
+        self._insert_crew_member("OFFICER, A", "FFC", "TTR")  # TTR officer (FFC rank)
+        self._insert_crew_member(
+            "DRIVER, B", "FFC", "LGV BA"
+        )  # LGV driver with BA (FFC = senior)
+        self._insert_crew_member("CREW, C", "FFT", "BA")  # BA crew member 1
+        self._insert_crew_member("CREW, D", "FFT", "BA")  # BA crew member 2
 
         # Insert P22P6 appliance
         self._insert_appliance("P22P6")
 
         # Check appliance is available
         result = get_appliance_available_data("P22P6")
-        assert result["available"] is True, "P22P6 should be available with minimal valid configuration"
+        assert (
+            result["available"] is True
+        ), "P22P6 should be available with minimal valid configuration"
 
     def test_p22p6_appliance_physically_unavailable(self):
         """Test P22P6 unavailable when appliance itself is not available."""
@@ -221,7 +241,9 @@ class TestP22P6BusinessRules:
 
         # Check appliance is unavailable
         result = get_appliance_available_data("P22P6")
-        assert result["available"] is False, "P22P6 should be unavailable when appliance itself is unavailable"
+        assert (
+            result["available"] is False
+        ), "P22P6 should be unavailable when appliance itself is unavailable"
 
 
 class TestAPIValidationScenarios:
@@ -236,12 +258,14 @@ class TestAPIValidationScenarios:
         self.conn.close()
         teardown_temp_db(self.temp_path)
 
-    def _insert_crew_member(self, name, role, skills, contact="", available=True, availability_hours=24):
+    def _insert_crew_member(
+        self, name, role, skills, contact="", available=True, availability_hours=24
+    ):
         """Helper to insert crew member with availability."""
         c = self.conn.cursor()
         c.execute(
             "INSERT INTO crew (name, role, skills, contact, contract_hours) VALUES (?, ?, ?, ?, ?)",
-            (name, role, skills, contact, "56")
+            (name, role, skills, contact, "56"),
         )
         crew_id = c.lastrowid
 
@@ -250,7 +274,7 @@ class TestAPIValidationScenarios:
             future = now + timedelta(hours=availability_hours)
             c.execute(
                 "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-                (crew_id, now, future)
+                (crew_id, now, future),
             )
 
         self.conn.commit()
@@ -263,7 +287,7 @@ class TestAPIValidationScenarios:
             "MCMAHON, JA",
             "FFC",
             "LGV BA",
-            "James McMahon|07123456789|james@example.com|Firefighter"
+            "James McMahon|07123456789|james@example.com|Firefighter",
         )
 
         crew_list = get_crew_list_data()
@@ -290,11 +314,17 @@ class TestAPIValidationScenarios:
     def test_skill_counting_accuracy(self):
         """Test accurate skill counting for business rules."""
         # Create specific crew configuration for skill testing
-        self._insert_crew_member("OFFICER, A", "WC", "TTR BA", available=True)      # TTR: 1, BA: 1
-        self._insert_crew_member("DRIVER, B", "FFC", "LGV BA", available=True)      # LGV: 1, BA: 2
-        self._insert_crew_member("CREW, C", "FFD", "BA", available=True)            # BA: 3
-        self._insert_crew_member("TRAINEE, D", "FFT", "", available=True)           # No skills
-        self._insert_crew_member("OFF_DUTY, E", "FFC", "TTR LGV BA", available=False)  # Unavailable (shouldn't count)
+        self._insert_crew_member(
+            "OFFICER, A", "WC", "TTR BA", available=True
+        )  # TTR: 1, BA: 1
+        self._insert_crew_member(
+            "DRIVER, B", "FFC", "LGV BA", available=True
+        )  # LGV: 1, BA: 2
+        self._insert_crew_member("CREW, C", "FFD", "BA", available=True)  # BA: 3
+        self._insert_crew_member("TRAINEE, D", "FFT", "", available=True)  # No skills
+        self._insert_crew_member(
+            "OFF_DUTY, E", "FFC", "TTR LGV BA", available=False
+        )  # Unavailable (shouldn't count)
 
         crew_list = get_crew_list_data()
         available_crew = []
@@ -312,8 +342,12 @@ class TestAPIValidationScenarios:
                 if skill in skill_counts:
                     skill_counts[skill] += 1
 
-        assert skill_counts["TTR"] == 1, "Should count exactly 1 TTR from available crew"
-        assert skill_counts["LGV"] == 1, "Should count exactly 1 LGV from available crew"
+        assert (
+            skill_counts["TTR"] == 1
+        ), "Should count exactly 1 TTR from available crew"
+        assert (
+            skill_counts["LGV"] == 1
+        ), "Should count exactly 1 LGV from available crew"
         assert skill_counts["BA"] == 3, "Should count exactly 3 BA from available crew"
 
     def test_mixed_availability_scenarios(self):
@@ -322,16 +356,26 @@ class TestAPIValidationScenarios:
         self._insert_crew_member("CASELY, CH", "FFC", "LGV BA", available=True)
         self._insert_crew_member("MCMAHON, JA", "FFC", "LGV BA", available=True)
         self._insert_crew_member("MUNRO, MA", "FFD", "BA", available=True)
-        self._insert_crew_member("COUTIE, JA", "FFT", "TTR", available=False)  # Off duty
-        self._insert_crew_member("GIBB, OL", "FFT", "LGV", available=False)    # Working elsewhere
-        self._insert_crew_member("MACDONALD, RO", "FFT", "BA", available=False)  # Working elsewhere
-        self._insert_crew_member("SABA, JA", "FFT", "LGV BA", available=False)   # Working elsewhere
+        self._insert_crew_member(
+            "COUTIE, JA", "FFT", "TTR", available=False
+        )  # Off duty
+        self._insert_crew_member(
+            "GIBB, OL", "FFT", "LGV", available=False
+        )  # Working elsewhere
+        self._insert_crew_member(
+            "MACDONALD, RO", "FFT", "BA", available=False
+        )  # Working elsewhere
+        self._insert_crew_member(
+            "SABA, JA", "FFT", "LGV BA", available=False
+        )  # Working elsewhere
 
         crew_list = get_crew_list_data()
         assert len(crew_list) == 7, "Should have all 7 crew members in list"
 
         # Verify available crew count matches expected scenario
-        available_count = sum(1 for i, crew in enumerate(crew_list) if i < 3)  # First 3 are available
+        available_count = sum(
+            1 for i, crew in enumerate(crew_list) if i < 3
+        )  # First 3 are available
         assert available_count == 3, "Should have exactly 3 available crew members"
 
     def test_reason_code_edge_cases(self):
@@ -340,13 +384,19 @@ class TestAPIValidationScenarios:
         # Note: Reason codes are typically handled in parsing, but availability should be correct
 
         # Crew member who should be unavailable (equivalent to 'O' - Off duty)
-        off_duty_id = self._insert_crew_member("OFF_DUTY, A", "FFC", "TTR", available=False)
+        off_duty_id = self._insert_crew_member(
+            "OFF_DUTY, A", "FFC", "TTR", available=False
+        )
 
         # Crew member who should be unavailable (equivalent to 'W' - Working elsewhere)
-        working_id = self._insert_crew_member("WORKING, B", "FFC", "LGV", available=False)
+        working_id = self._insert_crew_member(
+            "WORKING, B", "FFC", "LGV", available=False
+        )
 
         # Crew member who should be available (no reason code)
-        available_id = self._insert_crew_member("AVAILABLE, C", "FFC", "BA", available=True)
+        available_id = self._insert_crew_member(
+            "AVAILABLE, C", "FFC", "BA", available=True
+        )
 
         # Test API responses
         from api_server import get_crew_available_data
@@ -355,37 +405,57 @@ class TestAPIValidationScenarios:
         working_result = get_crew_available_data(working_id)
         available_result = get_crew_available_data(available_id)
 
-        assert off_duty_result["available"] is False, "Off duty crew should be unavailable"
-        assert working_result["available"] is False, "Working elsewhere crew should be unavailable"
-        assert available_result["available"] is True, "Available crew should be available"
+        assert (
+            off_duty_result["available"] is False
+        ), "Off duty crew should be unavailable"
+        assert (
+            working_result["available"] is False
+        ), "Working elsewhere crew should be unavailable"
+        assert (
+            available_result["available"] is True
+        ), "Available crew should be available"
 
     def test_duration_reasonableness(self):
         """Test that duration calculations are reasonable."""
         from api_server import get_crew_duration_data
 
         # Short availability (1 hour)
-        short_id = self._insert_crew_member("SHORT, A", "FFC", "BA", available=True, availability_hours=1)
+        short_id = self._insert_crew_member(
+            "SHORT, A", "FFC", "BA", available=True, availability_hours=1
+        )
 
         # Long availability (7 days = 168 hours, our filter limit)
-        long_id = self._insert_crew_member("LONG, B", "FFC", "BA", available=True, availability_hours=168)
+        long_id = self._insert_crew_member(
+            "LONG, B", "FFC", "BA", available=True, availability_hours=168
+        )
 
         # Very long availability (should be filtered out by quality controls)
-        very_long_id = self._insert_crew_member("VERY_LONG, C", "FFC", "BA", available=True, availability_hours=200)
+        very_long_id = self._insert_crew_member(
+            "VERY_LONG, C", "FFC", "BA", available=True, availability_hours=200
+        )
 
         short_result = get_crew_duration_data(short_id)
         long_result = get_crew_duration_data(long_id)
         very_long_result = get_crew_duration_data(very_long_id)
 
         # Short duration should be returned
-        assert short_result["duration"] is not None, "Short duration should be calculated"
-        assert "1.0h" in short_result["duration"] or "0.9" in short_result["duration"], "Short duration should be ~1 hour"
+        assert (
+            short_result["duration"] is not None
+        ), "Short duration should be calculated"
+        assert (
+            "1.0h" in short_result["duration"] or "0.9" in short_result["duration"]
+        ), "Short duration should be ~1 hour"
 
         # Long but valid duration should be returned
-        assert long_result["duration"] is not None, "Long valid duration should be calculated"
+        assert (
+            long_result["duration"] is not None
+        ), "Long valid duration should be calculated"
 
         # Very long duration should be filtered out by quality controls
         # Note: This tests the 7-day filter in the API
-        assert very_long_result["duration"] is None, "Very long duration should be filtered out"
+        assert (
+            very_long_result["duration"] is None
+        ), "Very long duration should be filtered out"
 
     def test_time_boundary_edge_cases(self):
         """Test edge cases around time boundaries."""
@@ -399,12 +469,12 @@ class TestAPIValidationScenarios:
         c = self.conn.cursor()
         c.execute(
             "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-            ("EDGE_CASE, A", "FFC", "BA", "56")
+            ("EDGE_CASE, A", "FFC", "BA", "56"),
         )
         crew_id = c.lastrowid
         c.execute(
             "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-            (crew_id, recent_start, near_future)
+            (crew_id, recent_start, near_future),
         )
         self.conn.commit()
 
@@ -414,19 +484,21 @@ class TestAPIValidationScenarios:
         # Test crew who just became unavailable (ended 1 minute ago)
         c.execute(
             "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-            ("JUST_ENDED, B", "FFC", "BA", "56")
+            ("JUST_ENDED, B", "FFC", "BA", "56"),
         )
         ended_crew_id = c.lastrowid
         past_start = now - timedelta(hours=2)
         recent_end = now - timedelta(minutes=1)
         c.execute(
             "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-            (ended_crew_id, past_start, recent_end)
+            (ended_crew_id, past_start, recent_end),
         )
         self.conn.commit()
 
         ended_result = get_crew_available_data(ended_crew_id)
-        assert ended_result["available"] is False, "Crew should be unavailable after end time"
+        assert (
+            ended_result["available"] is False
+        ), "Crew should be unavailable after end time"
 
 
 class TestDataQualityValidation:
@@ -450,7 +522,7 @@ class TestDataQualityValidation:
         for i in range(3):
             c.execute(
                 "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-                (f"CREW_{i}, A", "FFC", "BA", "56")
+                (f"CREW_{i}, A", "FFC", "BA", "56"),
             )
         self.conn.commit()
 
@@ -462,14 +534,24 @@ class TestDataQualityValidation:
 
             # Test availability endpoint
             avail_result = get_crew_available_data(crew_id)
-            assert "error" not in avail_result, f"Crew {crew_id} availability endpoint should not error"
-            assert "available" in avail_result, f"Crew {crew_id} should have availability status"
-            assert isinstance(avail_result["available"], bool), f"Crew {crew_id} availability should be boolean"
+            assert (
+                "error" not in avail_result
+            ), f"Crew {crew_id} availability endpoint should not error"
+            assert (
+                "available" in avail_result
+            ), f"Crew {crew_id} should have availability status"
+            assert isinstance(
+                avail_result["available"], bool
+            ), f"Crew {crew_id} availability should be boolean"
 
             # Test duration endpoint
             duration_result = get_crew_duration_data(crew_id)
-            assert "error" not in duration_result, f"Crew {crew_id} duration endpoint should not error"
-            assert "duration" in duration_result, f"Crew {crew_id} should have duration field"
+            assert (
+                "error" not in duration_result
+            ), f"Crew {crew_id} duration endpoint should not error"
+            assert (
+                "duration" in duration_result
+            ), f"Crew {crew_id} should have duration field"
 
     def test_nonexistent_crew_handling(self):
         """Test handling of requests for non-existent crew members."""
@@ -480,11 +562,17 @@ class TestDataQualityValidation:
 
         avail_result = get_crew_available_data(nonexistent_id)
         assert "error" in avail_result, "Non-existent crew should return error"
-        assert "not found" in avail_result["error"].lower(), "Error should mention not found"
+        assert (
+            "not found" in avail_result["error"].lower()
+        ), "Error should mention not found"
 
         duration_result = get_crew_duration_data(nonexistent_id)
-        assert "error" in duration_result, "Non-existent crew duration should return error"
-        assert "not found" in duration_result["error"].lower(), "Error should mention not found"
+        assert (
+            "error" in duration_result
+        ), "Non-existent crew duration should return error"
+        assert (
+            "not found" in duration_result["error"].lower()
+        ), "Error should mention not found"
 
     def test_appliance_endpoint_consistency(self):
         """Test that appliance endpoints are consistent."""
@@ -501,7 +589,9 @@ class TestDataQualityValidation:
 
         assert "error" not in avail_result, "P22P6 availability should not error"
         assert "available" in avail_result, "P22P6 should have availability status"
-        assert isinstance(avail_result["available"], bool), "P22P6 availability should be boolean"
+        assert isinstance(
+            avail_result["available"], bool
+        ), "P22P6 availability should be boolean"
 
         assert "error" not in duration_result, "P22P6 duration should not error"
         assert "duration" in duration_result, "P22P6 should have duration field"
@@ -514,7 +604,7 @@ class TestDataQualityValidation:
         c = self.conn.cursor()
         c.execute(
             "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-            ("OLD_DATA, A", "FFC", "BA", "56")
+            ("OLD_DATA, A", "FFC", "BA", "56"),
         )
         crew_id = c.lastrowid
 
@@ -523,12 +613,14 @@ class TestDataQualityValidation:
         old_end = old_start + timedelta(hours=8)
         c.execute(
             "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-            (crew_id, old_start, old_end)
+            (crew_id, old_start, old_end),
         )
         self.conn.commit()
 
         result = get_crew_available_data(crew_id)
-        assert result["available"] is False, "Old data should be filtered out, showing as unavailable"
+        assert (
+            result["available"] is False
+        ), "Old data should be filtered out, showing as unavailable"
 
 
 if __name__ == "__main__":
