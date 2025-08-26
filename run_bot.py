@@ -30,6 +30,10 @@ logger = get_logger()
 
 def cleanup_old_cache_files(cache_dir: str, today: datetime) -> None:
     """Clean up cache files older than today."""
+    if not os.path.exists(cache_dir):
+        logger.debug(f"Cache directory {cache_dir} does not exist, skipping cleanup")
+        return
+        
     for fname in os.listdir(cache_dir):
         match = re.match(r"grid_(\d{2}-\d{2}-\d{4})\.html", fname)
         if match:
