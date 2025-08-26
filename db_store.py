@@ -55,7 +55,7 @@ def init_db(db_path: str = DB_PATH, reset: bool = False):
     Otherwise tables are created if they do not already exist and existing
     data is preserved to allow historical accumulation across scraper runs.
     """
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
     c = conn.cursor()
     if reset:
         c.execute("DROP TABLE IF EXISTS crew_availability")
@@ -150,7 +150,7 @@ def insert_crew_details(
         conn = db_conn
         should_close = False
     else:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
         should_close = True
 
     try:
@@ -195,7 +195,7 @@ def insert_crew_availability(
         conn = db_conn
         should_close = False
     else:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
         should_close = True
 
     try:
@@ -237,15 +237,18 @@ def insert_crew_availability(
             # Clean up existing blocks that overlap with the date range being processed
             if min_date and max_date:
                 logger.debug(f"Cleaning up existing blocks for {name} in date range {min_date} to {max_date}")
+                # Use datetime range comparison instead of SQL date() function to avoid deprecation warnings
+                min_datetime = f"{min_date} 00:00:00"
+                max_datetime = f"{max_date} 23:59:59"
                 c.execute("""
                     DELETE FROM crew_availability
                     WHERE crew_id = ?
                     AND (
-                        date(start_time) BETWEEN ? AND ?
-                        OR date(end_time) BETWEEN ? AND ?
-                        OR (date(start_time) <= ? AND date(end_time) >= ?)
+                        start_time BETWEEN ? AND ?
+                        OR end_time BETWEEN ? AND ?
+                        OR (start_time <= ? AND end_time >= ?)
                     )
-                """, (crew_id, min_date, max_date, min_date, max_date, min_date, max_date))
+                """, (crew_id, min_datetime, max_datetime, min_datetime, max_datetime, min_datetime, max_datetime))
                 
                 deleted_count = c.rowcount
                 if deleted_count > 0:
@@ -293,7 +296,7 @@ def insert_appliance_availability(
         conn = db_conn
         should_close = False
     else:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
         should_close = True
     c = conn.cursor()
     try:
