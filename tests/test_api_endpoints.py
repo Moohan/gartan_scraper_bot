@@ -57,13 +57,15 @@ class TestAPIEndpoints:
         except (OSError, FileNotFoundError):
             pass
 
-    def _insert_crew_member(self, crew_id, name, role="FFC", skills="BA", contact="", available=True):
+    def _insert_crew_member(
+        self, crew_id, name, role="FFC", skills="BA", contact="", available=True
+    ):
         """Helper to insert crew member with availability."""
         conn = sqlite3.connect(self.temp_path)
         c = conn.cursor()
         c.execute(
             "INSERT INTO crew (id, name, role, skills, contact, contract_hours) VALUES (?, ?, ?, ?, ?, ?)",
-            (crew_id, name, role, skills, contact, "56")
+            (crew_id, name, role, skills, contact, "56"),
         )
 
         if available:
@@ -71,7 +73,7 @@ class TestAPIEndpoints:
             future = now + timedelta(hours=8)
             c.execute(
                 "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-                (crew_id, now, future)
+                (crew_id, now, future),
             )
 
         conn.commit()
@@ -81,14 +83,16 @@ class TestAPIEndpoints:
         """Helper to insert appliance with availability."""
         conn = sqlite3.connect(self.temp_path)
         c = conn.cursor()
-        c.execute("INSERT INTO appliance (id, name) VALUES (?, ?)", (appliance_id, name))
+        c.execute(
+            "INSERT INTO appliance (id, name) VALUES (?, ?)", (appliance_id, name)
+        )
 
         if available:
             now = datetime.now()
             future = now + timedelta(hours=8)
             c.execute(
                 "INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (?, ?, ?)",
-                (appliance_id, now, future)
+                (appliance_id, now, future),
             )
 
         conn.commit()
@@ -130,7 +134,13 @@ class TestAPIEndpoints:
     def test_crew_list_endpoint(self):
         """Test /crew endpoint."""
         # Insert test crew
-        self._insert_crew_member(1, "JONES, AB", "FFC", "BA LGV", "Alice Jones|07123456789|alice@example.com|Firefighter")
+        self._insert_crew_member(
+            1,
+            "JONES, AB",
+            "FFC",
+            "BA LGV",
+            "Alice Jones|07123456789|alice@example.com|Firefighter",
+        )
         self._insert_crew_member(2, "SMITH, CD", "FFT", "TTR", "")
 
         response = self.client.get("/crew")
@@ -315,7 +325,7 @@ class TestAPIEndpoints:
             "/health",
             "/crew",
             "/crew/1/available",
-            "/appliances/P22P6/available"
+            "/appliances/P22P6/available",
         ]
 
         for endpoint in endpoints:
@@ -332,11 +342,7 @@ class TestAPIEndpoints:
         self._insert_crew_member(1, "TEST, A")
 
         # JSON endpoints
-        json_endpoints = [
-            "/health",
-            "/crew",
-            "/crew/1/available"
-        ]
+        json_endpoints = ["/health", "/crew", "/crew/1/available"]
 
         for endpoint in json_endpoints:
             response = self.client.get(endpoint)
@@ -389,7 +395,11 @@ class TestAPIEndpoints:
 
         # Other endpoints should handle gracefully
         response = self.client.get("/crew")
-        assert response.status_code in [200, 500, 503]  # Various error responses acceptable
+        assert response.status_code in [
+            200,
+            500,
+            503,
+        ]  # Various error responses acceptable
 
 
 if __name__ == "__main__":

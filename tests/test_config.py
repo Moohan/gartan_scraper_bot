@@ -49,10 +49,10 @@ class TestConfig:
         test_username = "test_user_123"
         test_password = "test_pass_456"
 
-        with patch.dict(os.environ, {
-            "GARTAN_USERNAME": test_username,
-            "GARTAN_PASSWORD": test_password
-        }):
+        with patch.dict(
+            os.environ,
+            {"GARTAN_USERNAME": test_username, "GARTAN_PASSWORD": test_password},
+        ):
             config = Config()
 
             assert config.gartan_username == test_username
@@ -102,14 +102,14 @@ class TestConfig:
 
         # Test boundary between historic and today
         assert config.get_cache_minutes(-1) == -1  # Historic
-        assert config.get_cache_minutes(0) == 15   # Today
+        assert config.get_cache_minutes(0) == 15  # Today
 
         # Test boundary between today and tomorrow
-        assert config.get_cache_minutes(0) == 15   # Today
-        assert config.get_cache_minutes(1) == 60   # Tomorrow
+        assert config.get_cache_minutes(0) == 15  # Today
+        assert config.get_cache_minutes(1) == 60  # Tomorrow
 
         # Test boundary between tomorrow and future
-        assert config.get_cache_minutes(1) == 60      # Tomorrow
+        assert config.get_cache_minutes(1) == 60  # Tomorrow
         assert config.get_cache_minutes(2) == 60 * 24  # Future
 
     def test_config_instance_independence(self):
@@ -176,7 +176,9 @@ class TestConfig:
                 assert config.db_path == "gartan_availability.db"  # Local path
             except OSError:
                 # Expected - the current implementation doesn't handle this gracefully
-                pytest.skip("Config doesn't handle os.path.exists exceptions gracefully yet")
+                pytest.skip(
+                    "Config doesn't handle os.path.exists exceptions gracefully yet"
+                )
 
     def test_cache_expiry_edge_cases(self):
         """Test cache expiry with edge case inputs."""

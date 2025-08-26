@@ -38,20 +38,38 @@ def setup_test_scenario():
     )
 
     # Insert crew with insufficient qualifications (missing TTR)
-    c.execute("INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)", ("CREW, A", "FFC", "LGV BA", "56"))
-    c.execute("INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)", ("CREW, B", "FFD", "BA", "56"))
-    c.execute("INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)", ("CREW, C", "FFT", "BA", "56"))
-    c.execute("INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)", ("CREW, D", "FFT", "BA", "56"))
+    c.execute(
+        "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
+        ("CREW, A", "FFC", "LGV BA", "56"),
+    )
+    c.execute(
+        "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
+        ("CREW, B", "FFD", "BA", "56"),
+    )
+    c.execute(
+        "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
+        ("CREW, C", "FFT", "BA", "56"),
+    )
+    c.execute(
+        "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
+        ("CREW, D", "FFT", "BA", "56"),
+    )
 
     # Make all crew available
     now = datetime.now()
     future = now + timedelta(hours=8)
     for crew_id in range(1, 5):
-        c.execute("INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)", (crew_id, now, future))
+        c.execute(
+            "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
+            (crew_id, now, future),
+        )
 
     # Insert P22P6 appliance and make it physically available
     c.execute("INSERT INTO appliance (name) VALUES (?)", ("P22P6",))
-    c.execute("INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (?, ?, ?)", (1, now, future))
+    c.execute(
+        "INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (?, ?, ?)",
+        (1, now, future),
+    )
 
     conn.commit()
     return temp_path, conn
@@ -80,16 +98,24 @@ def test_business_rules_enforcement():
         # Should be None because business rules don't pass
         expected_duration = None
         actual_duration = duration_result.get("duration", "undefined")
-        assert actual_duration == expected_duration, f"Expected {expected_duration}, got {actual_duration}"
+        assert (
+            actual_duration == expected_duration
+        ), f"Expected {expected_duration}, got {actual_duration}"
         print("✅ P22P6 correctly shows no duration due to business rules")
 
         print("\n=== Adding TTR Officer ===")
         # Add a TTR officer
         c = conn.cursor()
-        c.execute("INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)", ("OFFICER, E", "WC", "TTR", "56"))
+        c.execute(
+            "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
+            ("OFFICER, E", "WC", "TTR", "56"),
+        )
         now = datetime.now()
         future = now + timedelta(hours=8)
-        c.execute("INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)", (5, now, future))
+        c.execute(
+            "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
+            (5, now, future),
+        )
         conn.commit()
 
         # Test again
@@ -99,7 +125,9 @@ def test_business_rules_enforcement():
         # Should now be True because all rules pass
         expected_with_ttr = True
         actual_with_ttr = result_with_ttr.get("available", None)
-        assert actual_with_ttr == expected_with_ttr, f"Expected {expected_with_ttr}, got {actual_with_ttr}"
+        assert (
+            actual_with_ttr == expected_with_ttr
+        ), f"Expected {expected_with_ttr}, got {actual_with_ttr}"
         print("✅ P22P6 correctly shows as available when all business rules pass")
 
         print("\n🎉 All business rule enforcement tests passed!")

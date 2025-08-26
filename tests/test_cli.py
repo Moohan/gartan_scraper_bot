@@ -23,6 +23,7 @@ class TestCliArgs:
 
     def test_from_args_basic(self):
         """Test creating CliArgs from basic arguments."""
+
         # Mock argparse Namespace
         class MockArgs:
             max_days = 5
@@ -39,6 +40,7 @@ class TestCliArgs:
 
     def test_from_args_cache_only(self):
         """Test CliArgs with cache-only flag."""
+
         class MockArgs:
             max_days = 3
             cache_only = True
@@ -52,6 +54,7 @@ class TestCliArgs:
 
     def test_from_args_cache_off(self):
         """Test CliArgs with cache-off flag."""
+
         class MockArgs:
             max_days = 3
             cache_only = False
@@ -65,6 +68,7 @@ class TestCliArgs:
 
     def test_from_args_cache_mode_explicit(self):
         """Test CliArgs with explicit cache_mode."""
+
         class MockArgs:
             max_days = 3
             cache_mode = "cache-only"
@@ -77,6 +81,7 @@ class TestCliArgs:
 
     def test_from_args_force_scrape(self):
         """Test CliArgs with force_scrape flag."""
+
         class MockArgs:
             max_days = 3
             cache_only = False
@@ -90,6 +95,7 @@ class TestCliArgs:
 
     def test_from_args_missing_attributes(self):
         """Test CliArgs with missing optional attributes."""
+
         class MockArgs:
             max_days = 7
 
@@ -260,7 +266,9 @@ class TestParseArgs:
 
     def test_parse_args_with_arguments(self):
         """Test parse_args with command line arguments."""
-        with patch.object(sys, "argv", ["run_bot.py", "--max-days", "5", "--cache-only"]):
+        with patch.object(
+            sys, "argv", ["run_bot.py", "--max-days", "5", "--cache-only"]
+        ):
             cli_args = parse_args()
 
             assert cli_args.max_days == 5
@@ -286,13 +294,26 @@ class TestParseArgs:
             assert cli_args.cache_mode == "cache-off"
 
         # Test explicit cache-mode
-        with patch.object(sys, "argv", ["run_bot.py", "--cache-mode", "cache-preferred"]):
+        with patch.object(
+            sys, "argv", ["run_bot.py", "--cache-mode", "cache-preferred"]
+        ):
             cli_args = parse_args()
             assert cli_args.cache_mode == "cache-preferred"
 
     def test_parse_args_complex_combination(self):
         """Test parse_args with complex argument combinations."""
-        with patch.object(sys, "argv", ["run_bot.py", "--max-days", "10", "--force-scrape", "--cache-mode", "cache-off"]):
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "run_bot.py",
+                "--max-days",
+                "10",
+                "--force-scrape",
+                "--cache-mode",
+                "cache-off",
+            ],
+        ):
             cli_args = parse_args()
 
             assert cli_args.max_days == 10
@@ -343,7 +364,9 @@ class TestCliIntegration:
     def test_edge_case_combinations(self):
         """Test edge cases in argument combinations."""
         # Zero max-days with force scrape
-        with patch.object(sys, "argv", ["run_bot.py", "--max-days", "0", "--force-scrape"]):
+        with patch.object(
+            sys, "argv", ["run_bot.py", "--max-days", "0", "--force-scrape"]
+        ):
             cli_args = parse_args()
             assert cli_args.max_days == 0
             assert cli_args.force_scrape is True
