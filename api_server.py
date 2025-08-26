@@ -765,7 +765,7 @@ def root():
         # Calculate dashboard statistics
         available_crew = [crew for crew in crew_data if crew["available"]]
         total_available = len(available_crew)
-        
+
         # Count skills
         skill_counts = {"TTR": 0, "LGV": 0, "BA": 0}
         for crew in available_crew:
