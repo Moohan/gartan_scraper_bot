@@ -9,26 +9,29 @@ class CliArgs:
 
     def __init__(self):
         self.max_days: int = 3
-        self.cache_mode: str = "cache-preferred"
-        self.force_scrape: bool = False
+        self.cache_mode: Optional[str] = None  # None = auto-detect, or explicit mode
+        self.fresh_start: bool = False
 
     @classmethod
     def from_args(cls, args):
         """Create CliArgs from parsed arguments."""
         cli_args = cls()
         cli_args.max_days = args.max_days
+        cli_args.fresh_start = getattr(args, "fresh_start", False)
 
         # Set cache mode based on flags
         if hasattr(args, "cache_only") and args.cache_only:
             cli_args.cache_mode = "cache-only"
-        elif hasattr(args, "cache_off") and args.cache_off:
-            cli_args.cache_mode = "cache-off"
-        elif hasattr(args, "cache_mode"):
+        elif hasattr(args, "no_cache") and args.no_cache:
+            cli_args.cache_mode = "no-cache"
+        elif hasattr(args, "cache_first") and args.cache_first:
+            cli_args.cache_mode = "cache-first"
+        elif hasattr(args, "cache_mode") and args.cache_mode:
             cli_args.cache_mode = args.cache_mode
         else:
-            cli_args.cache_mode = "cache-preferred"
+            # Default: intelligent caching based on data age (None = auto-detect)
+            cli_args.cache_mode = None
 
-        cli_args.force_scrape = getattr(args, "force_scrape", False)
         return cli_args
 
 
@@ -50,21 +53,26 @@ def create_argument_parser() -> argparse.ArgumentParser:
         "--cache-only", action="store_true", help="Use cache only, don't fetch new data"
     )
     cache_group.add_argument(
-        "--cache-off",
+        "--no-cache",
         action="store_true",
         help="Don't use cache, always fetch fresh data",
     )
     cache_group.add_argument(
+        "--cache-first",
+        action="store_true",
+        help="Use cache if available, even if stale",
+    )
+    cache_group.add_argument(
         "--cache-mode",
-        choices=["cache-only", "cache-preferred", "cache-off"],
-        default="cache-preferred",
-        help="Cache behavior mode",
+        choices=["cache-only", "cache-first", "no-cache"],
+        help="Cache behavior mode (default: intelligent caching based on data age)",
     )
 
+    # Database options
     parser.add_argument(
-        "--force-scrape",
+        "--fresh-start",
         action="store_true",
-        help="Force scrape even if cache is fresh",
+        help="Clear database and start fresh (forces complete rescrape)"
     )
 
     return parser

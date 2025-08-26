@@ -64,3 +64,19 @@ docker-compose logs -f
 ```bash
 docker-compose pull && docker-compose up -d
 ```
+
+## Local Development
+
+**Fresh start (clear database and rescrape):**
+
+```bash
+python run_bot.py --fresh-start --max-days 7
+```
+
+**Cache options:**
+
+```bash
+python run_bot.py --no-cache --max-days 3      # Force fresh data
+python run_bot.py --cache-first --max-days 3   # Use cache when available
+python run_bot.py --cache-only --max-days 3    # Cache only, no fetching
+```

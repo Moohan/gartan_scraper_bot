@@ -74,8 +74,17 @@ if __name__ == "__main__":
     logger.info(f"Fetching {effective_max_days} days of availability (week-aligned)...")
     start_time = time.time()
 
-    # Preserve history unless explicit reset requested
-    reset = os.environ.get("RESET_DB", "false").lower() == "true"
+    # Determine if we should reset the database
+    reset = (
+        os.environ.get("RESET_DB", "false").lower() == "true"
+        or args.fresh_start
+    )
+    
+    if args.fresh_start:
+        logger.info("🔄 Fresh start requested - clearing database and forcing complete rescrape")
+        # Override cache mode to ensure fresh data fetching
+        args.cache_mode = "no-cache"
+        
     db_conn = init_db(reset=reset)
     try:
         with concurrent.futures.ThreadPoolExecutor(
