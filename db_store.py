@@ -1,3 +1,15 @@
+"""Database storage functions for Gartan Scraper Bot."""
+
+import sqlite3
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+from config import config
+
+# Configure sqlite3 datetime adapters for Python 3.12+ compatibility
+sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
+sqlite3.register_converter("datetime", lambda dt: datetime.fromisoformat(dt.decode("utf-8")))
+
 CREW_DETAILS_TABLE = """
 CREATE TABLE IF NOT EXISTS crew (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -15,14 +27,6 @@ CREATE TABLE IF NOT EXISTS appliance (
     name TEXT NOT NULL UNIQUE
 );
 """
-import sqlite3
-from datetime import datetime, timedelta
-from typing import Any, Dict, List
-
-from config import config
-
-# Configure sqlite3 datetime adapters for Python 3.12+ compatibility
-sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
 sqlite3.register_converter("DATETIME", lambda b: datetime.fromisoformat(b.decode()))
 
 DB_PATH = config.db_path
@@ -135,7 +139,7 @@ def _convert_slots_to_blocks(
     return blocks
 
 
-def insert_crew_details(crew_list: list, contact_map: dict = None, db_conn=None):
+def insert_crew_details(crew_list: list, contact_map: Optional[Dict[str, str]] = None, db_conn=None):
     """
     Insert or update crew details (name, role, contract_hours, contact, skills) into crew table.
     Uses optimized batch operations and connection pooling.
