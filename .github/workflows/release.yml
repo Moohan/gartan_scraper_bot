@@ -33,9 +33,8 @@ jobs:
       run: |
         python -m pytest tests/ -v
 
-    - name: Build Docker image
-      run: |
-        docker build -t gartan-scraper:${{ github.ref_name }} .
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
     - name: Login to Docker Hub
       uses: docker/login-action@v3
@@ -43,24 +42,25 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Tag and Push to Docker Hub
-      run: |
-        docker tag gartan-scraper:${{ github.ref_name }} jamesmcmahon0/gartan_scraper_bot:${{ github.ref_name }}
-        docker tag gartan-scraper:${{ github.ref_name }} jamesmcmahon0/gartan_scraper_bot:latest
-        docker push jamesmcmahon0/gartan_scraper_bot:${{ github.ref_name }}
-        docker push jamesmcmahon0/gartan_scraper_bot:latest
-      env:
-        DOCKER_BUILDKIT: 1
+    - name: Build and Push Multi-Architecture Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        platforms: linux/amd64,linux/arm64
+        tags: |
+          jamesmcmahon0/gartan_scraper_bot:${{ github.ref_name }}
+          jamesmcmahon0/gartan_scraper_bot:latest
 
-    - name: Verify Docker Image
+    - name: Verify Docker Image (AMD64)
       run: |
-        docker pull jamesmcmahon0/gartan_scraper_bot:${{ github.ref_name }}
-        docker run -d --rm --name verify-image \
+        docker run -d --rm --name verify-image-amd64 \
+          --platform linux/amd64 \
           -e GARTAN_USERNAME=${{ secrets.GARTAN_USERNAME }} \
           -e GARTAN_PASSWORD=${{ secrets.GARTAN_PASSWORD }} \
           jamesmcmahon0/gartan_scraper_bot:${{ github.ref_name }}
         sleep 10
-        docker logs verify-image
+        docker logs verify-image-amd64
 
     - name: Create GitHub Release
       uses: actions/create-release@v1
