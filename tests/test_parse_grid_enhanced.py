@@ -405,5 +405,195 @@ class TestParseGridEdgeCases:
         # Should handle gracefully without crashing
 
 
+class TestParseSkillsTable:
+    """Test the parse_skills_table function which was not covered."""
+
+    def test_parse_skills_table_complete(self):
+        """Test parse_skills_table with complete skills data."""
+        from parse_grid import parse_skills_table
+        
+        html = """
+        <table>
+            <tr><td>Rules</td></tr>
+            <tr><td>Time</td><td>0800</td><td>0815</td><td>0830</td></tr>
+            <tr><td>BA</td><td>4</td><td>3</td><td>5</td></tr>
+            <tr><td>LGV</td><td>2</td><td>1</td><td>2</td></tr>
+            <tr><td>Total Crew</td><td>8</td><td>6</td><td>9</td></tr>
+            <tr><td>MGR</td><td>1</td><td>1</td><td>1</td></tr>
+        </table>
+        """
+        result = parse_skills_table(html, "2025-08-05")
+        
+        assert "skills_availability" in result
+        skills = result["skills_availability"]
+        
+        # Check all skill types are parsed
+        assert "BA" in skills
+        assert "LGV" in skills
+        assert "Total Crew" in skills
+        assert "MGR" in skills
+        
+        # Check specific values
+        assert skills["BA"]["2025-08-05 0800"] == 4
+        assert skills["LGV"]["2025-08-05 0815"] == 1
+        assert skills["Total Crew"]["2025-08-05 0830"] == 9
+
+    def test_parse_skills_table_no_table(self):
+        """Test parse_skills_table with no Rules table."""
+        from parse_grid import parse_skills_table
+        
+        html = """
+        <table>
+            <tr><td>Not Rules</td></tr>
+            <tr><td>Other Data</td></tr>
+        </table>
+        """
+        result = parse_skills_table(html, "2025-08-05")
+        assert result == {}
+
+    def test_parse_skills_table_no_header_row(self):
+        """Test parse_skills_table with Rules but no header row after."""
+        from parse_grid import parse_skills_table
+        
+        html = """
+        <table>
+            <tr><td>Rules</td></tr>
+        </table>
+        """
+        result = parse_skills_table(html, "2025-08-05")
+        assert result == {}
+
+    def test_parse_skills_table_invalid_data(self):
+        """Test parse_skills_table with invalid numeric data."""
+        from parse_grid import parse_skills_table
+        
+        html = """
+        <table>
+            <tr><td>Rules</td></tr>
+            <tr><td>Time</td><td>0800</td><td>0815</td></tr>
+            <tr><td>BA</td><td>invalid</td><td></td></tr>
+            <tr><td>LGV</td><td>abc</td><td>3.5</td></tr>
+        </table>
+        """
+        result = parse_skills_table(html, "2025-08-05")
+        skills = result["skills_availability"]
+        
+        # Should handle invalid data gracefully
+        assert skills["BA"]["2025-08-05 0800"] == 0
+        assert skills["BA"]["2025-08-05 0815"] == 0  # Empty string
+        assert skills["LGV"]["2025-08-05 0800"] == 0  # Non-numeric
+
+
+class TestMissingLineCoverage:
+    """Test specific missing lines to improve coverage."""
+
+    def test_get_table_and_header_no_gridavail(self):
+        """Test _get_table_and_header when no gridAvail table exists (line 144)."""
+        from parse_grid import _get_table_and_header
+        
+        html = "<html><body><table id='other'><tr><td>test</td></tr></table></body></html>"
+        table, header = _get_table_and_header(html)
+        assert table is None
+        assert header is None
+
+    def test_appliance_parsing_edge_cases(self):
+        """Test appliance parsing edge cases (lines 318-319, 330, 336, 351-353)."""
+        from parse_grid import parse_appliance_availability
+
+        # Test no time header row after "Appliances"
+        html1 = """
+        <table id='gridAvail'>
+            <tr><td colspan='5'>Appliances</td></tr>
+            <tr><td>P22P6</td><td>Available</td></tr>
+        </table>
+        """
+        result1 = parse_appliance_availability(html1, "2025-08-05")
+        # Should handle gracefully, might return data or empty dict
+        assert isinstance(result1, dict)  # Should not crash
+        
+        # Test empty title attribute 
+        html2 = """
+        <table id='gridAvail'>
+            <tr><td colspan='5'>Appliances</td></tr>
+            <tr><td>Time</td><td title="">0800</td><td>0815</td></tr>
+            <tr><td colspan='5'>P22P6</td><td style='background-color: #009933'></td><td></td></tr>
+        </table>
+        """
+        result2 = parse_appliance_availability(html2, "2025-08-05")
+        assert "P22P6" in result2  # Line 336
+        
+        # Test no P22P6 row found
+        html3 = """
+        <table id='gridAvail'>
+            <tr><td colspan='5'>Appliances</td></tr>
+            <tr><td>Time</td><td title="P22P6 (0800 - 0815) Available">0800</td></tr>
+            <tr><td colspan='5'>Engine1</td><td></td></tr>
+        </table>
+        """
+        result3 = parse_appliance_availability(html3, "2025-08-05")
+        # Should set all slots to False when P22P6 row not found (lines 351-353)
+        appliance_data = list(result3.values())[0]
+        assert not appliance_data["availability"]["2025-08-05 0800"]
+
+    def test_unknown_appliance_name_fallback(self):
+        """Test unknown appliance name fallback (line 388)."""
+        from parse_grid import parse_appliance_availability
+        
+        html = """
+        <table id='gridAvail'>
+            <tr><td colspan='5'>Appliances</td></tr>
+            <tr><td>Time</td><td title="P22P6 (0800 - 0815) Available">0800</td></tr>
+            <tr><td colspan='5'></td><td style='background-color: #009933'></td></tr>
+        </table>
+        """
+        result = parse_appliance_availability(html, "2025-08-05")
+        # Should use "UNKNOWN" when appliance name not found
+        assert "UNKNOWN" in result
+
+    def test_normalize_date_edge_cases(self):
+        """Test _normalize_date with various formats."""
+        from parse_grid import _normalize_date
+
+        # Test various date formats
+        assert _normalize_date("05-08-2025") == "05-08-2025"  # Returns as-is
+        assert _normalize_date("2025-08-05") == "2025-08-05"  # Returns as-is 
+        assert _normalize_date("05/08/2025") == "05/08/2025"  # Returns as-is
+        
+        # Test invalid format - should return as-is
+        assert _normalize_date("invalid-date") == "invalid-date"
+        assert _normalize_date("") == ""
+
+    def test_aggregate_crew_availability_edge_cases(self):
+        """Test aggregate_crew_availability edge cases (lines 493, 512)."""
+        from parse_grid import aggregate_crew_availability
+
+        # Test with complex availability patterns to trigger edge case logic
+        daily_crew_lists = [
+            [
+                {
+                    "name": "EDGE, CASE",
+                    "role": "FFC",
+                    "skills": "BA",
+                    "availability": {
+                        "2025-08-05 0800": True,
+                        "2025-08-05 0815": False,
+                        "2025-08-05 0830": True,
+                        "2025-08-05 0845": True,
+                        "2025-08-05 0900": False,
+                    }
+                }
+            ]
+        ]
+        
+        result = aggregate_crew_availability(daily_crew_lists)
+        assert len(result) == 1
+        
+        crew = result[0]
+        # Should calculate next_available and other status fields
+        assert "next_available" in crew
+        assert "next_available_until" in crew
+        assert "available_now" in crew
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
