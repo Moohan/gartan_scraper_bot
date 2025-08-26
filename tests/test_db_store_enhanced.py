@@ -35,6 +35,7 @@ class TestDatabaseStoreEnhanced:
 
         # Cleanup - try multiple times on Windows
         import time
+
         for attempt in range(3):
             try:
                 Path(db_path).unlink(missing_ok=True)
@@ -61,7 +62,12 @@ class TestDatabaseStoreEnhanced:
 
         # Test with valid crew data
         valid_crew_data = [
-            {"name": "VALID, CREW", "role": "FFC", "skills": "BA", "contract_hours": "40"}
+            {
+                "name": "VALID, CREW",
+                "role": "FFC",
+                "skills": "BA",
+                "contract_hours": "40",
+            }
         ]
 
         # Should handle gracefully without crashing
@@ -94,17 +100,18 @@ class TestDatabaseStoreEnhanced:
                     time_key = f"05/08/2025 {hour:02d}{minute:02d}"
                     availability[time_key] = (i + hour + minute) % 3 == 0
 
-            large_crew_data.append({
-                "name": f"CREW{i:03d}, TEST",
-                "role": "FFC",
-                "skills": "BA" if i % 2 == 0 else "LGV",
-                "contract_hours": "40"
-            })
+            large_crew_data.append(
+                {
+                    "name": f"CREW{i:03d}, TEST",
+                    "role": "FFC",
+                    "skills": "BA" if i % 2 == 0 else "LGV",
+                    "contract_hours": "40",
+                }
+            )
 
-            large_availability_data.append({
-                "name": f"CREW{i:03d}, TEST",
-                "availability": availability
-            })
+            large_availability_data.append(
+                {"name": f"CREW{i:03d}, TEST", "availability": availability}
+            )
 
         # Store the large dataset
         conn = sqlite3.connect(temp_db)
@@ -128,34 +135,42 @@ class TestDatabaseStoreEnhanced:
         """Test handling of duplicate and overlapping data."""
 
         # Store initial data
-        initial_crew_data = [{
-            "name": "DUPLICATE, TEST",
-            "role": "FFC",
-            "skills": "BA",
-            "contract_hours": "40"
-        }]
+        initial_crew_data = [
+            {
+                "name": "DUPLICATE, TEST",
+                "role": "FFC",
+                "skills": "BA",
+                "contract_hours": "40",
+            }
+        ]
 
-        initial_availability_data = [{
-            "name": "DUPLICATE, TEST",
-            "availability": {"05/08/2025 0800": True, "05/08/2025 0815": False}
-        }]
+        initial_availability_data = [
+            {
+                "name": "DUPLICATE, TEST",
+                "availability": {"05/08/2025 0800": True, "05/08/2025 0815": False},
+            }
+        ]
 
         conn = sqlite3.connect(temp_db)
         insert_crew_details(initial_crew_data, db_conn=conn)
         insert_crew_availability(initial_availability_data, db_conn=conn)
 
         # Store overlapping data with same name
-        overlapping_crew_data = [{
-            "name": "DUPLICATE, TEST",
-            "role": "FFT",  # Different role
-            "skills": "LGV",  # Different skills
-            "contract_hours": "35"
-        }]
+        overlapping_crew_data = [
+            {
+                "name": "DUPLICATE, TEST",
+                "role": "FFT",  # Different role
+                "skills": "LGV",  # Different skills
+                "contract_hours": "35",
+            }
+        ]
 
-        overlapping_availability_data = [{
-            "name": "DUPLICATE, TEST",
-            "availability": {"05/08/2025 0830": True}  # Different time
-        }]
+        overlapping_availability_data = [
+            {
+                "name": "DUPLICATE, TEST",
+                "availability": {"05/08/2025 0830": True},  # Different time
+            }
+        ]
 
         insert_crew_details(overlapping_crew_data, db_conn=conn)
         insert_crew_availability(overlapping_availability_data, db_conn=conn)
@@ -166,12 +181,16 @@ class TestDatabaseStoreEnhanced:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM crew WHERE name = 'DUPLICATE, TEST'")
         crew_count = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM crew_availability WHERE crew_id IN (SELECT id FROM crew WHERE name = 'DUPLICATE, TEST')")
+        cursor.execute(
+            "SELECT COUNT(*) FROM crew_availability WHERE crew_id IN (SELECT id FROM crew WHERE name = 'DUPLICATE, TEST')"
+        )
         availability_count = cursor.fetchone()[0]
         conn.close()
 
         # Should handle duplicates appropriately (update or ignore)
-        assert crew_count == 1  # Should be only one crew record due to UNIQUE constraint
+        assert (
+            crew_count == 1
+        )  # Should be only one crew record due to UNIQUE constraint
         assert availability_count > 0  # Should have availability records
 
     def test_appliance_data_handling(self, temp_db):
@@ -182,15 +201,12 @@ class TestDatabaseStoreEnhanced:
                 "availability": {
                     "05/08/2025 0800": True,
                     "05/08/2025 0815": False,
-                    "05/08/2025 0830": True
+                    "05/08/2025 0830": True,
                 }
             },
             "ENGINE1": {
-                "availability": {
-                    "05/08/2025 0800": False,
-                    "05/08/2025 0815": True
-                }
-            }
+                "availability": {"05/08/2025 0800": False, "05/08/2025 0815": True}
+            },
         }
 
         conn = sqlite3.connect(temp_db)
@@ -226,7 +242,7 @@ class TestDatabaseStoreEnhanced:
             "05/08/2025 0800": True,
             "05/08/2025 0815": True,
             "05/08/2025 0830": True,
-            "05/08/2025 0845": False
+            "05/08/2025 0845": False,
         }
         continuous_result = _convert_slots_to_blocks(continuous_slots)
         assert len(continuous_result) == 1
@@ -238,7 +254,7 @@ class TestDatabaseStoreEnhanced:
             "05/08/2025 0800": True,
             "05/08/2025 0815": False,
             "05/08/2025 0830": True,
-            "05/08/2025 0845": False
+            "05/08/2025 0845": False,
         }
         fragmented_result = _convert_slots_to_blocks(fragmented_slots)
         assert len(fragmented_result) == 2  # Two separate blocks
@@ -251,27 +267,24 @@ class TestDatabaseStoreEnhanced:
                 "name": "O'CONNOR, SEÁN",  # Apostrophe and accented characters
                 "role": "Watch Commander",
                 "skills": "BA & LGV",
-                "contract_hours": "40"
+                "contract_hours": "40",
             },
             {
                 "name": "SMITH-JONES, A",  # Hyphen
                 "role": "Fire Fighter",
                 "skills": "TTR/LGV",
-                "contract_hours": "35"
+                "contract_hours": "35",
             },
             {
                 "name": 'CREW WITH "QUOTES"',  # Double quotes
                 "role": "Officer (Acting)",  # Parentheses
                 "skills": "10% BA, 90% LGV",  # Percentages
-                "contract_hours": "42"
-            }
+                "contract_hours": "42",
+            },
         ]
 
         special_availability_data = [
-            {
-                "name": "O'CONNOR, SEÁN",
-                "availability": {"05/08/2025 0800": True}
-            }
+            {"name": "O'CONNOR, SEÁN", "availability": {"05/08/2025 0800": True}}
         ]
 
         conn = sqlite3.connect(temp_db)
@@ -292,10 +305,9 @@ class TestDatabaseStoreEnhanced:
         """Test database constraints and foreign key relationships."""
 
         # Try to insert availability for non-existent crew
-        availability_data = [{
-            "name": "NONEXISTENT, CREW",
-            "availability": {"05/08/2025 0800": True}
-        }]
+        availability_data = [
+            {"name": "NONEXISTENT, CREW", "availability": {"05/08/2025 0800": True}}
+        ]
 
         conn = sqlite3.connect(temp_db)
         insert_crew_availability(availability_data, db_conn=conn)
@@ -304,7 +316,9 @@ class TestDatabaseStoreEnhanced:
         # Should handle gracefully - no availability should be inserted for non-existent crew
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM crew_availability WHERE crew_id NOT IN (SELECT id FROM crew)")
+        cursor.execute(
+            "SELECT COUNT(*) FROM crew_availability WHERE crew_id NOT IN (SELECT id FROM crew)"
+        )
         orphaned_count = cursor.fetchone()[0]
         conn.close()
 
@@ -313,20 +327,24 @@ class TestDatabaseStoreEnhanced:
     def test_extreme_dates(self, temp_db):
         """Test handling of extreme date values."""
 
-        extreme_crew_data = [{
-            "name": "EXTREME, TEST",
-            "role": "FFC",
-            "skills": "BA",
-            "contract_hours": "40"
-        }]
-
-        extreme_availability_data = [{
-            "name": "EXTREME, TEST",
-            "availability": {
-                "01/01/2020 0000": True,  # Very old date
-                "31/12/2030 2345": False,  # Future date
+        extreme_crew_data = [
+            {
+                "name": "EXTREME, TEST",
+                "role": "FFC",
+                "skills": "BA",
+                "contract_hours": "40",
             }
-        }]
+        ]
+
+        extreme_availability_data = [
+            {
+                "name": "EXTREME, TEST",
+                "availability": {
+                    "01/01/2020 0000": True,  # Very old date
+                    "31/12/2030 2345": False,  # Future date
+                },
+            }
+        ]
 
         conn = sqlite3.connect(temp_db)
         insert_crew_details(extreme_crew_data, db_conn=conn)
