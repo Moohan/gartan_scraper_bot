@@ -272,7 +272,7 @@ def insert_crew_availability(
         if crew_availability_data:
             c.executemany(
                 """
-                INSERT INTO crew_availability (crew_id, start_time, end_time)
+                INSERT OR REPLACE INTO crew_availability (crew_id, start_time, end_time)
                 VALUES (?, ?, ?)
                 """,
                 crew_availability_data,
