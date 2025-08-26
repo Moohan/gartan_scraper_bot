@@ -350,6 +350,73 @@ def get_crew_hours_planned_week_data(crew_id: int) -> Dict[str, Any]:
         return {"error": "Internal server error"}
 
 
+def check_p22p6_business_rules() -> Dict[str, Any]:
+    """Check P22P6 business rules against available crew."""
+    try:
+        # Get all crew data
+        crew_data = get_crew_list_data()
+
+        # Check availability for each crew member and build available crew list
+        available_crew = []
+        for crew in crew_data:
+            crew_availability = get_crew_available_data(crew["id"])
+            if crew_availability.get("available", False):
+                available_crew.append(crew)
+
+        # Count skills for available crew
+        skill_counts = {"TTR": 0, "LGV": 0, "BA": 0}
+        for crew in available_crew:
+            skills = (
+                crew["skills"].split()
+                if crew["skills"] and crew["skills"] != "None"
+                else []
+            )
+            for skill in skills:
+                if skill in skill_counts:
+                    skill_counts[skill] += 1
+
+        # Business rules calculations
+        total_available = len(available_crew)
+        ttr_present = skill_counts["TTR"] > 0
+        lgv_present = skill_counts["LGV"] > 0
+        ba_non_ttr = sum(
+            1
+            for c in available_crew
+            if "BA" in (c["skills"] or "") and "TTR" not in (c["skills"] or "")
+        )
+        ffc_with_ba = any(
+            c["role"] in ["FFC", "CC", "WC", "CM"] and "BA" in (c["skills"] or "")
+            for c in available_crew
+        )
+
+        business_rules = {
+            "total_crew_ok": total_available >= 4,
+            "ttr_present": ttr_present,
+            "lgv_present": lgv_present,
+            "ba_non_ttr_ok": ba_non_ttr >= 2,
+            "ffc_with_ba": ffc_with_ba,
+        }
+
+        all_rules_pass = all(business_rules.values())
+
+        return {
+            "rules_pass": all_rules_pass,
+            "rules": business_rules,
+            "details": {
+                "total_available": total_available,
+                "skill_counts": skill_counts,
+                "ba_non_ttr": ba_non_ttr,
+                "ffc_with_ba": ffc_with_ba
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error checking P22P6 business rules: {e}")
+        return {
+            "rules_pass": False,
+            "error": "Error checking business rules"
+        }
+
+
 def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
     """Check if appliance is available right now."""
     try:
@@ -364,7 +431,7 @@ def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
 
             appliance_id = appliance[0]  # id is first column
 
-            # Check current availability with data quality filters
+            # Check basic appliance availability with data quality filters
             now = datetime.now()
             cursor.execute(
                 """
@@ -379,9 +446,25 @@ def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
             )
 
             result = cursor.fetchone()
-            is_available = result[0] > 0  # count is first column
+            appliance_physically_available = result[0] > 0  # count is first column
 
-            return {"available": is_available}
+            # For P22P6, apply business rules
+            if appliance_name == "P22P6":
+                if not appliance_physically_available:
+                    # If appliance itself isn't available, don't bother checking crew
+                    return {"available": False}
+
+                # Check business rules for crew capability
+                business_rules = check_p22p6_business_rules()
+                if "error" in business_rules:
+                    return {"error": business_rules["error"]}
+
+                # P22P6 is only available if both appliance is available AND crew rules pass
+                return {"available": business_rules["rules_pass"]}
+            else:
+                # For other appliances, just check basic availability
+                return {"available": appliance_physically_available}
+
     except Exception as e:
         logger.error(f"Error checking appliance availability: {e}")
         return {"error": "Internal server error"}
@@ -418,6 +501,17 @@ def get_appliance_duration_data(appliance_name: str) -> Dict[str, Any]:
 
             result = cursor.fetchone()
             if result:
+                # For P22P6, check business rules before returning duration
+                if appliance_name == "P22P6":
+                    business_rules = check_p22p6_business_rules()
+                    if "error" in business_rules:
+                        return {"error": business_rules["error"]}
+
+                    # If business rules don't pass, P22P6 is not operationally available
+                    if not business_rules["rules_pass"]:
+                        return {"duration": None}
+
+                # Calculate duration for available appliance
                 end_time = datetime.fromisoformat(result[1])
                 duration_minutes = int((end_time - now).total_seconds() / 60)
                 return {
@@ -671,42 +765,10 @@ def root():
             ),
         }
 
-        # Count skills for available crew
-        available_crew = [c for c in crew_data if c["available"]]
-        skill_counts = {"TTR": 0, "LGV": 0, "BA": 0}
-        for crew in available_crew:
-            skills = (
-                crew["skills"].split()
-                if crew["skills"] and crew["skills"] != "None"
-                else []
-            )
-            for skill in skills:
-                if skill in skill_counts:
-                    skill_counts[skill] += 1
-
-        # Business rules check
-        total_available = len(available_crew)
-        ttr_present = skill_counts["TTR"] > 0
-        lgv_present = skill_counts["LGV"] > 0
-        ba_non_ttr = sum(
-            1
-            for c in available_crew
-            if "BA" in (c["skills"] or "") and "TTR" not in (c["skills"] or "")
-        )
-        ffc_with_ba = any(
-            c["role"] in ["FFC", "CC", "WC", "CM"] and "BA" in (c["skills"] or "")
-            for c in available_crew
-        )
-
-        business_rules = {
-            "total_crew_ok": total_available >= 4,
-            "ttr_present": ttr_present,
-            "lgv_present": lgv_present,
-            "ba_non_ttr_ok": ba_non_ttr >= 2,
-            "ffc_with_ba": ffc_with_ba,
-        }
-
-        all_rules_pass = all(business_rules.values())
+        # Get business rules results
+        business_rules_result = check_p22p6_business_rules()
+        business_rules = business_rules_result.get("rules", {})
+        all_rules_pass = business_rules_result.get("rules_pass", False)
 
         html_template = """
 <!DOCTYPE html>
@@ -716,159 +778,159 @@ def root():
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gartan Scraper Bot - Crew Availability Dashboard</title>
     <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            margin: 0; 
-            padding: 20px; 
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
             background-color: #f5f5f5;
             line-height: 1.6;
         }
-        .container { 
-            max-width: 1200px; 
-            margin: 0 auto; 
-            background: white; 
-            border-radius: 8px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             padding: 30px;
         }
-        .header { 
-            text-align: center; 
-            margin-bottom: 30px; 
-            padding-bottom: 20px; 
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
             border-bottom: 2px solid #eee;
         }
-        .header h1 { 
-            color: #2c3e50; 
-            margin: 0; 
+        .header h1 {
+            color: #2c3e50;
+            margin: 0;
             font-size: 2.5em;
         }
-        .timestamp { 
-            color: #7f8c8d; 
-            font-size: 0.9em; 
+        .timestamp {
+            color: #7f8c8d;
+            font-size: 0.9em;
             margin-top: 10px;
         }
-        .section { 
-            margin-bottom: 30px; 
+        .section {
+            margin-bottom: 30px;
         }
-        .section h2 { 
-            color: #34495e; 
-            border-left: 4px solid #3498db; 
+        .section h2 {
+            color: #34495e;
+            border-left: 4px solid #3498db;
             padding-left: 15px;
             margin-bottom: 20px;
         }
-        .grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
-            gap: 15px; 
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
         }
-        .card { 
-            border: 1px solid #ddd; 
-            border-radius: 6px; 
-            padding: 15px; 
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
             background: #fafafa;
         }
-        .available { 
-            background: #d4edda; 
-            border-color: #c3e6cb; 
+        .available {
+            background: #d4edda;
+            border-color: #c3e6cb;
         }
-        .unavailable { 
-            background: #f8d7da; 
-            border-color: #f5c6cb; 
+        .unavailable {
+            background: #f8d7da;
+            border-color: #f5c6cb;
         }
-        .crew-name { 
-            font-weight: bold; 
-            font-size: 1.1em; 
+        .crew-name {
+            font-weight: bold;
+            font-size: 1.1em;
             margin-bottom: 5px;
         }
-        .crew-details { 
-            font-size: 0.9em; 
-            color: #666; 
+        .crew-details {
+            font-size: 0.9em;
+            color: #666;
         }
-        .status { 
-            display: inline-block; 
-            padding: 4px 8px; 
-            border-radius: 4px; 
-            font-weight: bold; 
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
             font-size: 0.8em;
         }
-        .status.yes { 
-            background: #28a745; 
-            color: white; 
+        .status.yes {
+            background: #28a745;
+            color: white;
         }
-        .status.no { 
-            background: #dc3545; 
-            color: white; 
+        .status.no {
+            background: #dc3545;
+            color: white;
         }
-        .appliance-section { 
-            text-align: center; 
-            background: #e8f4fd; 
-            border: 2px solid #3498db; 
-            border-radius: 8px; 
-            padding: 20px; 
+        .appliance-section {
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            padding: 20px;
             margin: 20px 0;
         }
-        .appliance-status { 
-            font-size: 2em; 
-            font-weight: bold; 
+        .appliance-status {
+            font-size: 2em;
+            font-weight: bold;
             margin: 10px 0;
         }
-        .appliance-status.operational { 
-            color: #28a745; 
+        .appliance-status.operational {
+            color: #28a745;
         }
-        .appliance-status.unavailable { 
-            color: #dc3545; 
+        .appliance-status.unavailable {
+            color: #dc3545;
         }
-        .business-rules { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-            gap: 10px; 
+        .business-rules {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 10px;
             margin: 20px 0;
         }
-        .rule { 
-            background: #f8f9fa; 
-            padding: 10px; 
-            border-radius: 4px; 
+        .rule {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
             border-left: 4px solid #6c757d;
         }
-        .rule.pass { 
-            border-left-color: #28a745; 
+        .rule.pass {
+            border-left-color: #28a745;
         }
-        .rule.fail { 
-            border-left-color: #dc3545; 
+        .rule.fail {
+            border-left-color: #dc3545;
         }
-        .summary-stats { 
-            display: flex; 
-            justify-content: space-around; 
-            background: #e9ecef; 
-            padding: 15px; 
-            border-radius: 6px; 
+        .summary-stats {
+            display: flex;
+            justify-content: space-around;
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 6px;
             margin: 20px 0;
         }
-        .stat { 
-            text-align: center; 
+        .stat {
+            text-align: center;
         }
-        .stat-number { 
-            font-size: 2em; 
-            font-weight: bold; 
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
             color: #495057;
         }
-        .stat-label { 
-            font-size: 0.9em; 
+        .stat-label {
+            font-size: 0.9em;
             color: #6c757d;
         }
-        .refresh-note { 
-            text-align: center; 
-            color: #6c757d; 
-            font-style: italic; 
+        .refresh-note {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
             margin-top: 30px;
         }
         @media (max-width: 768px) {
-            .summary-stats { 
-                flex-direction: column; 
-                gap: 10px; 
+            .summary-stats {
+                flex-direction: column;
+                gap: 10px;
             }
-            .header h1 { 
-                font-size: 2em; 
+            .header h1 {
+                font-size: 2em;
             }
         }
     </style>
@@ -883,7 +945,7 @@ def root():
             <h1>🚒 Gartan Crew Availability Dashboard</h1>
             <div class="timestamp">Last updated: {{ current_time.strftime('%H:%M:%S on %d/%m/%Y') }}</div>
         </div>
-        
+
         <div class="summary-stats">
             <div class="stat">
                 <div class="stat-number">{{ total_available }}</div>
@@ -902,7 +964,7 @@ def root():
                 <div class="stat-label">BA Qualified</div>
             </div>
         </div>
-        
+
         <div class="appliance-section">
             <h2>🚒 P22P6 Fire Appliance</h2>
             <div class="appliance-status {{ 'operational' if appliance_data.available else 'unavailable' }}">
@@ -911,24 +973,24 @@ def root():
             {% if appliance_data.duration %}
             <div>Available for: {{ appliance_data.duration }}</div>
             {% endif %}
-            
+
             <div class="business-rules">
                 <div class="rule {{ 'pass' if business_rules.total_crew_ok else 'fail' }}">
-                    <strong>Minimum Crew (≥4):</strong> 
+                    <strong>Minimum Crew (≥4):</strong>
                     <span class="status {{ 'yes' if business_rules.total_crew_ok else 'no' }}">
                         {{ 'PASS' if business_rules.total_crew_ok else 'FAIL' }}
                     </span>
                     <br><small>{{ total_available }} crew available</small>
                 </div>
                 <div class="rule {{ 'pass' if business_rules.ttr_present else 'fail' }}">
-                    <strong>Officer available:</strong> 
+                    <strong>Officer available:</strong>
                     <span class="status {{ 'yes' if business_rules.ttr_present else 'no' }}">
                         {{ 'PASS' if business_rules.ttr_present else 'FAIL' }}
                     </span>
                     <br><small>{{ skill_counts.TTR }} officer(s) available</small>
                 </div>
                 <div class="rule {{ 'pass' if business_rules.lgv_present else 'fail' }}">
-                    <strong>Driver available:</strong> 
+                    <strong>Driver available:</strong>
                     <span class="status {{ 'yes' if business_rules.lgv_present else 'no' }}">
                         {{ 'PASS' if business_rules.lgv_present else 'FAIL' }}
                     </span>
@@ -936,7 +998,7 @@ def root():
                 </div>
             </div>
         </div>
-        
+
         <div class="section">
             <h2>👥 Individual Crew Status</h2>
             <div class="grid">
@@ -946,7 +1008,7 @@ def root():
                     <div class="crew-details">
                         <strong>Role:</strong> {{ crew.role }}<br>
                         <strong>Skills:</strong> {{ crew.skills }}<br>
-                        <strong>Status:</strong> 
+                        <strong>Status:</strong>
                         <span class="status {{ 'yes' if crew.available else 'no' }}">
                             {{ 'AVAILABLE' if crew.available else 'UNAVAILABLE' }}
                         </span><br>
@@ -959,11 +1021,11 @@ def root():
                 {% endfor %}
             </div>
         </div>
-        
+
         <div class="refresh-note">
             This page automatically refreshes every 30 seconds
         </div>
-        
+
         <div class="section">
             <h2>🔗 API Endpoints</h2>
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;">
@@ -973,7 +1035,7 @@ def root():
                         <ul style="list-style: none; padding: 0;">
                             <li style="margin: 8px 0;"><a href="/health" style="text-decoration: none; color: #007bff;">/health</a> - Service and database status</li>
                         </ul>
-                        
+
                         <h3 style="color: #495057;">Crew Information</h3>
                         <ul style="list-style: none; padding: 0;">
                             <li style="margin: 8px 0;"><a href="/crew" style="text-decoration: none; color: #007bff;">/crew</a> - List all crew members with details</li>
@@ -989,14 +1051,14 @@ def root():
                             <li style="margin: 8px 0;"><a href="/appliances/P22P6/available" style="text-decoration: none; color: #007bff;">/appliances/P22P6/available</a> - Check if P22P6 is operational</li>
                             <li style="margin: 8px 0;"><a href="/appliances/P22P6/duration" style="text-decoration: none; color: #007bff;">/appliances/P22P6/duration</a> - How long P22P6 is available for</li>
                         </ul>
-                        
+
                         <h3 style="color: #495057;">Weekly Hours Tracking</h3>
                         <ul style="list-style: none; padding: 0;">
                             <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/hours-planned-week</span> - Total planned hours this week</li>
                             <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/hours-achieved</span> - Hours worked so far this week</li>
                             <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/hours-remaining</span> - Hours remaining to fulfill contract</li>
                         </ul>
-                        
+
                         <p style="margin-top: 15px; font-size: 0.9em; color: #6c757d;">
                             <strong>Note:</strong> Replace {id} with actual crew member ID (e.g., /crew/1/available)
                         </p>
