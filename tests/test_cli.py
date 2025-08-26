@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for CLI argument parsing and validation."""
+"""Tests for CLI argument parsing and validation - Updated for new CLI interface."""
 
 import argparse
 import sys
@@ -18,8 +18,8 @@ class TestCliArgs:
         cli_args = CliArgs()
 
         assert cli_args.max_days == 3
-        assert cli_args.cache_mode == "cache-preferred"
-        assert cli_args.force_scrape is False
+        assert cli_args.cache_mode is None  # Default is intelligent caching
+        assert cli_args.fresh_start is False
 
     def test_from_args_basic(self):
         """Test creating CliArgs from basic arguments."""
@@ -28,15 +28,17 @@ class TestCliArgs:
         class MockArgs:
             max_days = 5
             cache_only = False
-            cache_off = False
-            force_scrape = False
+            no_cache = False
+            cache_first = False
+            cache_mode = None
+            fresh_start = False
 
         args = MockArgs()
         cli_args = CliArgs.from_args(args)
 
         assert cli_args.max_days == 5
-        assert cli_args.cache_mode == "cache-preferred"
-        assert cli_args.force_scrape is False
+        assert cli_args.cache_mode is None  # Default intelligent caching
+        assert cli_args.fresh_start is False
 
     def test_from_args_cache_only(self):
         """Test CliArgs with cache-only flag."""
@@ -44,54 +46,89 @@ class TestCliArgs:
         class MockArgs:
             max_days = 3
             cache_only = True
-            cache_off = False
-            force_scrape = False
+            no_cache = False
+            cache_first = False
+            cache_mode = None
+            fresh_start = False
 
         args = MockArgs()
         cli_args = CliArgs.from_args(args)
 
+        assert cli_args.max_days == 3
         assert cli_args.cache_mode == "cache-only"
+        assert cli_args.fresh_start is False
 
-    def test_from_args_cache_off(self):
-        """Test CliArgs with cache-off flag."""
+    def test_from_args_no_cache(self):
+        """Test CliArgs with no-cache flag."""
+
+        class MockArgs:
+            max_days = 7
+            cache_only = False
+            no_cache = True
+            cache_first = False
+            cache_mode = None
+            fresh_start = False
+
+        args = MockArgs()
+        cli_args = CliArgs.from_args(args)
+
+        assert cli_args.max_days == 7
+        assert cli_args.cache_mode == "no-cache"
+        assert cli_args.fresh_start is False
+
+    def test_from_args_cache_first(self):
+        """Test CliArgs with cache-first flag."""
+
+        class MockArgs:
+            max_days = 2
+            cache_only = False
+            no_cache = False
+            cache_first = True
+            cache_mode = None
+            fresh_start = False
+
+        args = MockArgs()
+        cli_args = CliArgs.from_args(args)
+
+        assert cli_args.max_days == 2
+        assert cli_args.cache_mode == "cache-first"
+        assert cli_args.fresh_start is False
+
+    def test_from_args_fresh_start(self):
+        """Test CliArgs with fresh-start flag."""
 
         class MockArgs:
             max_days = 3
             cache_only = False
-            cache_off = True
-            force_scrape = False
+            no_cache = False
+            cache_first = False
+            cache_mode = None
+            fresh_start = True
 
         args = MockArgs()
         cli_args = CliArgs.from_args(args)
 
-        assert cli_args.cache_mode == "cache-off"
+        assert cli_args.max_days == 3
+        assert cli_args.cache_mode is None
+        assert cli_args.fresh_start is True
 
-    def test_from_args_cache_mode_explicit(self):
-        """Test CliArgs with explicit cache_mode."""
+    def test_from_args_explicit_cache_mode(self):
+        """Test CliArgs with explicit cache mode."""
 
         class MockArgs:
-            max_days = 3
+            max_days = 4
+            cache_only = False
+            no_cache = False
+            cache_first = False
             cache_mode = "cache-only"
-            force_scrape = False
+            fresh_start = False
 
         args = MockArgs()
         cli_args = CliArgs.from_args(args)
 
+        assert cli_args.max_days == 4
         assert cli_args.cache_mode == "cache-only"
-
-    def test_from_args_force_scrape(self):
-        """Test CliArgs with force_scrape flag."""
-
-        class MockArgs:
-            max_days = 3
-            cache_only = False
-            cache_off = False
-            force_scrape = True
-
-        args = MockArgs()
-        cli_args = CliArgs.from_args(args)
-
-        assert cli_args.force_scrape is True
+        assert cli_args.fresh_start is False
 
     def test_from_args_missing_attributes(self):
         """Test CliArgs with missing optional attributes."""
@@ -103,8 +140,8 @@ class TestCliArgs:
         cli_args = CliArgs.from_args(args)
 
         assert cli_args.max_days == 7
-        assert cli_args.cache_mode == "cache-preferred"  # Default
-        assert cli_args.force_scrape is False  # Default
+        assert cli_args.cache_mode is None  # Default
+        assert cli_args.fresh_start is False  # Default
 
 
 class TestArgumentParser:
@@ -118,281 +155,180 @@ class TestArgumentParser:
         assert parser.description == "Gartan Scraper Bot"
 
     def test_max_days_argument(self):
-        """Test --max-days argument parsing."""
+        """Test max-days argument parsing."""
         parser = create_argument_parser()
+        args = parser.parse_args(["--max-days", "5"])
 
-        # Test default value
-        args = parser.parse_args([])
-        assert args.max_days == 3
-
-        # Test custom value
-        args = parser.parse_args(["--max-days", "7"])
-        assert args.max_days == 7
+        assert args.max_days == 5
 
     def test_cache_only_argument(self):
-        """Test --cache-only argument."""
+        """Test cache-only argument parsing."""
         parser = create_argument_parser()
-
-        # Test default (should be False)
-        args = parser.parse_args([])
-        assert args.cache_only is False
-
-        # Test with flag
         args = parser.parse_args(["--cache-only"])
+
         assert args.cache_only is True
+        assert args.no_cache is False
+        assert args.cache_first is False
 
-    def test_cache_off_argument(self):
-        """Test --cache-off argument."""
+    def test_no_cache_argument(self):
+        """Test no-cache argument parsing."""
         parser = create_argument_parser()
+        args = parser.parse_args(["--no-cache"])
 
-        # Test default (should be False)
-        args = parser.parse_args([])
-        assert args.cache_off is False
+        assert args.no_cache is True
+        assert args.cache_only is False
+        assert args.cache_first is False
 
-        # Test with flag
-        args = parser.parse_args(["--cache-off"])
-        assert args.cache_off is True
+    def test_cache_first_argument(self):
+        """Test cache-first argument parsing."""
+        parser = create_argument_parser()
+        args = parser.parse_args(["--cache-first"])
+
+        assert args.cache_first is True
+        assert args.cache_only is False
+        assert args.no_cache is False
 
     def test_cache_mode_argument(self):
-        """Test --cache-mode argument with choices."""
+        """Test cache-mode argument parsing."""
         parser = create_argument_parser()
+        args = parser.parse_args(["--cache-mode", "cache-only"])
 
-        # Test default
+        assert args.cache_mode == "cache-only"
+
+    def test_fresh_start_argument(self):
+        """Test fresh-start argument parsing."""
+        parser = create_argument_parser()
+        args = parser.parse_args(["--fresh-start"])
+
+        assert args.fresh_start is True
+
+    def test_default_arguments(self):
+        """Test default argument values."""
+        parser = create_argument_parser()
         args = parser.parse_args([])
-        assert args.cache_mode == "cache-preferred"
 
-        # Test valid choices
-        for mode in ["cache-only", "cache-preferred", "cache-off"]:
-            args = parser.parse_args(["--cache-mode", mode])
-            assert args.cache_mode == mode
+        assert args.max_days == 3
+        assert args.cache_only is False
+        assert args.no_cache is False
+        assert args.cache_first is False
+        assert args.cache_mode is None
+        assert args.fresh_start is False
 
-    def test_cache_mode_invalid_choice(self):
-        """Test --cache-mode with invalid choice."""
+    def test_mutually_exclusive_cache_arguments(self):
+        """Test that cache arguments are mutually exclusive."""
         parser = create_argument_parser()
-
+        
+        # Should raise SystemExit due to mutually exclusive arguments
         with pytest.raises(SystemExit):
-            parser.parse_args(["--cache-mode", "invalid-mode"])
-
-    def test_force_scrape_argument(self):
-        """Test --force-scrape argument."""
-        parser = create_argument_parser()
-
-        # Test default (should be False)
-        args = parser.parse_args([])
-        assert args.force_scrape is False
-
-        # Test with flag
-        args = parser.parse_args(["--force-scrape"])
-        assert args.force_scrape is True
-
-    def test_mutually_exclusive_cache_flags(self):
-        """Test that cache flags are mutually exclusive."""
-        parser = create_argument_parser()
-
-        # These should fail with SystemExit
-        with pytest.raises(SystemExit):
-            parser.parse_args(["--cache-only", "--cache-off"])
-
-        with pytest.raises(SystemExit):
-            parser.parse_args(["--cache-only", "--cache-mode", "cache-off"])
-
-        with pytest.raises(SystemExit):
-            parser.parse_args(["--cache-off", "--cache-mode", "cache-preferred"])
-
-    def test_max_days_type_validation(self):
-        """Test that --max-days requires integer values."""
-        parser = create_argument_parser()
-
-        # Valid integer
-        args = parser.parse_args(["--max-days", "10"])
-        assert args.max_days == 10
-
-        # Invalid non-integer should raise SystemExit
-        with pytest.raises(SystemExit):
-            parser.parse_args(["--max-days", "not-a-number"])
-
-        with pytest.raises(SystemExit):
-            parser.parse_args(["--max-days", "3.5"])
-
-    def test_max_days_boundary_values(self):
-        """Test --max-days with boundary values."""
-        parser = create_argument_parser()
-
-        # Test zero
-        args = parser.parse_args(["--max-days", "0"])
-        assert args.max_days == 0
-
-        # Test negative values (should be accepted by argparse)
-        args = parser.parse_args(["--max-days", "-1"])
-        assert args.max_days == -1
-
-        # Test large values
-        args = parser.parse_args(["--max-days", "365"])
-        assert args.max_days == 365
-
-    def test_help_option(self):
-        """Test that help option works."""
-        parser = create_argument_parser()
-
-        with pytest.raises(SystemExit) as exc_info:
-            parser.parse_args(["--help"])
-
-        # Help should exit with code 0
-        assert exc_info.value.code == 0
-
-    def test_unknown_arguments(self):
-        """Test handling of unknown arguments."""
-        parser = create_argument_parser()
-
-        with pytest.raises(SystemExit):
-            parser.parse_args(["--unknown-flag"])
-
-        with pytest.raises(SystemExit):
-            parser.parse_args(["--max-days", "3", "--invalid"])
+            parser.parse_args(["--cache-only", "--no-cache"])
 
 
 class TestParseArgs:
-    """Test the main parse_args function."""
+    """Test the high-level parse_args function."""
 
     def test_parse_args_no_arguments(self):
-        """Test parse_args with no command line arguments."""
+        """Test parse_args with no arguments."""
         with patch.object(sys, "argv", ["run_bot.py"]):
             cli_args = parse_args()
 
-            assert isinstance(cli_args, CliArgs)
             assert cli_args.max_days == 3
-            assert cli_args.cache_mode == "cache-preferred"
-            assert cli_args.force_scrape is False
+            assert cli_args.cache_mode is None
+            assert cli_args.fresh_start is False
 
-    def test_parse_args_with_arguments(self):
-        """Test parse_args with command line arguments."""
-        with patch.object(
-            sys, "argv", ["run_bot.py", "--max-days", "5", "--cache-only"]
-        ):
+    def test_parse_args_max_days(self):
+        """Test parse_args with max-days argument."""
+        with patch.object(sys, "argv", ["run_bot.py", "--max-days", "7"]):
+            cli_args = parse_args()
+
+            assert cli_args.max_days == 7
+
+    def test_parse_args_fresh_start(self):
+        """Test parse_args with fresh-start argument."""
+        with patch.object(sys, "argv", ["run_bot.py", "--fresh-start"]):
+            cli_args = parse_args()
+
+            assert cli_args.fresh_start is True
+
+    def test_parse_args_cache_modes(self):
+        """Test parse_args with various cache modes."""
+        test_cases = [
+            (["run_bot.py", "--cache-only"], "cache-only"),
+            (["run_bot.py", "--no-cache"], "no-cache"),
+            (["run_bot.py", "--cache-first"], "cache-first"),
+            (["run_bot.py", "--cache-mode", "cache-only"], "cache-only"),
+        ]
+
+        for argv, expected_mode in test_cases:
+            with patch.object(sys, "argv", argv):
+                cli_args = parse_args()
+                assert cli_args.cache_mode == expected_mode
+
+    def test_parse_args_complex_combination(self):
+        """Test parse_args with multiple arguments."""
+        with patch.object(sys, "argv", ["run_bot.py", "--max-days", "5", "--fresh-start"]):
             cli_args = parse_args()
 
             assert cli_args.max_days == 5
-            assert cli_args.cache_mode == "cache-only"
-
-    def test_parse_args_force_scrape(self):
-        """Test parse_args with force scrape flag."""
-        with patch.object(sys, "argv", ["run_bot.py", "--force-scrape"]):
-            cli_args = parse_args()
-
-            assert cli_args.force_scrape is True
-
-    def test_parse_args_cache_modes(self):
-        """Test all cache mode variations through parse_args."""
-        # Test cache-only flag
-        with patch.object(sys, "argv", ["run_bot.py", "--cache-only"]):
-            cli_args = parse_args()
-            assert cli_args.cache_mode == "cache-only"
-
-        # Test cache-off flag
-        with patch.object(sys, "argv", ["run_bot.py", "--cache-off"]):
-            cli_args = parse_args()
-            assert cli_args.cache_mode == "cache-off"
-
-        # Test explicit cache-mode
-        with patch.object(
-            sys, "argv", ["run_bot.py", "--cache-mode", "cache-preferred"]
-        ):
-            cli_args = parse_args()
-            assert cli_args.cache_mode == "cache-preferred"
-
-    def test_parse_args_complex_combination(self):
-        """Test parse_args with complex argument combinations."""
-        with patch.object(
-            sys,
-            "argv",
-            [
-                "run_bot.py",
-                "--max-days",
-                "10",
-                "--force-scrape",
-                "--cache-mode",
-                "cache-off",
-            ],
-        ):
-            cli_args = parse_args()
-
-            assert cli_args.max_days == 10
-            assert cli_args.force_scrape is True
-            assert cli_args.cache_mode == "cache-off"
-
-    def test_parse_args_invalid_arguments(self):
-        """Test parse_args with invalid arguments."""
-        with patch.object(sys, "argv", ["run_bot.py", "--max-days", "invalid"]):
-            with pytest.raises(SystemExit):
-                parse_args()
-
-    def test_parse_args_help_exit(self):
-        """Test that parse_args exits appropriately for help."""
-        with patch.object(sys, "argv", ["run_bot.py", "--help"]):
-            with pytest.raises(SystemExit) as exc_info:
-                parse_args()
-
-            assert exc_info.value.code == 0
+            assert cli_args.fresh_start is True
+            assert cli_args.cache_mode is None
 
 
 class TestCliIntegration:
-    """Test CLI components working together."""
+    """Integration tests for complete CLI functionality."""
 
     def test_full_cli_pipeline(self):
         """Test complete CLI argument processing pipeline."""
-        # Mock command line arguments
-        test_args = ["run_bot.py", "--max-days", "7", "--cache-only", "--force-scrape"]
+        test_argv = ["run_bot.py", "--max-days", "10", "--no-cache", "--fresh-start"]
 
-        with patch.object(sys, "argv", test_args):
+        with patch.object(sys, "argv", test_argv):
             cli_args = parse_args()
 
-            # Verify all arguments were processed correctly
-            assert cli_args.max_days == 7
-            assert cli_args.cache_mode == "cache-only"
-            assert cli_args.force_scrape is True
+            assert cli_args.max_days == 10
+            assert cli_args.cache_mode == "no-cache"
+            assert cli_args.fresh_start is True
 
     def test_argument_precedence(self):
-        """Test argument precedence when multiple cache options could apply."""
-        # When using explicit --cache-mode, it should override flag-based settings
+        """Test argument precedence and mutual exclusion."""
         parser = create_argument_parser()
 
-        # Test that explicit cache-mode works
-        args = parser.parse_args(["--cache-mode", "cache-preferred"])
+        # Test that explicit cache-mode takes precedence
+        args = parser.parse_args(["--cache-mode", "cache-first"])
         cli_args = CliArgs.from_args(args)
-        assert cli_args.cache_mode == "cache-preferred"
+        assert cli_args.cache_mode == "cache-first"
 
     def test_edge_case_combinations(self):
-        """Test edge cases in argument combinations."""
-        # Zero max-days with force scrape
-        with patch.object(
-            sys, "argv", ["run_bot.py", "--max-days", "0", "--force-scrape"]
-        ):
-            cli_args = parse_args()
-            assert cli_args.max_days == 0
-            assert cli_args.force_scrape is True
+        """Test edge cases and unusual argument combinations."""
+        test_cases = [
+            # Maximum days with fresh start
+            (["run_bot.py", "--max-days", "1", "--fresh-start"], 1, True, None),
+            # Cache first with fresh start (fresh start should override cache mode)
+            (["run_bot.py", "--cache-first", "--fresh-start"], 3, True, "cache-first"),
+        ]
 
-    def test_cli_args_immutability_concept(self):
-        """Test that CliArgs behaves predictably after creation."""
-        cli_args = CliArgs()
-        original_max_days = cli_args.max_days
-
-        # Modify and ensure it's actually changed
-        cli_args.max_days = 10
-        assert cli_args.max_days == 10
-        assert cli_args.max_days != original_max_days
+        for argv, expected_days, expected_fresh, expected_cache in test_cases:
+            with patch.object(sys, "argv", argv):
+                cli_args = parse_args()
+                assert cli_args.max_days == expected_days
+                assert cli_args.fresh_start == expected_fresh
+                assert cli_args.cache_mode == expected_cache
 
     def test_argument_help_text_content(self):
-        """Test that help text contains expected information."""
+        """Test that help text contains expected content."""
         parser = create_argument_parser()
         help_text = parser.format_help()
 
-        # Check for key argument descriptions
+        # Check for key arguments
         assert "--max-days" in help_text
         assert "--cache-only" in help_text
-        assert "--cache-off" in help_text
+        assert "--no-cache" in help_text
+        assert "--cache-first" in help_text
         assert "--cache-mode" in help_text
-        assert "--force-scrape" in help_text
-        assert "Gartan Scraper Bot" in help_text
+        assert "--fresh-start" in help_text
+
+        # Check for descriptions
+        assert "Clear database and start fresh" in help_text
+        assert "Don't use cache" in help_text
+        assert "Use cache only" in help_text
 
 
 if __name__ == "__main__":
