@@ -98,3 +98,32 @@ def test_cleanup_cache_files_with_non_cache(tmp_path):
     removed = cleanup_cache_files(str(tmp_path), expiry_minutes=60 * 24)
     assert str(cache_file) in removed
     assert os.path.exists(str(non_cache_file))
+
+
+def test_cleanup_cache_files_nonexistent_directory():
+    """Test cleanup when cache directory doesn't exist."""
+    # Test with non-existent directory (line 70)
+    removed = cleanup_cache_files("/nonexistent/path", expiry_minutes=60)
+    assert removed == []
+
+
+def test_cleanup_cache_files_permission_error(tmp_path, monkeypatch):
+    """Test cleanup with file permission errors."""
+    # Create a cache file
+    cache_file = tmp_path / "grid_05-08-2025.html"
+    cache_file.write_text("test")
+    
+    # Make it old
+    old_time = datetime.now() - timedelta(days=2)
+    os.utime(str(cache_file), (old_time.timestamp(), old_time.timestamp()))
+    
+    # Mock os.remove to raise an exception (lines 88-89)
+    def mock_remove(path):
+        raise PermissionError("Access denied")
+    
+    monkeypatch.setattr("cache_utils.os.remove", mock_remove)
+    
+    # Should handle the exception gracefully
+    removed = cleanup_cache_files(str(tmp_path), expiry_minutes=60)
+    assert removed == []  # No files removed due to permission error
+    assert cache_file.exists()  # File still exists

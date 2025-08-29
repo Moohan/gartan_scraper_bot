@@ -103,3 +103,36 @@ def test_run_bot_cli_invalid_args(tmp_path):
         or "error" in result.stdout.lower()
         or "error" in result.stderr.lower()
     )
+
+
+def test_cleanup_old_cache_files_nonexistent_dir():
+    """Test cleanup_old_cache_files with non-existent directory."""
+    from datetime import datetime
+
+    from run_bot import cleanup_old_cache_files
+
+    # Test with non-existent directory (lines 37-38)
+    cleanup_old_cache_files("/nonexistent/path", datetime.now())
+    # Should not raise exception, just log and return
+
+
+def test_cleanup_old_cache_files_with_error(tmp_path, monkeypatch):
+    """Test cleanup_old_cache_files with file processing errors."""
+    from datetime import datetime
+
+    from run_bot import cleanup_old_cache_files
+
+    # Create a file with cache naming pattern
+    cache_file = tmp_path / "grid_05-08-2025.html"
+    cache_file.write_text("test")
+    
+    # Mock os.remove to raise an exception (lines 49-50)
+    def mock_remove(path):
+        raise PermissionError("Access denied")
+    
+    monkeypatch.setattr("run_bot.os.remove", mock_remove)
+    
+    # Should handle the exception gracefully
+    today = datetime.now()
+    cleanup_old_cache_files(str(tmp_path), today)
+    # Should not raise exception, just log warning

@@ -181,3 +181,16 @@ def test_delay_zero_base(monkeypatch):
 def test_delay_float(monkeypatch):
     monkeypatch.setattr("time.sleep", lambda x: None)
     delay(0.5, 1.5, 1.2)  # Should not error
+
+
+def test_delay_no_max_delay(monkeypatch):
+    """Test delay function when max_delay is None."""
+    sleep_calls = []
+    monkeypatch.setattr("time.sleep", lambda x: sleep_calls.append(x))
+    
+    # When max_delay is None, should use min_delay directly (line 92)
+    delay(min_delay=1.5, max_delay=None)  # Use < 2 to avoid countdown loop
+    
+    # Should have called sleep once with min_delay
+    assert len(sleep_calls) == 1
+    assert sleep_calls[0] == 1.5
