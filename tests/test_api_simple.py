@@ -15,9 +15,9 @@ class TestAPIErrorHandling:
         """Test get_crew_list_data with database connection error."""
         with patch('api_server.sqlite3.connect') as mock_connect:
             mock_connect.side_effect = sqlite3.Error("Database connection failed")
-            
+
             result = get_crew_list_data()
-            
+
             # Should return empty list on database error
             assert result == []
 
@@ -37,11 +37,11 @@ class TestAPIErrorHandling:
         dt2 = datetime(2025, 8, 26, 12, 0)
         dt3 = datetime(2025, 8, 26, 11, 0)
         dt4 = datetime(2025, 8, 26, 13, 0)
-        
+
         # Overlapping periods should be merged
         periods = [(dt1, dt2), (dt3, dt4)]
         result = merge_time_periods(periods)
-        
+
         # Should result in one merged period
         assert len(result) == 1
         assert result[0] == (dt1, dt4)
@@ -52,11 +52,11 @@ class TestAPIErrorHandling:
         dt2 = datetime(2025, 8, 26, 11, 0)
         dt3 = datetime(2025, 8, 26, 13, 0)
         dt4 = datetime(2025, 8, 26, 14, 0)
-        
+
         # Non-overlapping periods should remain separate
         periods = [(dt1, dt2), (dt3, dt4)]
         result = merge_time_periods(periods)
-        
+
         # Should result in two separate periods
         assert len(result) == 2
         assert result == [(dt1, dt2), (dt3, dt4)]
