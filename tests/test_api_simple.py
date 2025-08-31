@@ -13,7 +13,7 @@ class TestAPIErrorHandling:
 
     def test_get_crew_list_data_database_error(self):
         """Test get_crew_list_data with database connection error."""
-        with patch('api_server.sqlite3.connect') as mock_connect:
+        with patch("api_server.sqlite3.connect") as mock_connect:
             mock_connect.side_effect = sqlite3.Error("Database connection failed")
 
             result = get_crew_list_data()

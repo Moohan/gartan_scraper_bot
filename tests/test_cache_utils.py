@@ -112,17 +112,17 @@ def test_cleanup_cache_files_permission_error(tmp_path, monkeypatch):
     # Create a cache file
     cache_file = tmp_path / "grid_05-08-2025.html"
     cache_file.write_text("test")
-    
+
     # Make it old
     old_time = datetime.now() - timedelta(days=2)
     os.utime(str(cache_file), (old_time.timestamp(), old_time.timestamp()))
-    
+
     # Mock os.remove to raise an exception (lines 88-89)
     def mock_remove(path):
         raise PermissionError("Access denied")
-    
+
     monkeypatch.setattr("cache_utils.os.remove", mock_remove)
-    
+
     # Should handle the exception gracefully
     removed = cleanup_cache_files(str(tmp_path), expiry_minutes=60)
     assert removed == []  # No files removed due to permission error

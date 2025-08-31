@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 
 from db_store import (
+    _convert_slots_to_blocks,
     init_db,
     insert_appliance_availability,
     insert_crew_availability,
     insert_crew_details,
-    _convert_slots_to_blocks,
 )
 
 

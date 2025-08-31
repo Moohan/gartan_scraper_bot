@@ -46,11 +46,11 @@ class TestContainerMain(unittest.TestCase):
         shutdown_flag.clear()
 
         # Create temporary database for testing
-        self.temp_db = tempfile.NamedTemporaryFile(delete=False, suffix='.db')
+        self.temp_db = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
         self.temp_db.close()
 
         # Mock config
-        with patch('container_main.config') as mock_config:
+        with patch("container_main.config") as mock_config:
             mock_config.db_path = self.temp_db.name
             self.mock_config = mock_config
 
@@ -61,12 +61,15 @@ class TestContainerMain(unittest.TestCase):
         except:
             pass
 
-    @patch('container_main.sys.exit')
+    @patch("container_main.sys.exit")
     def test_signal_handler_graceful_shutdown(self, mock_exit):
         """Test signal handler initiates graceful shutdown"""
         # Mock processes
         mock_process1 = Mock()
-        mock_process1.is_alive.side_effect = [True, False]  # Alive before terminate, dead after join
+        mock_process1.is_alive.side_effect = [
+            True,
+            False,
+        ]  # Alive before terminate, dead after join
         mock_process1.name = "test_process1"
 
         mock_process2 = Mock()
@@ -93,7 +96,7 @@ class TestContainerMain(unittest.TestCase):
         # Verify sys.exit was called
         mock_exit.assert_called_once_with(0)
 
-    @patch('container_main.sys.exit')
+    @patch("container_main.sys.exit")
     def test_signal_handler_force_kill(self, mock_exit):
         """Test signal handler force kills unresponsive processes"""
         # Mock unresponsive process
@@ -105,7 +108,9 @@ class TestContainerMain(unittest.TestCase):
         processes.append(mock_process)
 
         # Make terminate not work (process still alive after join)
-        mock_process.join.return_value = None  # join doesn't return anything when timeout
+        mock_process.join.return_value = (
+            None  # join doesn't return anything when timeout
+        )
 
         # Call signal handler
         signal_handler(signal.SIGTERM, None)
@@ -114,43 +119,40 @@ class TestContainerMain(unittest.TestCase):
         mock_process.kill.assert_called_once()
         mock_exit.assert_called_once_with(0)
 
-    @patch('container_main.logger')
+    @patch("container_main.logger")
     def test_run_scheduler_success(self, mock_logger):
         """Test successful scheduler process execution"""
-        with patch('scheduler.main') as mock_scheduler_main:
+        with patch("scheduler.main") as mock_scheduler_main:
             run_scheduler()
             mock_scheduler_main.assert_called_once()
             mock_logger.info.assert_called()
 
-    @patch('container_main.logger')
+    @patch("container_main.logger")
     def test_run_scheduler_failure(self, mock_logger):
         """Test scheduler process failure handling"""
-        with patch('scheduler.main', side_effect=Exception("Test error")):
+        with patch("scheduler.main", side_effect=Exception("Test error")):
             with self.assertRaises(Exception):
                 run_scheduler()
             mock_logger.error.assert_called()
 
-    @patch('container_main.logger')
-    @patch('api_server.app')
+    @patch("container_main.logger")
+    @patch("api_server.app")
     def test_run_api_server_success(self, mock_app, mock_logger):
         """Test successful API server process execution"""
         mock_app.run = Mock()
 
-        with patch.dict(os.environ, {'PORT': '8080'}):
+        with patch.dict(os.environ, {"PORT": "8080"}):
             run_api_server()
 
         mock_app.run.assert_called_once_with(
-            host="0.0.0.0",
-            port=8080,
-            debug=False,
-            use_reloader=False
+            host="0.0.0.0", port=8080, debug=False, use_reloader=False
         )
         mock_logger.info.assert_called()
 
-    @patch('container_main.logger')
+    @patch("container_main.logger")
     def test_run_api_server_failure(self, mock_logger):
         """Test API server process failure handling"""
-        with patch('api_server.app') as mock_app:
+        with patch("api_server.app") as mock_app:
             mock_app.run.side_effect = Exception("Test error")
             with self.assertRaises(Exception):
                 run_api_server()
@@ -166,7 +168,7 @@ class TestContainerMain(unittest.TestCase):
         conn.commit()
         conn.close()
 
-        with patch('container_main.config', self.mock_config):
+        with patch("container_main.config", self.mock_config):
             result = wait_for_database()
 
         self.assertTrue(result)
@@ -175,21 +177,28 @@ class TestContainerMain(unittest.TestCase):
         """Test database waiting timeout with short timeout"""
         # Don't create database file
 
-        with patch('container_main.config', self.mock_config):
-            with patch('container_main.time.sleep'):  # Mock sleep to speed up test
-                with patch('container_main.wait_for_database') as mock_wait:
+        with patch("container_main.config", self.mock_config):
+            with patch("container_main.time.sleep"):  # Mock sleep to speed up test
+                with patch("container_main.wait_for_database") as mock_wait:
                     mock_wait.return_value = False
                     result = wait_for_database()
                     self.assertFalse(result)
 
-    @patch('container_main.logger')
-    @patch('container_main.Process')
-    @patch('container_main.wait_for_database', return_value=True)
-    @patch('container_main.run_scheduler')
-    @patch('container_main.run_api_server')
-    @patch('container_main.signal_handler')
-    def test_main_successful_orchestration(self, mock_signal_handler, mock_run_api, mock_run_scheduler,
-                                           mock_wait_db, mock_process_class, mock_logger):
+    @patch("container_main.logger")
+    @patch("container_main.Process")
+    @patch("container_main.wait_for_database", return_value=True)
+    @patch("container_main.run_scheduler")
+    @patch("container_main.run_api_server")
+    @patch("container_main.signal_handler")
+    def test_main_successful_orchestration(
+        self,
+        mock_signal_handler,
+        mock_run_api,
+        mock_run_scheduler,
+        mock_wait_db,
+        mock_process_class,
+        mock_logger,
+    ):
         """Test successful main orchestration"""
         # Mock processes
         mock_scheduler_process = Mock()
@@ -199,8 +208,12 @@ class TestContainerMain(unittest.TestCase):
 
         mock_process_class.side_effect = [mock_scheduler_process, mock_api_process]
 
-        with patch('container_main.shutdown_flag') as mock_shutdown_flag:
-            mock_shutdown_flag.is_set.side_effect = [False, False, True]  # Exit after 2 checks
+        with patch("container_main.shutdown_flag") as mock_shutdown_flag:
+            mock_shutdown_flag.is_set.side_effect = [
+                False,
+                False,
+                True,
+            ]  # Exit after 2 checks
 
             main()
 
@@ -214,14 +227,23 @@ class TestContainerMain(unittest.TestCase):
 
         mock_logger.info.assert_called()
 
-    @patch('container_main.logger')
-    @patch('container_main.Process')
-    @patch('container_main.wait_for_database', return_value=False)  # Test timeout scenario
-    @patch('container_main.run_scheduler')
-    @patch('container_main.run_api_server')
-    @patch('container_main.signal_handler')
-    def test_main_database_timeout_orchestration(self, mock_signal_handler, mock_run_api, mock_run_scheduler,
-                                                 mock_wait_db, mock_process_class, mock_logger):
+    @patch("container_main.logger")
+    @patch("container_main.Process")
+    @patch(
+        "container_main.wait_for_database", return_value=False
+    )  # Test timeout scenario
+    @patch("container_main.run_scheduler")
+    @patch("container_main.run_api_server")
+    @patch("container_main.signal_handler")
+    def test_main_database_timeout_orchestration(
+        self,
+        mock_signal_handler,
+        mock_run_api,
+        mock_run_scheduler,
+        mock_wait_db,
+        mock_process_class,
+        mock_logger,
+    ):
         """Test main orchestration when database times out"""
         # Mock processes
         mock_scheduler_process = Mock()
@@ -231,8 +253,12 @@ class TestContainerMain(unittest.TestCase):
 
         mock_process_class.side_effect = [mock_scheduler_process, mock_api_process]
 
-        with patch('container_main.shutdown_flag') as mock_shutdown_flag:
-            mock_shutdown_flag.is_set.side_effect = [False, False, True]  # Exit after 2 checks
+        with patch("container_main.shutdown_flag") as mock_shutdown_flag:
+            mock_shutdown_flag.is_set.side_effect = [
+                False,
+                False,
+                True,
+            ]  # Exit after 2 checks
 
             main()
 
@@ -247,10 +273,12 @@ class TestContainerMain(unittest.TestCase):
         # Verify warning was logged about database timeout
         mock_logger.warning.assert_called()
 
-    @patch('container_main.logger')
-    @patch('container_main.Process')
-    @patch('container_main.signal_handler')
-    def test_main_process_failure_detection(self, mock_signal_handler, mock_process_class, mock_logger):
+    @patch("container_main.logger")
+    @patch("container_main.Process")
+    @patch("container_main.signal_handler")
+    def test_main_process_failure_detection(
+        self, mock_signal_handler, mock_process_class, mock_logger
+    ):
         """Test main orchestration detects process failures"""
         # Mock processes
         mock_scheduler_process = Mock()
@@ -260,20 +288,23 @@ class TestContainerMain(unittest.TestCase):
 
         mock_process_class.side_effect = [mock_scheduler_process, mock_api_process]
 
-        with patch('container_main.wait_for_database', return_value=True):
-            with patch('container_main.shutdown_flag') as mock_shutdown_flag:
-                mock_shutdown_flag.is_set.side_effect = [False, True]  # Exit after process check
+        with patch("container_main.wait_for_database", return_value=True):
+            with patch("container_main.shutdown_flag") as mock_shutdown_flag:
+                mock_shutdown_flag.is_set.side_effect = [
+                    False,
+                    True,
+                ]  # Exit after process check
 
                 main()
 
         # Verify shutdown was triggered due to dead process
         mock_logger.error.assert_called_with("Process api_server died unexpectedly")
 
-    @patch('container_main.logger')
-    @patch('container_main.signal_handler')
+    @patch("container_main.logger")
+    @patch("container_main.signal_handler")
     def test_main_exception_handling(self, mock_signal_handler, mock_logger):
         """Test main orchestration handles exceptions"""
-        with patch('container_main.Process', side_effect=Exception("Test error")):
+        with patch("container_main.Process", side_effect=Exception("Test error")):
             main()
 
         # Verify exception was logged and shutdown was triggered

@@ -208,25 +208,28 @@ def test_insert_appliance_availability():
 def test_init_db_with_reset():
     """Test database initialization with reset flag."""
     import tempfile
+
     db_path = tempfile.mktemp(suffix=".db")
     try:
         # Create database with some data first
         conn = init_db(db_path, reset=False)
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO crew (name, role) VALUES (?, ?)", ("TEST_USER", "FFC"))
+        cursor.execute(
+            "INSERT INTO crew (name, role) VALUES (?, ?)", ("TEST_USER", "FFC")
+        )
         conn.commit()
         conn.close()
-        
+
         # Reset should clear all data (lines 65-68)
         conn = init_db(db_path, reset=True)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM crew")
         count = cursor.fetchone()[0]
         conn.close()
-        
+
         # Should have no data after reset
         assert count == 0
-        
+
     finally:
         if os.path.exists(db_path):
             os.remove(db_path)

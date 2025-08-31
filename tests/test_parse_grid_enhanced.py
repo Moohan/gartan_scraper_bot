@@ -411,7 +411,7 @@ class TestParseSkillsTable:
     def test_parse_skills_table_complete(self):
         """Test parse_skills_table with complete skills data."""
         from parse_grid import parse_skills_table
-        
+
         html = """
         <table>
             <tr><td>Rules</td></tr>
@@ -423,16 +423,16 @@ class TestParseSkillsTable:
         </table>
         """
         result = parse_skills_table(html, "2025-08-05")
-        
+
         assert "skills_availability" in result
         skills = result["skills_availability"]
-        
+
         # Check all skill types are parsed
         assert "BA" in skills
         assert "LGV" in skills
         assert "Total Crew" in skills
         assert "MGR" in skills
-        
+
         # Check specific values
         assert skills["BA"]["2025-08-05 0800"] == 4
         assert skills["LGV"]["2025-08-05 0815"] == 1
@@ -441,7 +441,7 @@ class TestParseSkillsTable:
     def test_parse_skills_table_no_table(self):
         """Test parse_skills_table with no Rules table."""
         from parse_grid import parse_skills_table
-        
+
         html = """
         <table>
             <tr><td>Not Rules</td></tr>
@@ -454,7 +454,7 @@ class TestParseSkillsTable:
     def test_parse_skills_table_no_header_row(self):
         """Test parse_skills_table with Rules but no header row after."""
         from parse_grid import parse_skills_table
-        
+
         html = """
         <table>
             <tr><td>Rules</td></tr>
@@ -466,7 +466,7 @@ class TestParseSkillsTable:
     def test_parse_skills_table_invalid_data(self):
         """Test parse_skills_table with invalid numeric data."""
         from parse_grid import parse_skills_table
-        
+
         html = """
         <table>
             <tr><td>Rules</td></tr>
@@ -477,7 +477,7 @@ class TestParseSkillsTable:
         """
         result = parse_skills_table(html, "2025-08-05")
         skills = result["skills_availability"]
-        
+
         # Should handle invalid data gracefully
         assert skills["BA"]["2025-08-05 0800"] == 0
         assert skills["BA"]["2025-08-05 0815"] == 0  # Empty string
@@ -490,8 +490,10 @@ class TestMissingLineCoverage:
     def test_get_table_and_header_no_gridavail(self):
         """Test _get_table_and_header when no gridAvail table exists (line 144)."""
         from parse_grid import _get_table_and_header
-        
-        html = "<html><body><table id='other'><tr><td>test</td></tr></table></body></html>"
+
+        html = (
+            "<html><body><table id='other'><tr><td>test</td></tr></table></body></html>"
+        )
         table, header = _get_table_and_header(html)
         assert table is None
         assert header is None
@@ -510,8 +512,8 @@ class TestMissingLineCoverage:
         result1 = parse_appliance_availability(html1, "2025-08-05")
         # Should handle gracefully, might return data or empty dict
         assert isinstance(result1, dict)  # Should not crash
-        
-        # Test empty title attribute 
+
+        # Test empty title attribute
         html2 = """
         <table id='gridAvail'>
             <tr><td colspan='5'>Appliances</td></tr>
@@ -521,7 +523,7 @@ class TestMissingLineCoverage:
         """
         result2 = parse_appliance_availability(html2, "2025-08-05")
         assert "P22P6" in result2  # Line 336
-        
+
         # Test no P22P6 row found
         html3 = """
         <table id='gridAvail'>
@@ -538,7 +540,7 @@ class TestMissingLineCoverage:
     def test_unknown_appliance_name_fallback(self):
         """Test unknown appliance name fallback (line 388)."""
         from parse_grid import parse_appliance_availability
-        
+
         html = """
         <table id='gridAvail'>
             <tr><td colspan='5'>Appliances</td></tr>
@@ -556,9 +558,9 @@ class TestMissingLineCoverage:
 
         # Test various date formats
         assert _normalize_date("05-08-2025") == "05-08-2025"  # Returns as-is
-        assert _normalize_date("2025-08-05") == "2025-08-05"  # Returns as-is 
+        assert _normalize_date("2025-08-05") == "2025-08-05"  # Returns as-is
         assert _normalize_date("05/08/2025") == "05/08/2025"  # Returns as-is
-        
+
         # Test invalid format - should return as-is
         assert _normalize_date("invalid-date") == "invalid-date"
         assert _normalize_date("") == ""
@@ -580,14 +582,14 @@ class TestMissingLineCoverage:
                         "2025-08-05 0830": True,
                         "2025-08-05 0845": True,
                         "2025-08-05 0900": False,
-                    }
+                    },
                 }
             ]
         ]
-        
+
         result = aggregate_crew_availability(daily_crew_lists)
         assert len(result) == 1
-        
+
         crew = result[0]
         # Should calculate next_available and other status fields
         assert "next_available" in crew

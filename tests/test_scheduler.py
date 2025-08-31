@@ -39,11 +39,11 @@ class TestScheduler(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         # Create temporary database for testing
-        self.temp_db = tempfile.NamedTemporaryFile(delete=False, suffix='.db')
+        self.temp_db = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
         self.temp_db.close()
 
         # Mock config
-        with patch('scheduler.config') as mock_config:
+        with patch("scheduler.config") as mock_config:
             mock_config.db_path = self.temp_db.name
             self.mock_config = mock_config
 
@@ -62,27 +62,32 @@ class TestScheduler(unittest.TestCase):
 
         # Create tables
         cursor.execute("CREATE TABLE crew (id INTEGER PRIMARY KEY, name TEXT)")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE crew_availability (
                 id INTEGER PRIMARY KEY,
                 crew_id INTEGER,
                 start_time TEXT,
                 end_time TEXT
             )
-        """)
+        """
+        )
 
         # Add test data
         cursor.execute("INSERT INTO crew (name) VALUES ('Test Crew')")
         recent_time = (datetime.now() + timedelta(hours=1)).isoformat()
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO crew_availability (crew_id, start_time, end_time)
             VALUES (1, '2025-01-01T10:00:00', ?)
-        """, (recent_time,))
+        """,
+            (recent_time,),
+        )
 
         conn.commit()
         conn.close()
 
-        with patch('scheduler.DB_PATH', self.temp_db.name):
+        with patch("scheduler.DB_PATH", self.temp_db.name):
             result = check_database_health()
 
         self.assertTrue(result)
@@ -92,7 +97,7 @@ class TestScheduler(unittest.TestCase):
         # Remove the temp file
         os.unlink(self.temp_db.name)
 
-        with patch('scheduler.DB_PATH', self.temp_db.name):
+        with patch("scheduler.DB_PATH", self.temp_db.name):
             result = check_database_health()
 
         self.assertFalse(result)
@@ -103,7 +108,7 @@ class TestScheduler(unittest.TestCase):
         conn = sqlite3.connect(self.temp_db.name)
         conn.close()
 
-        with patch('scheduler.DB_PATH', self.temp_db.name):
+        with patch("scheduler.DB_PATH", self.temp_db.name):
             result = check_database_health()
 
         self.assertFalse(result)
@@ -115,33 +120,38 @@ class TestScheduler(unittest.TestCase):
         cursor = conn.cursor()
 
         cursor.execute("CREATE TABLE crew (id INTEGER PRIMARY KEY, name TEXT)")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE crew_availability (
                 id INTEGER PRIMARY KEY,
                 crew_id INTEGER,
                 start_time TEXT,
                 end_time TEXT
             )
-        """)
+        """
+        )
 
         # Add old data (more than 1 day ago)
         cursor.execute("INSERT INTO crew (name) VALUES ('Test Crew')")
         old_time = (datetime.now() - timedelta(days=2)).isoformat()
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO crew_availability (crew_id, start_time, end_time)
             VALUES (1, '2025-01-01T10:00:00', ?)
-        """, (old_time,))
+        """,
+            (old_time,),
+        )
 
         conn.commit()
         conn.close()
 
-        with patch('scheduler.DB_PATH', self.temp_db.name):
+        with patch("scheduler.DB_PATH", self.temp_db.name):
             result = check_database_health()
 
         self.assertFalse(result)
 
-    @patch('scheduler.logger')
-    @patch('scheduler.subprocess.run')
+    @patch("scheduler.logger")
+    @patch("scheduler.subprocess.run")
     def test_run_scraper_success(self, mock_subprocess_run, mock_logger):
         """Test successful scraper execution"""
         # Mock successful subprocess run
@@ -156,8 +166,8 @@ class TestScheduler(unittest.TestCase):
         mock_subprocess_run.assert_called_once()
         mock_logger.info.assert_called()
 
-    @patch('scheduler.logger')
-    @patch('scheduler.subprocess.run')
+    @patch("scheduler.logger")
+    @patch("scheduler.subprocess.run")
     def test_run_scraper_failure(self, mock_subprocess_run, mock_logger):
         """Test scraper execution failure"""
         # Mock failed subprocess run
@@ -171,8 +181,11 @@ class TestScheduler(unittest.TestCase):
         self.assertFalse(result)
         mock_logger.error.assert_called()
 
-    @patch('scheduler.logger')
-    @patch('scheduler.subprocess.run', side_effect=subprocess.TimeoutExpired("run_bot.py", 300))
+    @patch("scheduler.logger")
+    @patch(
+        "scheduler.subprocess.run",
+        side_effect=subprocess.TimeoutExpired("run_bot.py", 300),
+    )
     def test_run_scraper_timeout(self, mock_subprocess_run, mock_logger):
         """Test scraper execution timeout"""
         result = run_scraper(3)
@@ -180,8 +193,8 @@ class TestScheduler(unittest.TestCase):
         self.assertFalse(result)
         mock_logger.error.assert_called_with("Scraper run timed out after 5 minutes")
 
-    @patch('scheduler.logger')
-    @patch('scheduler.subprocess.run', side_effect=Exception("Test error"))
+    @patch("scheduler.logger")
+    @patch("scheduler.subprocess.run", side_effect=Exception("Test error"))
     def test_run_scraper_exception(self, mock_subprocess_run, mock_logger):
         """Test scraper execution with general exception"""
         result = run_scraper(3)
@@ -189,10 +202,12 @@ class TestScheduler(unittest.TestCase):
         self.assertFalse(result)
         mock_logger.error.assert_called()
 
-    @patch('scheduler.logger')
-    @patch('scheduler.check_database_health', return_value=False)
-    @patch('scheduler.run_scraper', return_value=True)
-    def test_scheduled_scrape_comprehensive(self, mock_run_scraper, mock_check_health, mock_logger):
+    @patch("scheduler.logger")
+    @patch("scheduler.check_database_health", return_value=False)
+    @patch("scheduler.run_scraper", return_value=True)
+    def test_scheduled_scrape_comprehensive(
+        self, mock_run_scraper, mock_check_health, mock_logger
+    ):
         """Test scheduled scrape with comprehensive parameters when no recent data"""
         scheduled_scrape()
 
@@ -200,10 +215,12 @@ class TestScheduler(unittest.TestCase):
         mock_run_scraper.assert_called_with(7)
         mock_logger.info.assert_called()
 
-    @patch('scheduler.logger')
-    @patch('scheduler.check_database_health', return_value=True)
-    @patch('scheduler.run_scraper', return_value=True)
-    def test_scheduled_scrape_update(self, mock_run_scraper, mock_check_health, mock_logger):
+    @patch("scheduler.logger")
+    @patch("scheduler.check_database_health", return_value=True)
+    @patch("scheduler.run_scraper", return_value=True)
+    def test_scheduled_scrape_update(
+        self, mock_run_scraper, mock_check_health, mock_logger
+    ):
         """Test scheduled scrape with update parameters when database is healthy"""
         scheduled_scrape()
 
@@ -211,28 +228,36 @@ class TestScheduler(unittest.TestCase):
         mock_run_scraper.assert_called_with(3)
         mock_logger.info.assert_called()
 
-    @patch('scheduler.logger')
-    @patch('scheduler.check_database_health', side_effect=[True, False])
-    @patch('scheduler.run_scraper', return_value=True)
-    def test_scheduled_scrape_health_check_failure(self, mock_run_scraper, mock_check_health, mock_logger):
+    @patch("scheduler.logger")
+    @patch("scheduler.check_database_health", side_effect=[True, False])
+    @patch("scheduler.run_scraper", return_value=True)
+    def test_scheduled_scrape_health_check_failure(
+        self, mock_run_scraper, mock_check_health, mock_logger
+    ):
         """Test scheduled scrape when post-run health check fails"""
         scheduled_scrape()
 
-        mock_logger.warning.assert_called_with("Scrape completed but database health check failed")
+        mock_logger.warning.assert_called_with(
+            "Scrape completed but database health check failed"
+        )
 
-    @patch('scheduler.logger')
-    @patch('scheduler.check_database_health', return_value=True)
-    @patch('scheduler.run_scraper', return_value=False)
-    def test_scheduled_scrape_run_failure(self, mock_run_scraper, mock_check_health, mock_logger):
+    @patch("scheduler.logger")
+    @patch("scheduler.check_database_health", return_value=True)
+    @patch("scheduler.run_scraper", return_value=False)
+    def test_scheduled_scrape_run_failure(
+        self, mock_run_scraper, mock_check_health, mock_logger
+    ):
         """Test scheduled scrape when scraper run fails"""
         scheduled_scrape()
 
         mock_logger.error.assert_called_with("Scheduled scrape failed")
 
-    @patch('scheduler.logger')
-    @patch('scheduler.check_database_health', return_value=False)
-    @patch('scheduler.run_scraper', return_value=True)
-    def test_initial_data_check_needed(self, mock_run_scraper, mock_check_health, mock_logger):
+    @patch("scheduler.logger")
+    @patch("scheduler.check_database_health", return_value=False)
+    @patch("scheduler.run_scraper", return_value=True)
+    def test_initial_data_check_needed(
+        self, mock_run_scraper, mock_check_health, mock_logger
+    ):
         """Test initial data check when data is needed"""
         initial_data_check()
 
@@ -240,58 +265,71 @@ class TestScheduler(unittest.TestCase):
         mock_run_scraper.assert_called_with(7)
         mock_logger.info.assert_called()
 
-    @patch('scheduler.logger')
-    @patch('scheduler.check_database_health', return_value=True)
-    @patch('scheduler.run_scraper')
-    def test_initial_data_check_not_needed(self, mock_run_scraper, mock_check_health, mock_logger):
+    @patch("scheduler.logger")
+    @patch("scheduler.check_database_health", return_value=True)
+    @patch("scheduler.run_scraper")
+    def test_initial_data_check_not_needed(
+        self, mock_run_scraper, mock_check_health, mock_logger
+    ):
         """Test initial data check when data already exists"""
         initial_data_check()
 
         # Should not run scraper
         mock_run_scraper.assert_not_called()
-        mock_logger.info.assert_called_with("Database contains valid data - skipping initial scrape")
+        mock_logger.info.assert_called_with(
+            "Database contains valid data - skipping initial scrape"
+        )
 
-    @patch('scheduler.logger')
-    @patch('scheduler.check_database_health', return_value=False)
-    @patch('scheduler.run_scraper', return_value=False)
-    def test_initial_data_check_failure(self, mock_run_scraper, mock_check_health, mock_logger):
+    @patch("scheduler.logger")
+    @patch("scheduler.check_database_health", return_value=False)
+    @patch("scheduler.run_scraper", return_value=False)
+    def test_initial_data_check_failure(
+        self, mock_run_scraper, mock_check_health, mock_logger
+    ):
         """Test initial data check when scraper fails"""
         initial_data_check()
 
-        mock_logger.error.assert_called_with("Initial scrape failed - will retry on next scheduled run")
+        mock_logger.error.assert_called_with(
+            "Initial scrape failed - will retry on next scheduled run"
+        )
 
-    @patch('scheduler.logger')
-    @patch('scheduler.schedule')
-    @patch('scheduler.initial_data_check')
-    @patch('scheduler.scheduled_scrape')
-    def test_main_successful_startup(self, mock_scheduled_scrape, mock_initial_check,
-                                   mock_schedule, mock_logger):
+    @patch("scheduler.logger")
+    @patch("scheduler.schedule")
+    @patch("scheduler.initial_data_check")
+    @patch("scheduler.scheduled_scrape")
+    def test_main_successful_startup(
+        self, mock_scheduled_scrape, mock_initial_check, mock_schedule, mock_logger
+    ):
         """Test successful main scheduler startup"""
         # Mock schedule to exit quickly
         mock_schedule.run_pending.return_value = None
 
-        with patch('scheduler.time.sleep', side_effect=KeyboardInterrupt()):
+        with patch("scheduler.time.sleep", side_effect=KeyboardInterrupt()):
             main()
 
         mock_initial_check.assert_called_once()
         mock_logger.info.assert_called()
 
-    @patch('scheduler.logger')
-    @patch('scheduler.schedule')
-    @patch('scheduler.initial_data_check')
-    def test_main_keyboard_interrupt(self, mock_initial_check, mock_schedule, mock_logger):
+    @patch("scheduler.logger")
+    @patch("scheduler.schedule")
+    @patch("scheduler.initial_data_check")
+    def test_main_keyboard_interrupt(
+        self, mock_initial_check, mock_schedule, mock_logger
+    ):
         """Test main scheduler handles keyboard interrupt"""
-        with patch('scheduler.time.sleep', side_effect=KeyboardInterrupt()):
+        with patch("scheduler.time.sleep", side_effect=KeyboardInterrupt()):
             main()
 
         mock_logger.info.assert_called_with("Scheduler stopped by user")
 
-    @patch('scheduler.logger')
-    @patch('scheduler.schedule')
-    @patch('scheduler.initial_data_check')
-    def test_main_exception_handling(self, mock_initial_check, mock_schedule, mock_logger):
+    @patch("scheduler.logger")
+    @patch("scheduler.schedule")
+    @patch("scheduler.initial_data_check")
+    def test_main_exception_handling(
+        self, mock_initial_check, mock_schedule, mock_logger
+    ):
         """Test main scheduler handles general exceptions"""
-        with patch('scheduler.time.sleep', side_effect=Exception("Test error")):
+        with patch("scheduler.time.sleep", side_effect=Exception("Test error")):
             with self.assertRaises(Exception):
                 main()
 
