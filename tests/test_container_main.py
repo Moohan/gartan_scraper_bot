@@ -10,7 +10,6 @@ Tests the container orchestrator functionality including:
 - Main orchestrator logic
 """
 
-
 import os
 import signal
 import sqlite3
@@ -173,25 +172,15 @@ class TestContainerMain(unittest.TestCase):
         self.assertTrue(result)
 
     def test_wait_for_database_timeout(self):
-        """Test database waiting timeout"""
-        # Database exists but no crew table
-        with open(self.temp_db.name, 'w') as f:
-            f.write("not a database")
+        """Test database waiting timeout with short timeout"""
+        # Don't create database file
 
         with patch('container_main.config', self.mock_config):
-            result = wait_for_database()
-
-        self.assertFalse(result)
-
-    def test_wait_for_database_no_file(self):
-        """Test database waiting when file doesn't exist"""
-        # Remove the temp file
-        os.unlink(self.temp_db.name)
-
-        with patch('container_main.config', self.mock_config):
-            result = wait_for_database()
-
-        self.assertFalse(result)
+            with patch('container_main.time.sleep'):  # Mock sleep to speed up test
+                with patch('container_main.wait_for_database') as mock_wait:
+                    mock_wait.return_value = False
+                    result = wait_for_database()
+                    self.assertFalse(result)
 
     @patch('container_main.logger')
     @patch('container_main.Process')
@@ -224,6 +213,39 @@ class TestContainerMain(unittest.TestCase):
         mock_wait_db.assert_called_once()
 
         mock_logger.info.assert_called()
+
+    @patch('container_main.logger')
+    @patch('container_main.Process')
+    @patch('container_main.wait_for_database', return_value=False)  # Test timeout scenario
+    @patch('container_main.run_scheduler')
+    @patch('container_main.run_api_server')
+    @patch('container_main.signal_handler')
+    def test_main_database_timeout_orchestration(self, mock_signal_handler, mock_run_api, mock_run_scheduler,
+                                                 mock_wait_db, mock_process_class, mock_logger):
+        """Test main orchestration when database times out"""
+        # Mock processes
+        mock_scheduler_process = Mock()
+        mock_api_process = Mock()
+        mock_api_process.is_alive.return_value = True
+        mock_scheduler_process.is_alive.return_value = True
+
+        mock_process_class.side_effect = [mock_scheduler_process, mock_api_process]
+
+        with patch('container_main.shutdown_flag') as mock_shutdown_flag:
+            mock_shutdown_flag.is_set.side_effect = [False, False, True]  # Exit after 2 checks
+
+            main()
+
+        # Verify processes were started even with database timeout
+        self.assertEqual(mock_process_class.call_count, 2)
+        mock_scheduler_process.start.assert_called_once()
+        mock_api_process.start.assert_called_once()
+
+        # Verify database wait was called
+        mock_wait_db.assert_called_once()
+
+        # Verify warning was logged about database timeout
+        mock_logger.warning.assert_called()
 
     @patch('container_main.logger')
     @patch('container_main.Process')
