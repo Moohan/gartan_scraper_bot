@@ -187,10 +187,10 @@ def test_delay_no_max_delay(monkeypatch):
     """Test delay function when max_delay is None."""
     sleep_calls = []
     monkeypatch.setattr("time.sleep", lambda x: sleep_calls.append(x))
-    
+
     # When max_delay is None, should use min_delay directly (line 92)
     delay(min_delay=1.5, max_delay=None)  # Use < 2 to avoid countdown loop
-    
+
     # Should have called sleep once with min_delay
     assert len(sleep_calls) == 1
     assert sleep_calls[0] == 1.5

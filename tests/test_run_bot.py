@@ -125,13 +125,13 @@ def test_cleanup_old_cache_files_with_error(tmp_path, monkeypatch):
     # Create a file with cache naming pattern
     cache_file = tmp_path / "grid_05-08-2025.html"
     cache_file.write_text("test")
-    
+
     # Mock os.remove to raise an exception (lines 49-50)
     def mock_remove(path):
         raise PermissionError("Access denied")
-    
+
     monkeypatch.setattr("run_bot.os.remove", mock_remove)
-    
+
     # Should handle the exception gracefully
     today = datetime.now()
     cleanup_old_cache_files(str(tmp_path), today)
