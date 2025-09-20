@@ -1,48 +1,62 @@
 """HTML parsing and availability aggregation utilities.
 
 Transforms raw schedule grid HTML into structured availability blocks for
-crew and appliances, plus helper summarisation (next available windows etc.).
+crew and appliances, plus helper summarization (next available windows etc.).
 """
 
 from datetime import datetime as dt
+from typing import Any, Dict, List, Optional, TypedDict, Union
 
-from bs4 import BeautifulSoup, Tag  # type: ignore
+from bs4 import BeautifulSoup, NavigableString, Tag  # type: ignore
 
 from utils import log_debug
 
+# Type aliases for clarity
+GridElement = Union[Tag, NavigableString]
+GridTable = Tag
+GridCell = Tag
+AvailabilityDict = Dict[str, Union[str, List[str], Dict[str, bool]]]
+TimeBlock = Dict[str, Union[str, List[str]]]
 
-def _calculate_availability_summary(
-    slot_tuples: list[tuple[dt, bool]], now: dt
-) -> dict:  # pylint: disable=too-complex
-    """
-    Calculates availability summary fields from a sorted list of (datetime, available) tuples.
-    """
+
+class GridResult(TypedDict):
+    """Structured result from grid HTML parsing."""
+    date: Optional[str]
+    crew_availability: List[AvailabilityDict]
+    appliance_availability: Dict[str, AvailabilityDict]
+    skills_data: Dict[str, Dict[str, int]]
+
+
+def safe_find_one(element: Tag, name: str, **kwargs) -> Optional[Tag]:
+    """Safely find one element, ensuring it is a Tag."""
+    result = element.find(name, **kwargs)
+    return result if isinstance(result, Tag) else None
+
+
+def safe_find_all(element: Union[Tag, BeautifulSoup], name: str, **kwargs) -> List[Tag]:
+    """Safely find all elements, ensuring they are Tags."""
+    results = element.find_all(name, **kwargs)
+    return [r for r in results if isinstance(r, Tag)]
+
+
+def _find_next_availability_block(
+    slot_tuples: list[tuple[dt, bool]], start_idx: int, now: dt
+) -> tuple[Optional[dt], Optional[dt], Optional[str]]:
+    """Find next block of continuous availability from given index."""
+    if start_idx >= len(slot_tuples):
+        return None, None, None
+
     next_avail = None
-    next_avail_until = None
-    available_now = False
     available_for = None
 
-    # Check if available right now
-    covering_idx = None
-    for idx, (slot_dt, _) in enumerate(slot_tuples):
-        if slot_dt > now:
-            covering_idx = idx - 1 if idx > 0 else 0
-            break
-    if covering_idx is None and slot_tuples:
-        covering_idx = len(slot_tuples) - 1
-
-    if covering_idx is not None:
-        _, avail = slot_tuples[covering_idx]
-        if avail:
-            available_now = True
-
-    # Find the next continuous block of availability
-    for idx, (slot_dt, avail) in enumerate(slot_tuples):
+    for idx in range(start_idx, len(slot_tuples)):
+        slot_dt, avail = slot_tuples[idx]
         if slot_dt >= now and avail:
-            next_avail = slot_dt.strftime("%d/%m/%Y %H:%M")
+            next_avail = slot_dt
             last_true_dt = slot_dt
             next_avail_until_dt = None
 
+            # Look ahead for continuous availability
             for j in range(idx + 1, len(slot_tuples)):
                 next_dt, next_avail_val = slot_tuples[j]
                 if next_avail_val:
@@ -53,54 +67,77 @@ def _calculate_availability_summary(
                     next_avail_until_dt = next_dt
                     break
 
-            # Calculate available_for based on the block found
-            duration_hours = (last_true_dt - slot_dt).total_seconds() / 3600.0
-            if duration_hours >= 72:
-                available_for = ">72h"
-            else:
-                # Add the duration of the last slot (15 mins)
-                duration_hours += 0.25
-                available_for = f"{round(duration_hours, 2)}h"
+            # Calculate duration
+            duration_hours = (last_true_dt - slot_dt).total_seconds() / 3600.0 + 0.25
+            available_for = ">72h" if duration_hours >= 72 else f"{round(duration_hours, 2)}h"
 
-            if next_avail_until_dt:
-                next_avail_until = next_avail_until_dt.strftime("%d/%m/%Y %H:%M")
+            return next_avail, next_avail_until_dt, available_for
 
-            break  # Found the first available block, so we are done
+    return None, None, None
+
+
+def _calculate_current_availability(
+    slot_tuples: list[tuple[dt, bool]], now: dt
+) -> tuple[bool, int]:
+    """Check if available right now and get current slot index."""
+    covering_idx = None
+    for idx, (slot_dt, _) in enumerate(slot_tuples):
+        if slot_dt > now:
+            covering_idx = idx - 1 if idx > 0 else 0
+            break
+
+    if covering_idx is None and slot_tuples:
+        covering_idx = len(slot_tuples) - 1
+
+    available_now = False
+    if covering_idx is not None:
+        _, avail = slot_tuples[covering_idx]
+        available_now = avail
+
+    return available_now, covering_idx or 0
+
+
+def _calculate_availability_summary(
+    slot_tuples: list[tuple[dt, bool]], now: dt
+) -> dict:
+    """Calculates availability summary fields from sorted (datetime, available) tuples."""
+    available_now, current_idx = _calculate_current_availability(slot_tuples, now)
+    next_avail, next_avail_until_dt, available_for = _find_next_availability_block(
+        slot_tuples, current_idx, now
+    )
 
     return {
         "available_now": available_now,
-        "next_available": next_avail,
-        "next_available_until": next_avail_until,
+        "next_available": next_avail.strftime("%d/%m/%Y %H:%M") if next_avail else None,
+        "next_available_until": next_avail_until_dt.strftime("%d/%m/%Y %H:%M")
+        if next_avail_until_dt
+        else None,
         "available_for": available_for,
     }
 
 
-def aggregate_appliance_availability(
-    daily_appliance_lists, crew_list_agg=None
-):  # pylint: disable=too-complex
-    """
-    Aggregate appliance availability across multiple days, calculate next_available, next_available_until, available_now, available_for.
-    Also add a 'crew' entry: list of crew available during the next available period for the appliance.
-    Args:
-        daily_appliance_lists: list of dicts (from parse_appliance_availability)
-        crew_list_agg: list of crew dicts (from aggregate_crew_availability)
-    Returns:
-        list of dicts, one per appliance, with merged slot data and summary fields
-    """
-    from datetime import datetime as dt
+def _merge_appliance_data(
+    appliance_dict: Dict[str, Dict], appliance: str, data: Dict
+) -> None:
+    """Merge availability data for a single appliance."""
+    if appliance not in appliance_dict:
+        appliance_dict[appliance] = {"appliance": appliance, "availability": {}}
+    appliance_dict[appliance]["availability"].update(data.get("availability", {}))
 
+
+def aggregate_appliance_availability(
+    daily_appliance_lists: List[Dict[str, AvailabilityDict]]
+) -> List[AvailabilityDict]:
+    """Aggregate appliance availability across multiple days."""
     appliance_dict = {}
     # Merge all slot availabilities for each appliance
     for daily in daily_appliance_lists:
         for appliance, data in daily.items():
-            if appliance not in appliance_dict:
-                appliance_dict[appliance] = {"appliance": appliance, "availability": {}}
-            appliance_dict[appliance]["availability"].update(
-                data.get("availability", {})
-            )
+            _merge_appliance_data(appliance_dict, appliance, data)
+
     # Now recalculate summary fields for each appliance
     now = dt.now()
-    for appliance, entry in appliance_dict.items():
+    for entry in appliance_dict.values():
         availability = entry["availability"]
         slot_tuples = []
         for slot, avail in availability.items():
@@ -114,34 +151,20 @@ def aggregate_appliance_availability(
         summary = _calculate_availability_summary(slot_tuples, now)
         entry.update(summary)
 
-        # Add crew available during the next available period
+        # Initialize empty crew list
         entry["crew"] = []
-        if crew_list_agg and entry["next_available"]:
-            next_avail_dt = dt.strptime(entry["next_available"], "%d/%m/%Y %H:%M")
-
-            for crew in crew_list_agg:
-                crew_avail = crew.get("availability", {})
-                # Check if crew is available at the start of the appliance's next available period
-                slot_key_to_check = next_avail_dt.strftime("%d/%m/%Y %H%M")
-                if crew_avail.get(slot_key_to_check, False):
-                    entry["crew"].append(crew["name"])
 
     return list(appliance_dict.values())
 
 
-def _get_table_and_header(grid_html):
-    """
-    Extract the main table and header row from the grid HTML.
-    Returns (table, header_row) or (None, None) if not found.
-    """
+def _get_table_and_header(grid_html: str) -> tuple[Optional[Tag], Optional[Tag]]:
+    """Extract main table and header row."""
     soup = BeautifulSoup(grid_html, "html.parser")
-    table = soup.find("table", attrs={"id": "gridAvail"})
+    table = safe_find_one(soup, "table", attrs={"id": "gridAvail"})
     if not table:
         return None, None
-    rows = table.find_all("tr", recursive=False)
-    for tr in rows:
-        if not isinstance(tr, Tag):
-            continue
+        
+    for tr in safe_find_all(table, "tr", recursive=False):
         tr_class = tr.attrs.get("class", [])
         if isinstance(tr_class, list) and "gridheader" in tr_class:
             return table, tr
@@ -149,7 +172,7 @@ def _get_table_and_header(grid_html):
 
 
 def _get_slot_datetimes(availability: dict) -> list[tuple[dt, bool]]:
-    """Converts a dictionary of availability slots to a sorted list of (datetime, bool) tuples."""
+    """Convert dict of slots to sorted list of datetime tuples."""
     slot_datetimes = []
     for slot, is_avail in availability.items():
         try:
@@ -160,14 +183,9 @@ def _get_slot_datetimes(availability: dict) -> list[tuple[dt, bool]]:
     slot_datetimes.sort()
     return slot_datetimes
 
-
-def _extract_time_slots(header_row):
-    """
-    Extract time slot labels from the header row (skipping first 5 columns).
-    """
+def _extract_time_slots(header_row: Tag) -> list[str]:
+    """Extract time slot labels."""
     header_cells = header_row.find_all("td")
-    # Extract all time slot labels after the first header columns (skip only non-time columns)
-    # Find the first cell that looks like a time (e.g., '0000', '0015', etc.)
     import re
 
     slot_start_idx = 0
@@ -179,13 +197,8 @@ def _extract_time_slots(header_row):
     return [cell.get_text(strip=True) for cell in header_cells[slot_start_idx:]]
 
 
-def _extract_crew_availability(date, table, time_slots):
-    """
-    Extract crew availability for all rows in the table.
-    Returns a dict with crew_availability list.
-    """
-    from datetime import datetime as dt
-
+def _extract_crew_availability(date: Optional[str], table: Tag, time_slots: List[str]) -> Dict[str, list]:
+    """Extract crew availability."""
     date_prefix = _normalize_date(date)
     now = dt.now()
     crew_data = []
@@ -193,57 +206,44 @@ def _extract_crew_availability(date, table, time_slots):
         crew_data.append(_parse_crew_row(tr, time_slots, date_prefix, now))
     return {"crew_availability": crew_data}
 
-
-def _extract_crew_rows(table):
-    """
-    Return all crew rows (tr) with class 'employee'.
-    """
+def _extract_crew_rows(table: Tag) -> List[Tag]:
+    """Get crew rows with class 'employee'."""
     return [
         tr
-        for tr in table.find_all("tr")
-        if isinstance(tr.get("class", []), list) and "employee" in tr.get("class", [])
+        for tr in safe_find_all(table, "tr")
+        if tr.attrs.get("class") and "employee" in tr.attrs["class"]
     ]
 
 
-def _parse_crew_row(tr, time_slots, date_prefix, now):
-    tds = tr.find_all("td")
+def _parse_crew_row(tr: Tag, time_slots: List[str], date_prefix: str, now: dt) -> Dict[str, Any]:
+    """Parse crew row into structured data."""
+    tds = safe_find_all(tr, "td")
 
-    # Parse crew metadata from the structured columns
-    name = tds[0].get_text(strip=True)  # Employee name (colspan=2)
-    role = tds[1].get_text(strip=True) if len(tds) > 1 else None  # Role column
-    contract_hours = (
-        tds[2].get_text(strip=True) if len(tds) > 2 else None
-    )  # Contract Hours column
+    # Parse crew metadata
+    name = tds[0].get_text(strip=True)
+    role = tds[1].get_text(strip=True) if len(tds) > 1 else None
+    contract_hours = tds[2].get_text(strip=True) if len(tds) > 2 else None
     skills = None
 
-    # Find the skills column (class="skillCol") and time slot start
+    # Find skill column
     slot_start_idx = -1
     for i, td in enumerate(tds):
-        if "skillCol" in td.get("class", []):
+        if td.attrs.get("class") and "skillCol" in td.attrs["class"]:
             skills = td.get_text(strip=True).replace("&nbsp;", " ").strip()
             slot_start_idx = i + 1
             break
 
-    # Fallback for rows that might not have a skillCol
     if slot_start_idx == -1:
-        # A reasonable guess is that the slots start after the 4th cell.
-        # This is brittle but better than failing completely.
         slot_start_idx = 4
 
     avail_cells = tds[slot_start_idx : slot_start_idx + len(time_slots)]
-
     availability = _parse_availability_cells(
         avail_cells, time_slots, date_prefix, entity_type="crew"
     )
     slot_datetimes = _get_slot_datetimes(availability)
     summary = _calculate_availability_summary(slot_datetimes, now)
 
-    from logging_config import get_logger
-
-    logger = get_logger()
-    logger.debug(
-        f"Parsed crew row for {name}: {len(availability)} slots found, summary: {summary}"
-    )
+    log_debug("crew", f"Parsed crew row for {name}: {len(availability)} slots, summary: {summary}")
 
     return {
         "name": name,
@@ -255,158 +255,213 @@ def _parse_crew_row(tr, time_slots, date_prefix, now):
     }
 
 
-def parse_appliance_availability(grid_html, date=None):
-    """
-    Parse the appliance availability table and return a dict of slot -> bool (True=available, False=unavailable).
-    Args:
-        grid_html (str): HTML string of the gridAvail table
-        date (str): booking date (optional)
-    Returns:
-        dict: { 'date': date, 'appliance_availability': { slot: bool, ... } }
-    """
-    from bs4 import BeautifulSoup, Tag
+def _find_appliance_name(appliance_row: Optional[Tag]) -> str:
+    """Extract appliance name from row."""
+    if not appliance_row:
+        return "UNKNOWN"
+    
+    for td in safe_find_all(appliance_row, "td", recursive=False):
+        if td.has_attr("colspan") and td["colspan"] == "5" and td.get_text(strip=True):
+            return td.get_text(strip=True)
+    
+    return "UNKNOWN"
 
+
+def _find_appliance_table(soup: BeautifulSoup) -> Optional[Tag]:
+    """Find the appliance table in HTML content."""
+    tables = safe_find_all(soup, "table")
+    for table_idx, table in enumerate(tables):
+        for idx, tr in enumerate(safe_find_all(table, "tr", recursive=False)):
+            tds = safe_find_all(tr, "td", recursive=False)
+            if tds and tds[0].get_text(strip=True).lower() == "appliances" and tds[0].get(
+                "colspan"
+            ) == "5":
+                log_debug(
+                    "appliance", f"Found 'Appliances' header in table {table_idx}, row {idx}."
+                )
+                return table
+    return None
+
+
+def _find_time_header_row(table: Tag) -> Optional[Tag]:
+    """Find time header row in appliance table."""
+    trs = safe_find_all(table, "tr", recursive=False)
+    for i in range(len(trs)):
+        tds = safe_find_all(trs[i], "td", recursive=False)
+        if tds and tds[0].get_text(strip=True).lower() == "appliances" and tds[0].get(
+            "colspan"
+        ) == "5":
+            if i + 1 < len(trs):
+                log_debug("appliance", f"Found time header row at index {i+1}.")
+                return trs[i + 1]
+    return None
+
+
+def _extract_appliance_time_slots(time_header_row: Tag) -> list[str]:
+    """Extract time slots from appliance header row."""
+    import re
+    from typing import cast
+
+    time_slots = []
+    for cell in safe_find_all(time_header_row, "td")[1:]:
+        title = cast(str, cell.get("title", "")) or ""
+        match = re.search(r"\((\d{4}) - \d{4}\)", title)
+        if match:
+            time_slots.append(match.group(1))
+        else:
+            time_slots.append("")
+    return time_slots
+
+
+def _normalize_date(date: Optional[str]) -> str:
+    """Normalize date to dd/mm/yyyy format."""
+    if not date:
+        return ""
+        
+    try:
+        date_obj = dt.strptime(str(date), "%d/%m/%Y")
+        return date_obj.strftime("%d/%m/%Y")
+    except ValueError:
+        return str(date)
+
+
+def _parse_skills_row(
+    row: Tag, time_slots: list[str], date_prefix: str
+) -> dict[str, int]:
+    """Parse a single skill row."""
+    cells = safe_find_all(row, "td")
+    avail_data = {}
+
+    if len(cells) > len(time_slots):
+        for i, time_slot in enumerate(time_slots):
+            slot_key = f"{date_prefix} {time_slot}"
+            cell_idx = i + 1
+            if cell_idx < len(cells):
+                avail_text = cells[cell_idx].get_text(strip=True)
+                try:
+                    avail_count = int(avail_text) if avail_text.isdigit() else 0
+                    avail_data[slot_key] = avail_count
+                except ValueError:
+                    avail_data[slot_key] = 0
+
+    return avail_data
+
+
+def _find_skills_table(soup: BeautifulSoup) -> Optional[tuple[Tag, int]]:
+    """Find skills/rules table and header row index."""
+    for table in safe_find_all(soup, "table"):
+        for i, row in enumerate(safe_find_all(table, "tr")):
+            cells = safe_find_all(row, "td")
+            if cells and cells[0].get_text(strip=True).lower() == "rules":
+                return table, i
+    return None
+
+
+def _extract_skills_time_slots(header_row: Optional[Tag]) -> list[str]:
+    """Extract time slots from skills table header."""
+    time_slots = []
+    if header_row:
+        header_cells = safe_find_all(header_row, "td")[1:]  # Skip first cell
+        for cell in header_cells:
+            time_text = cell.get_text(strip=True)
+            if time_text.isdigit() and len(time_text) == 4:
+                time_slots.append(time_text)
+    return time_slots
+
+
+def parse_skills_table(
+    grid_html: str, date: Optional[str] = None
+) -> Dict[str, Dict[str, Any]]:
+    """Parse skills/rules table for BA, LGV, Total Crew counts."""
+    log_debug("skills", "Parsing skills/rules table...")
+    soup = BeautifulSoup(grid_html, "html.parser")
+
+    skills_result = _find_skills_table(soup)
+    if not skills_result:
+        log_debug("skills", "No skills/rules table found")
+        return {}
+
+    skills_table, header_idx = skills_result
+    rows = safe_find_all(skills_table, "tr")
+    header_row = rows[header_idx + 1] if header_idx + 1 < len(rows) else None
+
+    time_slots = _extract_skills_time_slots(header_row)
+    date_prefix = _normalize_date(date)
+    skills_data = {}
+
+    for row in rows:
+        cells = safe_find_all(row, "td")
+        if len(cells) < 2:
+            continue
+
+        skill_name = cells[0].get_text(strip=True)
+        if skill_name in ["BA", "LGV", "Total Crew", "MGR"]:
+            skills_data[skill_name] = _parse_skills_row(
+                row, time_slots, date_prefix
+            )
+
+    log_debug("skills", f"Parsed skills data: {skills_data}")
+    return {"skills_availability": skills_data}
+
+
+def _find_p22p6_row(table: Tag) -> Optional[Tag]:
+    """Find P22P6 row in appliance table."""
+    for tr_idx, tr in enumerate(safe_find_all(table, "tr", recursive=False)):
+        tds = safe_find_all(tr, "td", recursive=False)
+        if tds and tds[0].get_text(strip=True) == "P22P6" and tds[0].get(
+            "colspan"
+        ) == "5":
+            log_debug("appliance", f"Found P22P6 row at index {tr_idx}.")
+            return tr
+    return None
+
+
+def _parse_appliance_availability_data(
+    appliance_row: Optional[Tag], time_slots: List[str], date_prefix: str
+) -> Dict[str, bool]:
+    """Parse availability data from appliance row."""
+    if not appliance_row:
+        return {f"{date_prefix} {slot}": False for slot in time_slots}
+
+    tds = safe_find_all(appliance_row, "td", recursive=False)
+    avail_cells = tds[1:]
+    return _parse_availability_cells(
+        avail_cells, time_slots, date_prefix, entity_type="appliance"
+    )
+
+
+def parse_appliance_availability(
+    grid_html: str, date: Optional[str] = None
+) -> Dict[str, Dict[str, Any]]:
+    """Parse appliance availability."""
     log_debug("appliance", "Parsing appliance availability...")
     soup = BeautifulSoup(grid_html, "html.parser")
-    tables = [t for t in soup.find_all("table") if isinstance(t, Tag)]
-    log_debug("appliance", f"Found {len(tables)} tables.")
-    appliance_table = None
-    for table_idx, table in enumerate(tables):
-        trs = [
-            tr for tr in table.find_all("tr", recursive=False) if isinstance(tr, Tag)
-        ]
-        for idx, tr in enumerate(trs):
-            tds = [
-                td for td in tr.find_all("td", recursive=False) if isinstance(td, Tag)
-            ]
-            if (
-                tds
-                and tds[0].get_text(strip=True).lower() == "appliances"
-                and tds[0].get("colspan") == "5"
-            ):
-                log_debug(
-                    "appliance",
-                    f"Found 'Appliances' header in table {table_idx}, row {idx}.",
-                )
-                appliance_table = table
-                break
-        if appliance_table:
-            break
+    appliance_table = _find_appliance_table(soup)
     if not appliance_table:
         log_debug("appliance", "No appliance table found.")
         return {}
-    trs = [
-        tr
-        for tr in appliance_table.find_all("tr", recursive=False)
-        if isinstance(tr, Tag)
-    ]
-    time_header_row = None
-    for i in range(len(trs)):
-        tds = [
-            td for td in trs[i].find_all("td", recursive=False) if isinstance(td, Tag)
-        ]
-        if (
-            tds
-            and tds[0].get_text(strip=True).lower() == "appliances"
-            and tds[0].get("colspan") == "5"
-        ):
-            if i + 1 < len(trs):
-                time_header_row = trs[i + 1]
-                log_debug("appliance", f"Found time header row at index {i+1}.")
-            break
+
+    time_header_row = _find_time_header_row(appliance_table)
     if not time_header_row:
         log_debug("appliance", "No time header row found after 'Appliances' header.")
         return {}
-    time_header_cells = [
-        cell for cell in time_header_row.find_all("td") if isinstance(cell, Tag)
-    ]
-    # Extract slot times from the title attribute, e.g., 'P22P6 (0000 - 0015) Available'
-    import re
 
-    time_slots = []
-    for cell in time_header_cells[1:]:
-        title = cell.get("title")
-        if not isinstance(title, str):
-            title = ""
-        match = re.search(r"\((\d{4}) - \d{4}\)", title)
-        if match:
-            slot_time = match.group(1)
-            time_slots.append(slot_time)
-        else:
-            time_slots.append("")
-    appliance_row = None
-    for tr_idx, tr in enumerate(trs):
-        tds = [td for td in tr.find_all("td", recursive=False) if isinstance(td, Tag)]
-        if (
-            tds
-            and tds[0].get_text(strip=True) == "P22P6"
-            and tds[0].get("colspan") == "5"
-        ):
-            log_debug("appliance", f"Found P22P6 row at index {tr_idx}.")
-            appliance_row = tr
-            break
+    time_slots = _extract_appliance_time_slots(time_header_row)
+    appliance_row = _find_p22p6_row(appliance_table)
     date_prefix = _normalize_date(date)
-    availability = {}
-    if not appliance_row:
-        for slot in time_slots:
-            slot_key = f"{date_prefix} {slot}"
-            availability[slot_key] = False
-    else:
-        tds = [
-            td
-            for td in appliance_row.find_all("td", recursive=False)
-            if isinstance(td, Tag)
-        ]
-        # The slot cells start after the first <td colspan=5>
-        avail_cells = tds[1:]
-        availability = _parse_availability_cells(
-            avail_cells, time_slots, date_prefix, entity_type="appliance"
-        )
-
-    result = {
-        "availability": availability,
-    }
-    # Extract appliance name from the row
-    appliance_name = None
-    from bs4 import Tag
-
-    if appliance_row:
-        tds = [
-            td
-            for td in appliance_row.find_all("td", recursive=False)
-            if isinstance(td, Tag)
-        ]
-        for td in tds:
-            if (
-                td.has_attr("colspan")
-                and td["colspan"] == "5"
-                and td.get_text(strip=True)
-            ):
-                appliance_name = td.get_text(strip=True)
-                break
-    if not appliance_name:
-        appliance_name = "UNKNOWN"
-    # Always wrap in dict keyed by appliance name
-    return {appliance_name: result}
+    
+    availability = _parse_appliance_availability_data(appliance_row, time_slots, date_prefix)
+    appliance_name = _find_appliance_name(appliance_row)
+    
+    return {appliance_name: {"availability": availability}}
 
 
-def aggregate_crew_availability(daily_crew_lists):
-    """
-    Aggregate crew availability across multiple days, calculate next_available, next_available_until, available_now, available_for.
-    Args:
-        daily_crew_lists: list of lists of crew dicts (from parse_grid_html)
-    Returns:
-        crew_list: list of merged crew dicts with status fields
-    """
-    from datetime import datetime as dt
-
+def aggregate_crew_availability(daily_crew_lists: List[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    """Aggregate crew availability across multiple days."""
     crew_dict = {}
-    from logging_config import get_logger
+    log_debug("crew", f"Aggregating crew availability from {len(daily_crew_lists)} daily lists.")
 
-    logger = get_logger()
-    logger.debug(
-        f"Aggregating crew availability from {len(daily_crew_lists)} daily lists."
-    )
+    # Merge all crew data
     for crew_list in daily_crew_lists:
         for crew in crew_list:
             name = crew["name"]
@@ -422,8 +477,11 @@ def aggregate_crew_availability(daily_crew_lists):
             for slot, avail in crew["availability"].items():
                 crew_dict[name]["availability"][slot] = avail
                 crew_dict[name]["_all_slots"].append((slot, avail))
+
+    # Calculate summaries
     now = dt.now()
-    logger.debug(f"Aggregated into {len(crew_dict)} unique crew members.")
+    log_debug("crew", f"Aggregated into {len(crew_dict)} unique crew members.")
+
     for crew in crew_dict.values():
         slot_tuples = []
         for slot, avail in crew["_all_slots"]:
@@ -436,101 +494,79 @@ def aggregate_crew_availability(daily_crew_lists):
 
         summary = _calculate_availability_summary(slot_tuples, now)
         crew.update(summary)
-        logger.debug(
+        log_debug(
+            "crew",
             f"Calculated summary for {crew['name']}: available_now={summary['available_now']}, next_available={summary['next_available']}"
         )
 
         del crew["_all_slots"]
+
     return list(crew_dict.values())
 
 
-# parse_grid.py: provides parse_grid_html(grid_html, date=None)
-
-
-def parse_grid_html(grid_html, date=None):  # pylint: disable=too-complex
-    """
-    Parse the grid HTML and return structured crew and appliance availability data.
-    Args:
-        grid_html (str): HTML string of the gridAvail table
-        date (str): booking date (optional)
-    Returns:
-        dict: { 'date': date, 'crew_availability': [...], 'appliance_availability': {...} }
-    """
-
+def parse_grid_html(grid_html: str, date: Optional[str] = None) -> GridResult:
+    """Parse grid HTML into structured crew/appliance availability data."""
     table, header_row = _get_table_and_header(grid_html)
-    crew_result = {"date": date, "crew_availability": []}
+    
+    result: GridResult = {
+        "date": date,
+        "crew_availability": [],
+        "appliance_availability": {},
+        "skills_data": {}
+    }
+    
     if table and header_row:
         time_slots = _extract_time_slots(header_row)
         crew_result = _extract_crew_availability(date, table, time_slots)
-        crew_result["date"] = date
-    appliance_result = parse_appliance_availability(grid_html, date)
-    merged = {"date": date}
-    merged["crew_availability"] = crew_result.get("crew_availability", [])
-    merged["appliance_availability"] = appliance_result
-    return merged
+        result["crew_availability"] = crew_result.get("crew_availability", [])
+        
+    result["appliance_availability"] = parse_appliance_availability(grid_html, date)
+    result["skills_data"] = parse_skills_table(grid_html, date)
+    
+    return result
 
 
-def _is_crew_available_in_cell(cell):
-    """
-    Determine if a crew member is available based on cell content and styling.
-    Returns True if available, False if unavailable.
-    """
-    # Handle None input
+def _is_crew_available_in_cell(cell: Optional[Tag]) -> bool:
+    """Check if crew member is available based on cell content."""
     if cell is None:
         return False
 
     style = cell.get("style", "")
     cell_text = cell.get_text(strip=True)
 
-    # Check for specific unavailable reason codes
+    # Check unavailable codes
     if cell_text == "O":  # Off
         return False
-    elif cell_text == "W":  # Working (often means unavailable for additional duties)
+    elif cell_text == "W":  # Working
         return False
-    elif cell_text == "F":  # Fire call (unavailable for additional duties)
+    elif cell_text == "F":  # Fire call
         return False
-    elif cell_text in ["S", "SL", "AL", "H"]:  # Sick, Sick Leave, Annual Leave, Holiday
+    elif cell_text in ["S", "SL", "AL", "H"]:  # Leave types
         return False
-    elif cell_text in [
-        "T",
-        "TR",
-        "C",
-    ]:  # Training, Course - usually unavailable for ops
+    elif cell_text in ["T", "TR", "C"]:  # Training
         return False
     elif isinstance(style, str) and "background-color" in style.lower():
-        # Background color present - check if it's a specific unavailable state
         style_str = style.replace(" ", "").lower()
-        # Red/pink backgrounds typically indicate unavailable
-        if any(
-            color in style_str for color in ["#ff0000", "#ff6666", "#ffcccc", "red"]
-        ):
+        # Unavailable colors
+        if any(color in style_str for color in ["#ff0000", "#ff6666", "#ffcccc", "red"]):
             return False
-        # Gray backgrounds might indicate off/unavailable
-        elif any(
-            color in style_str for color in ["#cccccc", "#999999", "gray", "grey"]
-        ):
+        elif any(color in style_str for color in ["#cccccc", "#999999", "gray", "grey"]):
             return False
 
-    return True  # Default to available
+    return True
 
 
-def _parse_availability_cells(avail_cells, time_slots, date_prefix, entity_type="crew"):
-    """
-    Parse availability cells for a crew or appliance row.
-    - For 'crew', availability is determined by specific unavailable states
-    - For 'appliance', availability is explicitly marked by a green background.
-    """
+def _parse_availability_cells(avail_cells: List[Tag], time_slots: List[str], date_prefix: str, entity_type: str = "crew") -> Dict[str, bool]:
+    """Parse availability cells for crew/appliance row."""
     availability = {}
     for i, cell in enumerate(avail_cells):
         slot = time_slots[i]
         slot_key = f"{date_prefix} {slot}"
 
-        is_available = False  # Default to not available
-
+        is_available = False
         if entity_type == "crew":
             is_available = _is_crew_available_in_cell(cell)
         elif entity_type == "appliance":
-            # For appliances, a slot is available if it has the specific green background color.
             style = cell.get("style", "")
             if isinstance(style, str):
                 style_str = style.replace(" ", "").lower()
@@ -538,98 +574,7 @@ def _parse_availability_cells(avail_cells, time_slots, date_prefix, entity_type=
                     is_available = True
 
         availability[slot_key] = is_available
+
     return availability
 
 
-def parse_skills_table(grid_html, date=None):
-    """
-    Parse the skills/rules table to extract BA, LGV, Total Crew counts for validation.
-    Returns dict with skill availability data for cross-checking computed values.
-    """
-    from bs4 import BeautifulSoup, Tag
-
-    log_debug("skills", "Parsing skills/rules table...")
-    soup = BeautifulSoup(grid_html, "html.parser")
-    tables = [t for t in soup.find_all("table") if isinstance(t, Tag)]
-
-    skills_table = None
-    for table in tables:
-        # Look for table with "Rules" header
-        rows = table.find_all("tr")
-        for row in rows:
-            cells = row.find_all("td")
-            if cells and cells[0].get_text(strip=True).lower() == "rules":
-                skills_table = table
-                break
-        if skills_table:
-            break
-
-    if not skills_table:
-        log_debug("skills", "No skills/rules table found")
-        return {}
-
-    # Extract time slots from header
-    header_row = None
-    rows = skills_table.find_all("tr")
-    for i, row in enumerate(rows):
-        cells = row.find_all("td")
-        if cells and cells[0].get_text(strip=True).lower() == "rules":
-            if i + 1 < len(rows):
-                header_row = rows[i + 1]
-            break
-
-    if not header_row:
-        log_debug("skills", "No header row found after 'Rules'")
-        return {}
-
-    time_slots = []
-    header_cells = header_row.find_all("td")[1:]  # Skip first merged cell
-    for cell in header_cells:
-        time_text = cell.get_text(strip=True)
-        if time_text.isdigit() and len(time_text) == 4:
-            time_slots.append(time_text)
-
-    # Parse skill rows (BA, LGV, Total Crew, etc.)
-    skills_data = {}
-    date_prefix = _normalize_date(date)
-
-    for row in rows:
-        cells = row.find_all("td")
-        if len(cells) < 2:
-            continue
-
-        skill_name = cells[0].get_text(strip=True)
-        if skill_name in ["BA", "LGV", "Total Crew", "MGR"]:
-            # This should be a "Req"/"Avail" pair
-            if len(cells) > len(time_slots):
-                # Parse available numbers for each time slot
-                avail_data = {}
-                for i, time_slot in enumerate(time_slots):
-                    slot_key = f"{date_prefix} {time_slot}"
-                    # Cells might be offset - need to find the right index
-                    cell_idx = i + 1
-                    if cell_idx < len(cells):
-                        avail_text = cells[cell_idx].get_text(strip=True)
-                        try:
-                            avail_count = int(avail_text) if avail_text.isdigit() else 0
-                            avail_data[slot_key] = avail_count
-                        except ValueError:
-                            avail_data[slot_key] = 0
-
-                skills_data[skill_name] = avail_data
-
-    log_debug("skills", f"Parsed skills data: {skills_data}")
-    return {"skills_availability": skills_data}
-
-
-def _normalize_date(date):
-    """
-    Normalize date to dd/mm/yyyy format, or return as-is if not possible.
-    """
-    from datetime import datetime as dt
-
-    try:
-        date_obj = dt.strptime(date, "%d/%m/%Y")
-        return date_obj.strftime("%d/%m/%Y")
-    except Exception:
-        return date or ""
