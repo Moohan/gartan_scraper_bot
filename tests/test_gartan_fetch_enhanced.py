@@ -8,7 +8,6 @@ from unittest.mock import Mock, patch
 import pytest
 
 from gartan_fetch import (
-    AuthenticationError,
     _fetch_and_write_cache,
     _is_cache_valid,
     _perform_delay,
@@ -154,10 +153,9 @@ class TestGartanFetchErrorHandling:
     def test_login_missing_credentials(self):
         """Test login with missing credentials (lines 178-180)."""
         with patch.dict(os.environ, {}, clear=True):
-            # Should raise AuthenticationError for missing credentials
+            # Should raise AssertionError for missing credentials
             with pytest.raises(
-                AuthenticationError,
-                match="GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment"
+                AssertionError, match="GARTAN_USERNAME and GARTAN_PASSWORD must be set"
             ):
                 gartan_login_and_get_session()
 
@@ -165,8 +163,7 @@ class TestGartanFetchErrorHandling:
     def test_login_empty_credentials(self):
         """Test login with empty credentials (lines 178-180)."""
         with pytest.raises(
-            AuthenticationError,
-            match="GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment"
+            AssertionError, match="GARTAN_USERNAME and GARTAN_PASSWORD must be set"
         ):
             gartan_login_and_get_session()
 

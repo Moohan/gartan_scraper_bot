@@ -163,7 +163,7 @@ def _get_table_and_header(grid_html: str) -> tuple[Optional[Tag], Optional[Tag]]
     table = safe_find_one(soup, "table", attrs={"id": "gridAvail"})
     if not table:
         return None, None
-        
+
     for tr in safe_find_all(table, "tr", recursive=False):
         tr_class = tr.attrs.get("class", [])
         if isinstance(tr_class, list) and "gridheader" in tr_class:
@@ -259,11 +259,11 @@ def _find_appliance_name(appliance_row: Optional[Tag]) -> str:
     """Extract appliance name from row."""
     if not appliance_row:
         return "UNKNOWN"
-    
+
     for td in safe_find_all(appliance_row, "td", recursive=False):
         if td.has_attr("colspan") and td["colspan"] == "5" and td.get_text(strip=True):
             return td.get_text(strip=True)
-    
+
     return "UNKNOWN"
 
 
@@ -317,7 +317,7 @@ def _normalize_date(date: Optional[str]) -> str:
     """Normalize date to dd/mm/yyyy format."""
     if not date:
         return ""
-        
+
     try:
         date_obj = dt.strptime(str(date), "%d/%m/%Y")
         return date_obj.strftime("%d/%m/%Y")
@@ -449,10 +449,10 @@ def parse_appliance_availability(
     time_slots = _extract_appliance_time_slots(time_header_row)
     appliance_row = _find_p22p6_row(appliance_table)
     date_prefix = _normalize_date(date)
-    
+
     availability = _parse_appliance_availability_data(appliance_row, time_slots, date_prefix)
     appliance_name = _find_appliance_name(appliance_row)
-    
+
     return {appliance_name: {"availability": availability}}
 
 
@@ -507,22 +507,22 @@ def aggregate_crew_availability(daily_crew_lists: List[List[Dict[str, Any]]]) ->
 def parse_grid_html(grid_html: str, date: Optional[str] = None) -> GridResult:
     """Parse grid HTML into structured crew/appliance availability data."""
     table, header_row = _get_table_and_header(grid_html)
-    
+
     result: GridResult = {
         "date": date,
         "crew_availability": [],
         "appliance_availability": {},
         "skills_data": {}
     }
-    
+
     if table and header_row:
         time_slots = _extract_time_slots(header_row)
         crew_result = _extract_crew_availability(date, table, time_slots)
         result["crew_availability"] = crew_result.get("crew_availability", [])
-        
+
     result["appliance_availability"] = parse_appliance_availability(grid_html, date)
     result["skills_data"] = parse_skills_table(grid_html, date)
-    
+
     return result
 
 
@@ -576,5 +576,3 @@ def _parse_availability_cells(avail_cells: List[Tag], time_slots: List[str], dat
         availability[slot_key] = is_available
 
     return availability
-
-

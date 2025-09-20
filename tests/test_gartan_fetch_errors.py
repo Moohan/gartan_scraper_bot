@@ -164,7 +164,7 @@ class TestGartanFetchErrorHandling:
             get_response.content = b'<form></form>'
             get_response.url = 'https://gartan.test/main'
             get_response.text = 'Welcome'
-            
+
             mock_session.get.return_value = get_response
             mock_session.post.return_value = get_response
 
