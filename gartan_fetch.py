@@ -211,6 +211,11 @@ def _perform_delay(min_delay, max_delay, base):
 
 # (removed duplicate imports; consolidated at top)
 
+# Custom exceptions
+class AuthenticationError(Exception):
+    """Raised when authentication fails."""
+    pass
+
 # Load environment variables
 load_dotenv()
 
@@ -237,16 +242,20 @@ _session_timeout = 1800  # 30 minutes
 def gartan_login_and_get_session():
     """
     Get an authenticated session, reusing existing session if still valid.
-    Returns an authenticated requests.Session().
-    Raises AssertionError if credentials are missing.
+
+    Returns:
+        requests.Session: An authenticated session.
+
+    Raises:
+        AuthenticationError: If login fails due to missing/invalid credentials or other auth issues.
     """
     global _authenticated_session, _session_authenticated_time
     import time
 
     username, password = _get_credentials()
-    assert (
-        username and password
-    ), "GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment (not committed)"
+    if not username or not password:
+        log_debug("error", "Missing Gartan credentials in environment")
+        raise AuthenticationError("GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment (not committed)")
 
     current_time = time.time()
 
@@ -259,33 +268,33 @@ def gartan_login_and_get_session():
         log_debug("session", "Reusing existing authenticated session")
         return _authenticated_session
 
-    # Create new authenticated session
-    # Obtain a session; support both a manager object with get_session() or a plain Session
-    session_candidate = get_session_manager()
-    if hasattr(session_candidate, "get_session"):
-        try:
-            session = session_candidate.get_session()
-        except Exception:  # pragma: no cover - defensive
-            import requests
-
-            session = requests.Session()
-    else:
-        session = session_candidate
-
+    # Create new session
+    import requests
+    session = requests.Session()
     log_debug("session", "Creating new authenticated session")
 
-    form, resp = _get_login_form(session)
-    post_url = _get_login_post_url(form)
-    payload = _build_login_payload(form, username, password)
-    headers = _get_login_headers()
-    _post_login(session, post_url, payload, headers)
-    _get_data_page(session, headers)
+    try:
+        # Attempt login with retry limit
+        form, resp = _get_login_form(session)
+        post_url = _get_login_post_url(form)
+        payload = _build_login_payload(form, username, password)
+        headers = _get_login_headers()
 
-    # Cache the authenticated session
-    _authenticated_session = session
-    _session_authenticated_time = current_time
+        _post_login(session, post_url, payload, headers)
+        _get_data_page(session, headers)
 
-    return session
+        # Cache the authenticated session on success
+        _authenticated_session = session
+        _session_authenticated_time = current_time
+
+        return session
+
+    except AuthenticationError as e:
+        log_debug("error", f"Authentication failed: {str(e)}")
+        raise  # Re-raise auth errors to stop retries
+    except Exception as e:
+        log_debug("error", f"Unexpected error during login: {str(e)}")
+        raise AuthenticationError(f"Login failed due to unexpected error: {str(e)}")
 
 
 def _get_login_form(session):
@@ -367,23 +376,43 @@ def _get_login_headers():
 
 def _post_login(session, post_url, payload, headers):
     """
-    Perform the login POST request.
+    Perform the login POST request and verify success.
+    Raises AuthenticationError if login fails.
     """
     login_resp = session.post(post_url, data=payload, headers=headers)
     if login_resp.status_code != 200:
         log_debug("error", f"Login POST failed with status: {login_resp.status_code}")
+        raise AuthenticationError("Login request failed - incorrect credentials")
+
+    # Check for login failure indicators in response
+    if "Invalid User Name/Password" in login_resp.text or "unsuccessfulAttempts" in login_resp.text:
+        log_debug("error", "Login rejected - invalid credentials")
+        raise AuthenticationError("Invalid username or password")
 
 
 def _get_data_page(session, headers):
     """
     Retrieve the main data page after login to confirm authentication.
+
+    Raises:
+        AuthenticationError: If authentication check fails.
     """
-    data_resp = session.get(DATA_URL, headers=headers)
-    if data_resp.status_code != 200:
-        log_debug("error", f"Failed to retrieve data page: {data_resp.status_code}")
-        raise Exception(
-            f"[ERROR] Failed to retrieve data page: {data_resp.status_code}"
-        )
+    try:
+        data_resp = session.get(DATA_URL, headers=headers)
+        if data_resp.status_code != 200:
+            log_debug("error", f"Failed to retrieve data page: {data_resp.status_code}")
+            raise AuthenticationError(f"Access denied (HTTP {data_resp.status_code})")
+
+        # Check if we were redirected to login page or access denied
+        if "Login.aspx" in data_resp.url or "Access Denied" in data_resp.text:
+            log_debug("error", "Login verification failed - redirected to login page")
+            raise AuthenticationError("Login failed - session not authenticated")
+
+    except AuthenticationError:
+        raise
+    except Exception as e:
+        log_debug("error", f"Unexpected error checking authentication: {str(e)}")
+        raise AuthenticationError(f"Failed to verify login: {str(e)}")
 
 
 def fetch_grid_html_for_date(session, booking_date):

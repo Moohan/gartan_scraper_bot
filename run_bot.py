@@ -17,6 +17,7 @@ from db_store import (
     insert_crew_details,
 )
 from gartan_fetch import (
+    AuthenticationError,
     fetch_and_cache_grid_html,
     gartan_login_and_get_session,
 )
@@ -63,7 +64,15 @@ if __name__ == "__main__":
         exit(1)
 
     today = datetime.now()
-    session = gartan_login_and_get_session()
+    try:
+        session = gartan_login_and_get_session()
+    except AuthenticationError as e:
+        logger.error(f"🔒 Authentication failed: {str(e)}")
+        logger.error("Please update your Gartan credentials and try again.")
+        exit(1)
+    except Exception as e:
+        logger.error(f"⚠️ Unexpected error during login: {str(e)}")
+        exit(1)
 
     # Calculate week-aligned date range for weekly availability tracking
     start_date, effective_max_days = get_week_aligned_date_range(args.max_days)
