@@ -255,7 +255,7 @@ def gartan_login_and_get_session():
     username, password = _get_credentials()
     if not username or not password:
         log_debug("error", "Missing Gartan credentials in environment")
-        raise AuthenticationError("GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment (not committed)")
+        raise AuthenticationError("GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment")
 
     current_time = time.time()
 
@@ -269,7 +269,6 @@ def gartan_login_and_get_session():
         return _authenticated_session
 
     # Create new session
-    import requests
     session = requests.Session()
     log_debug("session", "Creating new authenticated session")
 
