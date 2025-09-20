@@ -14,6 +14,7 @@ def test_gartan_login_and_get_session(monkeypatch):
             self.text = text
             self.content = text.encode("utf-8")
             self.status_code = 200
+            self.url = "https://grampianrds.firescotland.gov.uk/GartanAvailability/Availability/Schedule/AvailabilityMain1.aspx"
 
     class DummySession:
         def get(self, url, *args, **kwargs):
@@ -51,8 +52,8 @@ def test_gartan_login_failure(monkeypatch):
     try:
         importlib.reload(gartan_fetch)
         gartan_fetch.gartan_login_and_get_session()
-    except Exception as e:
-        assert "Failed to retrieve data page" in str(e)
+    except gartan_fetch.AuthenticationError as e:
+        assert "Login request failed - incorrect credentials" in str(e)
 
 
 def test_fetch_and_cache_grid_html_cache(monkeypatch, tmp_path):

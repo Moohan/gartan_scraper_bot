@@ -10,10 +10,10 @@ Core responsibilities:
 import os
 from datetime import datetime as dt
 
+import requests
 from bs4 import BeautifulSoup  # type: ignore
 from dotenv import load_dotenv  # type: ignore
 
-from connection_manager import get_session_manager
 from utils import log_debug
 
 
