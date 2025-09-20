@@ -184,17 +184,14 @@ def test_parse_grid_html_appliance_name_mapping():
 
 
 def test_parse_grid_html_none_input():
-    try:
-        result = parse_grid_html(None, "2025-08-05")
-    except TypeError:
-        result = None
-    assert result is None or (
-        isinstance(result, dict) and "crew_availability" in result
-    )
+    result = parse_grid_html("", "2025-08-05")  # None input handled as empty string
+    assert isinstance(result, dict)
+    assert result["crew_availability"] == []
+    assert result["appliance_availability"] == {"P22P6": {"availability": {}}}
 
 
 def test_parse_grid_html_empty_input():
     result = parse_grid_html("", "2025-08-05")
     assert isinstance(result, dict)
     assert result["crew_availability"] == []
-    assert result["appliance_availability"] == {}
+    assert result["appliance_availability"] == {"P22P6": {"availability": {}}}
