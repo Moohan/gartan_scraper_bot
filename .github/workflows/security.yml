@@ -46,7 +46,7 @@ jobs:
         pip-audit
         
     - name: Upload security reports
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       if: always()
       with:
         name: security-reports
@@ -61,7 +61,7 @@ jobs:
         pip list --outdated
         
     - name: Upload outdated packages report
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: outdated-packages
         path: outdated-packages.json
