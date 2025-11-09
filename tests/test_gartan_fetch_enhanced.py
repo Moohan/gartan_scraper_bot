@@ -166,7 +166,8 @@ class TestGartanFetchErrorHandling:
         with patch.dict(os.environ, {}, clear=True):
             # Should raise AuthenticationError for missing credentials
             with pytest.raises(
-                AuthenticationError, match="GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment"
+                AuthenticationError,
+                match="GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment",
             ):
                 gartan_login_and_get_session()
 
@@ -174,7 +175,8 @@ class TestGartanFetchErrorHandling:
     def test_login_empty_credentials(self):
         """Test login with empty credentials (lines 178-180)."""
         with pytest.raises(
-            AuthenticationError, match="GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment"
+            AuthenticationError,
+            match="GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment",
         ):
             gartan_login_and_get_session()
 
@@ -186,7 +188,10 @@ class TestGartanFetchErrorHandling:
         with patch("gartan_fetch._get_login_form") as mock_get_form:
             mock_get_form.side_effect = Exception("Network error")
 
-            with pytest.raises(AuthenticationError, match="Login failed due to unexpected error: Network error"):
+            with pytest.raises(
+                AuthenticationError,
+                match="Login failed due to unexpected error: Network error",
+            ):
                 gartan_login_and_get_session()
 
     @patch.dict(

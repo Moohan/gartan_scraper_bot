@@ -41,9 +41,11 @@ class TestGartanFetchErrorHandling:
         test_date = "26/08/2025"  # Use string format expected by the function
 
         # Mock file existence but read failure
-        with patch('gartan_fetch.os.path.exists', return_value=True), \
-             patch('gartan_fetch.open', mock_open()) as mock_file:
-            mock_file.side_effect = UnicodeDecodeError('utf-8', b'', 0, 1, 'invalid')
+        with (
+            patch("gartan_fetch.os.path.exists", return_value=True),
+            patch("gartan_fetch.open", mock_open()) as mock_file,
+        ):
+            mock_file.side_effect = UnicodeDecodeError("utf-8", b"", 0, 1, "invalid")
 
             # Should handle decode error gracefully
             session = requests.Session()
@@ -54,19 +56,23 @@ class TestGartanFetchErrorHandling:
         """Test fetch_and_cache_grid_html with file write error."""
         test_date = "26/08/2025"  # Use string format expected by the function
 
-        with patch('gartan_fetch.os.path.exists', return_value=False), \
-             patch('gartan_fetch.fetch_grid_html_for_date', return_value='<html></html>'), \
-             patch('gartan_fetch.open', mock_open()) as mock_file:
+        with (
+            patch("gartan_fetch.os.path.exists", return_value=False),
+            patch(
+                "gartan_fetch.fetch_grid_html_for_date", return_value="<html></html>"
+            ),
+            patch("gartan_fetch.open", mock_open()) as mock_file,
+        ):
             mock_file.side_effect = IOError("Write permission denied")
 
             # Should still return data even if caching fails
             session = requests.Session()
             result = fetch_and_cache_grid_html(session, test_date)
-            assert result == '<html></html>'
+            assert result == "<html></html>"
 
     def test_login_with_network_error(self):
         """Test gartan_login_and_get_session with network error."""
-        with patch('gartan_fetch.requests.Session') as mock_session_class:
+        with patch("gartan_fetch.requests.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_session_class.return_value = mock_session
             mock_session.get.side_effect = requests.ConnectionError("Network error")
@@ -78,13 +84,15 @@ class TestGartanFetchErrorHandling:
 
     def test_login_with_missing_form(self):
         """Test gartan_login_and_get_session with missing login form."""
-        with patch('gartan_fetch.requests.Session') as mock_session_class:
+        with patch("gartan_fetch.requests.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_session_class.return_value = mock_session
 
             # Mock response without login form
             mock_response = MagicMock()
-            mock_response.content = '<html><body>No form here</body></html>'.encode('utf-8')
+            mock_response.content = "<html><body>No form here</body></html>".encode(
+                "utf-8"
+            )
             mock_session.get.return_value = mock_response
 
             # Should raise exception for missing form
@@ -96,7 +104,7 @@ class TestGartanFetchErrorHandling:
         from bs4 import BeautifulSoup
 
         # Complex form with multiple input types
-        html = '''
+        html = """
         <form>
             <input type="text" name="username" value="">
             <input type="password" name="password" value="">
@@ -109,30 +117,30 @@ class TestGartanFetchErrorHandling:
                 <option value="admin" selected>Admin</option>
             </select>
         </form>
-        '''
+        """
 
-        soup = BeautifulSoup(html, 'html.parser')
-        form = soup.find('form')
+        soup = BeautifulSoup(html, "html.parser")
+        form = soup.find("form")
 
         payload = _build_login_payload(form, "testuser", "testpass")
 
         # Should include all form fields with appropriate values
-        assert payload['txt_userid'] == "testuser"
-        assert payload['txt_pword'] == "testpass"
-        assert 'token' in payload
-        assert 'remember' in payload
+        assert payload["txt_userid"] == "testuser"
+        assert payload["txt_pword"] == "testpass"
+        assert "token" in payload
+        assert "remember" in payload
         # These fields should be handled gracefully if present
-        if 'comments' in payload:
-            assert payload['comments'] == ""
-        if 'role' in payload:
-            assert payload['role'] == "admin"
+        if "comments" in payload:
+            assert payload["comments"] == ""
+        if "role" in payload:
+            assert payload["role"] == "admin"
 
     def test_build_login_payload_edge_cases(self):
         """Test _build_login_payload with edge cases."""
         from bs4 import BeautifulSoup
 
         # Form with missing attributes
-        html = '''
+        html = """
         <form>
             <input type="text" name="username">
             <input name="unnamed_field" value="test">
@@ -140,21 +148,21 @@ class TestGartanFetchErrorHandling:
             <select name="empty_select">
             </select>
         </form>
-        '''
+        """
 
-        soup = BeautifulSoup(html, 'html.parser')
-        form = soup.find('form')
+        soup = BeautifulSoup(html, "html.parser")
+        form = soup.find("form")
 
         payload = _build_login_payload(form, "user", "pass")
 
         # Should handle missing attributes gracefully
-        assert payload['txt_userid'] == "user"
-        assert 'txt_pword' in payload
+        assert payload["txt_userid"] == "user"
+        assert "txt_pword" in payload
         # Extra fields should be handled without error
-        if 'unnamed_field' in payload:
-            assert payload['unnamed_field'] == "test"
+        if "unnamed_field" in payload:
+            assert payload["unnamed_field"] == "test"
         # Input without name should be ignored
-        assert len([k for k in payload.keys() if k == 'unnamed_field']) <= 1
+        assert len([k for k in payload.keys() if k == "unnamed_field"]) <= 1
 
     def test_cache_file_corruption_handling(self):
         """Test handling of corrupted cache files."""
@@ -164,29 +172,38 @@ class TestGartanFetchErrorHandling:
         os.makedirs("_cache", exist_ok=True)
 
         # Mock corrupted file that exists but is unreadable
-        with patch('gartan_fetch.os.path.exists', return_value=True), \
-             patch('gartan_fetch.open', mock_open(read_data=b'\x80\x81\x82')) as mock_file:
-            mock_file.side_effect = UnicodeDecodeError('utf-8', b'\x80\x81\x82', 0, 1, 'invalid start byte')
+        with (
+            patch("gartan_fetch.os.path.exists", return_value=True),
+            patch(
+                "gartan_fetch.open", mock_open(read_data=b"\x80\x81\x82")
+            ) as mock_file,
+        ):
+            mock_file.side_effect = UnicodeDecodeError(
+                "utf-8", b"\x80\x81\x82", 0, 1, "invalid start byte"
+            )
 
-            with patch('gartan_fetch.fetch_grid_html_for_date', return_value='<html>fresh</html>'):
+            with patch(
+                "gartan_fetch.fetch_grid_html_for_date",
+                return_value="<html>fresh</html>",
+            ):
                 session = requests.Session()
                 result = fetch_and_cache_grid_html(session, test_date)
 
                 # Should fall back to fresh fetch
-                assert result == '<html>fresh</html>'
+                assert result == "<html>fresh</html>"
 
     def test_session_persistence_failure(self):
         """Test resilience to session persistence failure."""
-        with patch('requests.Session') as mock_session_class:
+        with patch("requests.Session") as mock_session_class:
             mock_session = MagicMock()
             mock_session_class.return_value = mock_session
 
             # Mock responses
             get_response = MagicMock()
             get_response.status_code = 200
-            get_response.content = b'<form></form>'
-            get_response.url = 'https://gartan.test/main'
-            get_response.text = 'Welcome'
+            get_response.content = b"<form></form>"
+            get_response.url = "https://gartan.test/main"
+            get_response.text = "Welcome"
 
             mock_session.get.return_value = get_response
             mock_session.post.return_value = get_response

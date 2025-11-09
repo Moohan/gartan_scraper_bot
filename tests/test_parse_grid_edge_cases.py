@@ -18,14 +18,14 @@ class TestParseGridEdgeCases:
     def test_parse_appliance_availability_malformed_html(self):
         """Test parsing with malformed HTML structure."""
         # HTML without proper table structure
-        malformed_html = '''
+        malformed_html = """
         <html>
             <body>
                 <div>Appliances</div>
                 <p>No table here</p>
             </body>
         </html>
-        '''
+        """
 
         result = parse_appliance_availability(malformed_html)
 
@@ -34,7 +34,7 @@ class TestParseGridEdgeCases:
 
     def test_parse_appliance_availability_missing_time_header(self):
         """Test parsing when time header row is missing."""
-        html_without_time_header = '''
+        html_without_time_header = """
         <html>
             <body>
                 <table>
@@ -43,7 +43,7 @@ class TestParseGridEdgeCases:
                 </table>
             </body>
         </html>
-        '''
+        """
 
         result = parse_appliance_availability(html_without_time_header)
 
@@ -52,7 +52,7 @@ class TestParseGridEdgeCases:
 
     def test_parse_skills_table_complex_structure(self):
         """Test parsing skills table with complex nested structure."""
-        complex_html = '''
+        complex_html = """
         <html>
             <body>
                 <table>
@@ -69,7 +69,7 @@ class TestParseGridEdgeCases:
                 </table>
             </body>
         </html>
-        '''
+        """
 
         result = parse_skills_table(complex_html)
 
@@ -80,7 +80,7 @@ class TestParseGridEdgeCases:
 
     def test_parse_grid_html_with_corrupted_data(self):
         """Test parsing grid with corrupted or incomplete data."""
-        corrupted_html = '''
+        corrupted_html = """
         <html>
             <body>
                 <!-- Incomplete crew table -->
@@ -93,30 +93,34 @@ class TestParseGridEdgeCases:
                     <tr><td>Appliances</td></tr>
                     <tr><td>P22P6</td>
                 <!-- Truncated HTML -->
-        '''
+        """
 
         test_date = dt(2025, 8, 26).strftime("%d/%m/%Y")
         result = parse_grid_html(corrupted_html, test_date)
 
         # Should handle corrupted HTML gracefully
         assert isinstance(result, dict)
-        assert 'crew_availability' in result
-        assert 'appliance_availability' in result
-        assert 'skills_data' in result
+        assert "crew_availability" in result
+        assert "appliance_availability" in result
+        assert "skills_data" in result
 
     def test_aggregate_crew_availability_overlapping_slots(self):
         """Test aggregation with complex overlapping time slots."""
-        crew_data = [[{
-            "name": "MCMAHON, JA",
-            "role": "FFC",
-            "availability": {
-                "26/08/2025 0000": True,
-                "26/08/2025 0015": True,
-                "26/08/2025 0030": False,
-                "26/08/2025 0045": True,
-                "26/08/2025 0100": True
-            }
-        }]]
+        crew_data = [
+            [
+                {
+                    "name": "MCMAHON, JA",
+                    "role": "FFC",
+                    "availability": {
+                        "26/08/2025 0000": True,
+                        "26/08/2025 0015": True,
+                        "26/08/2025 0030": False,
+                        "26/08/2025 0045": True,
+                        "26/08/2025 0100": True,
+                    },
+                }
+            ]
+        ]
 
         result = aggregate_crew_availability(crew_data)
 
@@ -129,16 +133,18 @@ class TestParseGridEdgeCases:
 
     def test_aggregate_appliance_availability_edge_times(self):
         """Test appliance aggregation with edge case times."""
-        appliance_data = [{
-            "P22P6": {
-                "appliance": "P22P6",
-                "availability": {
-                    "26/08/2025 2345": True,
-                    "26/08/2025 0000": True,
-                    "26/08/2025 0015": False
+        appliance_data = [
+            {
+                "P22P6": {
+                    "appliance": "P22P6",
+                    "availability": {
+                        "26/08/2025 2345": True,
+                        "26/08/2025 0000": True,
+                        "26/08/2025 0015": False,
+                    },
                 }
             }
-        }]
+        ]
 
         result = aggregate_appliance_availability(appliance_data)
 
@@ -150,7 +156,7 @@ class TestParseGridEdgeCases:
 
     def test_parse_skills_table_missing_columns(self):
         """Test parsing table with missing columns."""
-        html_missing_columns = '''
+        html_missing_columns = """
         <html>
             <body>
                 <table>
@@ -160,7 +166,7 @@ class TestParseGridEdgeCases:
                 </table>
             </body>
         </html>
-        '''
+        """
 
         result = parse_skills_table(html_missing_columns)
 
@@ -171,13 +177,13 @@ class TestParseGridEdgeCases:
 
     def test_parse_grid_html_empty_tables(self):
         """Test parsing with empty tables."""
-        empty_html = '''
+        empty_html = """
         <html>
             <body>
                 <table></table>
             </body>
         </html>
-        '''
+        """
 
         result = parse_grid_html(empty_html)
         # Empty tables should result in empty structures
@@ -191,7 +197,7 @@ class TestParseGridEdgeCases:
         """Test time slot parsing at day boundaries."""
         # Test HTML with slots spanning midnight
         test_date = dt(2025, 8, 26).strftime("%d/%m/%Y")
-        boundary_html = '''
+        boundary_html = """
         <html>
             <body>
                 <table>
@@ -208,7 +214,7 @@ class TestParseGridEdgeCases:
                 </table>
             </body>
         </html>
-        '''
+        """
 
         result = parse_appliance_availability(boundary_html, test_date)
 
@@ -218,7 +224,7 @@ class TestParseGridEdgeCases:
 
     def test_unicode_and_special_characters(self):
         """Test parsing with Unicode and special characters in names."""
-        unicode_html = '''
+        unicode_html = """
         <html>
             <body>
                 <table>
@@ -230,7 +236,7 @@ class TestParseGridEdgeCases:
                 </table>
             </body>
         </html>
-        '''
+        """
 
         result = parse_skills_table(unicode_html)
 
