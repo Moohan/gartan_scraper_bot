@@ -2,12 +2,14 @@
 """Enhanced tests for gartan_fetch.py error handling and edge cases."""
 
 import os
+import shutil
 import tempfile
 from unittest.mock import Mock, patch
 
 import pytest
 
 from gartan_fetch import (
+    AuthenticationError,
     _fetch_and_write_cache,
     _is_cache_valid,
     _perform_delay,
@@ -18,6 +20,15 @@ from gartan_fetch import (
 
 class TestGartanFetchErrorHandling:
     """Test error handling and edge cases in gartan_fetch.py"""
+
+    def setup_method(self):
+        """Set up test environment."""
+        os.makedirs("_cache", exist_ok=True)
+
+    def teardown_method(self):
+        """Clean up test environment."""
+        if os.path.exists("_cache"):
+            shutil.rmtree("_cache")
 
     def setup_method(self):
         """Set up test environment."""
@@ -153,9 +164,9 @@ class TestGartanFetchErrorHandling:
     def test_login_missing_credentials(self):
         """Test login with missing credentials (lines 178-180)."""
         with patch.dict(os.environ, {}, clear=True):
-            # Should raise AssertionError for missing credentials
+            # Should raise AuthenticationError for missing credentials
             with pytest.raises(
-                AssertionError, match="GARTAN_USERNAME and GARTAN_PASSWORD must be set"
+                AuthenticationError, match="GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment"
             ):
                 gartan_login_and_get_session()
 
@@ -163,7 +174,7 @@ class TestGartanFetchErrorHandling:
     def test_login_empty_credentials(self):
         """Test login with empty credentials (lines 178-180)."""
         with pytest.raises(
-            AssertionError, match="GARTAN_USERNAME and GARTAN_PASSWORD must be set"
+            AuthenticationError, match="GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment"
         ):
             gartan_login_and_get_session()
 
@@ -175,7 +186,7 @@ class TestGartanFetchErrorHandling:
         with patch("gartan_fetch._get_login_form") as mock_get_form:
             mock_get_form.side_effect = Exception("Network error")
 
-            with pytest.raises(Exception, match="Network error"):
+            with pytest.raises(AuthenticationError, match="Login failed due to unexpected error: Network error"):
                 gartan_login_and_get_session()
 
     @patch.dict(

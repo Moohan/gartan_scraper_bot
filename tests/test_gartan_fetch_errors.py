@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Tests for gartan_fetch error handling and edge cases."""
 
+import os
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 import requests
 
 from gartan_fetch import (
+    AuthenticationError,
     _build_login_payload,
+    _get_login_form,
     fetch_and_cache_grid_html,
     gartan_login_and_get_session,
 )
@@ -15,6 +18,23 @@ from gartan_fetch import (
 
 class TestGartanFetchErrorHandling:
     """Test error handling in gartan_fetch functions."""
+
+    def setUp(self):
+        """Set up test environment."""
+        self.test_cache_dir = "_cache"
+        os.makedirs(self.test_cache_dir, exist_ok=True)
+
+    def tearDown(self):
+        """Clean up test environment."""
+        if os.path.exists(self.test_cache_dir):
+            for f in os.listdir(self.test_cache_dir):
+                os.remove(os.path.join(self.test_cache_dir, f))
+            os.rmdir(self.test_cache_dir)
+
+    def setUp(self):
+        """Set up test environment."""
+        # Create _cache directory before tests
+        os.makedirs("_cache", exist_ok=True)
 
     def test_fetch_and_cache_file_read_error(self):
         """Test fetch_and_cache_grid_html with file read error."""
@@ -64,12 +84,12 @@ class TestGartanFetchErrorHandling:
 
             # Mock response without login form
             mock_response = MagicMock()
-            mock_response.text = '<html><body>No form here</body></html>'
+            mock_response.content = '<html><body>No form here</body></html>'.encode('utf-8')
             mock_session.get.return_value = mock_response
 
             # Should raise exception for missing form
-            with pytest.raises(Exception, match="Login form not found"):
-                gartan_login_and_get_session()
+            with pytest.raises(AuthenticationError, match=r"^Login form not found$"):
+                _get_login_form(mock_session)
 
     def test_build_login_payload_complex_form(self):
         """Test _build_login_payload with complex form structure."""
@@ -139,6 +159,9 @@ class TestGartanFetchErrorHandling:
     def test_cache_file_corruption_handling(self):
         """Test handling of corrupted cache files."""
         test_date = "26/08/2025"  # Use string format expected by the function
+
+        # Create _cache directory
+        os.makedirs("_cache", exist_ok=True)
 
         # Mock corrupted file that exists but is unreadable
         with patch('gartan_fetch.os.path.exists', return_value=True), \

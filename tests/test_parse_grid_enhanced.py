@@ -461,7 +461,7 @@ class TestParseSkillsTable:
         </table>
         """
         result = parse_skills_table(html, "2025-08-05")
-        assert result == {}
+        assert result == {"skills_availability": {}}
 
     def test_parse_skills_table_invalid_data(self):
         """Test parse_skills_table with invalid numeric data."""

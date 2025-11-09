@@ -56,6 +56,7 @@ class TestParseGridEdgeCases:
         <html>
             <body>
                 <table>
+                    <tr><td>Rules</td></tr>
                     <tr>
                         <td rowspan="2">MCMAHON, JA</td>
                         <td>TTR, LGV, BA</td>
@@ -194,7 +195,7 @@ class TestParseGridEdgeCases:
         <html>
             <body>
                 <table>
-                    <tr>
+                    <tr class="gridheader">
                         <td>Time Slots</td>
                         <td title="P22P6 (2345 - 0000) Available">23:45</td>
                         <td title="P22P6 (0000 - 0015) Available">00:00</td>

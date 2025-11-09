@@ -222,9 +222,7 @@ if __name__ == "__main__":
         )
 
         # Aggregate and store appliance availability in SQLite
-        appliance_agg = aggregate_appliance_availability(
-            daily_appliance_lists, crew_list_agg
-        )
+        appliance_agg = aggregate_appliance_availability(daily_appliance_lists)
         # Convert list of dicts to a single dict keyed by appliance name
         appliance_agg_dict = {
             item["appliance"]: item for item in appliance_agg if "appliance" in item
