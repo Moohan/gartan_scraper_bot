@@ -211,10 +211,13 @@ def _perform_delay(min_delay, max_delay, base):
 
 # (removed duplicate imports; consolidated at top)
 
+
 # Custom exceptions
 class AuthenticationError(Exception):
     """Raised when authentication fails."""
+
     pass
+
 
 # Load environment variables
 load_dotenv()
@@ -255,7 +258,9 @@ def gartan_login_and_get_session():
     username, password = _get_credentials()
     if not username or not password:
         log_debug("error", "Missing Gartan credentials in environment")
-        raise AssertionError("GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment (not committed)")
+        raise AssertionError(
+            "GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment (not committed)"
+        )
 
     current_time = time.time()
 
@@ -270,6 +275,7 @@ def gartan_login_and_get_session():
 
     # Create new session
     import requests
+
     session = requests.Session()
     log_debug("session", "Creating new authenticated session")
 
@@ -385,7 +391,10 @@ def _post_login(session, post_url, payload, headers):
         raise AuthenticationError("Login request failed - incorrect credentials")
 
     # Check for login failure indicators in response
-    if "Invalid User Name/Password" in login_resp.text or "unsuccessfulAttempts" in login_resp.text:
+    if (
+        "Invalid User Name/Password" in login_resp.text
+        or "unsuccessfulAttempts" in login_resp.text
+    ):
         log_debug("error", "Login rejected - invalid credentials")
         raise AuthenticationError("Invalid username or password")
 
