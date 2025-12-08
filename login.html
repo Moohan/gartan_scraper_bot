@@ -1,0 +1,126 @@
+<body class="login-page">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4 col-md-offset-4">
+                <div class="login-panel panel panel-default">
+                    <div class="panel-heading">
+                        <div class="login-logo">
+                            <img src="/GartanAvailability/Content/images/logo.png" alt="Gartan" class="img-responsive" />
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <form action="./Login.aspx" onsubmit="javascript:return WebForm_OnSubmit();" id="form1" method="post">
+                            <div class="aspNetHidden">
+                                <input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+                                <input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+                                <input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="Yc5crq3dPs7jcfuWJRzL/s2AGOh75a+nrr7wB8WbB4jeDFrq+z+t7LzC1LhGCsuoWQPgM/6Xk8d+g06iVwB/kX4a+23nFLm1hY+edLg+r9Qy6DftV/GfVpDk/AcoV/yY" />
+                            </div>
+
+                            <script type="text/javascript">
+                                //<![CDATA[
+                                var theForm = document.forms['form1'];
+                                if (!theForm) {
+                                    theForm = document.form1;
+                                }
+                                function __doPostBack(eventTarget, eventArgument) {
+                                    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+                                        theForm.__EVENTTARGET.value = eventTarget;
+                                        theForm.__EVENTARGUMENT.value = eventArgument;
+                                        theForm.submit();
+                                    }
+                                }
+                                //]]>
+                            </script>
+
+                            <script src="/GartanAvailability/WebResource.axd?d=pynGkmcFUV13He1Qd6_TZI2dJ2M7Y00dFzPj-23k_2eR8aJ4c-0c-3r9r-9c-2a-1b-3d-4e-5f-6g-7h-8i-9j-0k-1l-2m-3n-4o-5p-6q-7r-8s-9t-0u-1v-2w-3x-4y-5z&t=638472818980000000" type="text/javascript"></script>
+                            <script src="/GartanAvailability/WebResource.axd?d=x2d-x-y-z-1a-2b-3c-4d-5e-6f-7g-8h-9i-0j-1k-2l-3m-4n-5o-6p-7q-8r-9s-0t-1u-2v-3w-4x-5y-6z&t=638472818980000000" type="text/javascript"></script>
+                            <script type="text/javascript">
+                                //<![CDATA[
+                                function WebForm_OnSubmit() {
+                                    if (typeof(ValidatorOnSubmit) == "function" && ValidatorOnSubmit() == false) return false;
+                                    return true;
+                                }
+                                //]]>
+                            </script>
+
+                            <div class="aspNetHidden">
+                                <input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="CA0B0334" />
+                                <input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="2a-3b-4c-5d-6e-7f-8g-9h-0i-1j-2k-3l-4m-5n-6o-7p-8q-9r-0s-1t-2u-3v-4w-5x-6y-7z-8a-9b-0c-1d-2e-3f-4g-5h-6i-7j-8k-9l-0m-1n-2o-3p-4q-5r-6s-7t-8u-9v-0w-1x-2y-3z-4a-5b-6c-7d-8e-9f-0g-1h-2i-3j-4k-5l-6m-7n-8o-9p-0q-1r-2s-3t-4u-5v-6w-7x-8y-9z" />
+                            </div>
+
+                            <fieldset>
+                                <div class="form-group">
+                                    <input name="txt_userid" type="text" id="txt_userid" class="form-control" placeholder="User ID" autofocus />
+                                </div>
+                                <div class="form-group">
+                                    <input name="txt_pword" type="password" id="txt_pword" class="form-control" placeholder="Password" />
+                                </div>
+                                <div class="form-group">
+                                    <span id="lbl_Error" class="text-danger"></span>
+                                </div>
+                                <input type="submit" name="btnLogin" value="Sign In" onclick="javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(&quot;btnLogin&quot;, &quot;&quot;, true, &quot;&quot;, &quot;&quot;, false, false))" id="btnLogin" class="btn btn-lg btn-primary btn-block" />
+                            </fieldset>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        //<![CDATA[
+        var Page_Validators =  new Array(document.getElementById("val_userid"), document.getElementById("val_pword"));
+        //]]>
+    </script>
+
+    <script type="text/javascript">
+        //<![CDATA[
+        var val_userid = document.all ? document.all["val_userid"] : document.getElementById("val_userid");
+        val_userid.controltovalidate = "txt_userid";
+        val_userid.errormessage = "User ID is a required field.";
+        val_userid.validationGroup = "";
+        val_userid.evaluationfunction = "RequiredFieldValidatorEvaluateIsValid";
+        val_userid.initialvalue = "";
+        var val_pword = document.all ? document.all["val_pword"] : document.getElementById("val_pword");
+        val_pword.controltovalidate = "txt_pword";
+        val_pword.errormessage = "Password is a required field.";
+        val_pword.validationGroup = "";
+        val_pword.evaluationfunction = "RequiredFieldValidatorEvaluateIsValid";
+        val_pword.initialvalue = "";
+        //]]>
+    </script>
+
+    <script type="text/javascript">
+        //<![CDATA[
+        var __enabledControlArray =  new Array('txt_userid', 'txt_pword', 'btnLogin');
+
+        function WebForm_OnSubmit() {
+            if (typeof(ValidatorOnSubmit) == "function" && ValidatorOnSubmit() == false) return false;
+            return true;
+        }
+
+        function WebForm_DoPostBackWithOptions(options) {
+            var validationResult = true;
+            if (options.validationGroup) {
+                if (typeof(Page_ClientValidate) == 'function') {
+                    validationResult = Page_ClientValidate(options.validationGroup);
+                }
+            }
+            if (validationResult) {
+                if ((typeof(options.actionUrl) != "undefined") && (options.actionUrl != null) && (options.actionUrl.length > 0)) {
+                    theForm.action = options.actionUrl;
+                }
+                if (options.trackFocus) {
+                    var lastFocus = theForm.elements["__LASTFOCUS"];
+                    if ((typeof(lastFocus) != "undefined") && (lastFocus != null)) {
+                        lastFocus.value = options.eventTarget;
+                    }
+                }
+                if ((typeof(options.clientSubmit) != "undefined") && (options.clientSubmit)) {
+                    __doPostBack(options.eventTarget, options.eventArgument);
+                }
+            }
+        }
+        //]]>
+    </script>
+</body>
