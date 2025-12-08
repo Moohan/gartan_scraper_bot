@@ -9,19 +9,15 @@ class Config:
     def __init__(self):
         self.log_level = "DEBUG"
         # Use container path if running in container, local path otherwise
-        if os.path.exists("/app"):
-            self.db_path = "/app/data/gartan_availability.db"
-        else:
-            self.db_path = "gartan_availability.db"
+        in_container = os.path.exists("/app") and "PYTEST_CURRENT_TEST" not in os.environ
+
+        self.db_path = "/app/data/gartan_availability.db" if in_container else "gartan_availability.db"
         self.cache_dir = "_cache"
         self.max_cache_minutes = 60 * 24 * 7  # 1 week
         self.gartan_username = os.environ.get("GARTAN_USERNAME", "")
         self.gartan_password = os.environ.get("GARTAN_PASSWORD", "")
         # Use container path if running in container, local path otherwise
-        if os.path.exists("/app"):
-            self.log_file = "/app/logs/gartan_debug.log"
-        else:
-            self.log_file = "gartan_debug.log"
+        self.log_file = "/app/logs/gartan_debug.log" if in_container else "gartan_debug.log"
         self.max_log_size = 10 * 1024 * 1024  # 10MB
         self.max_workers = 4  # For concurrent processing
 
