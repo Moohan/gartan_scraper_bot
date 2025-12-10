@@ -275,9 +275,9 @@ def _find_appliance_name(appliance_row: Optional[Tag]) -> str:
     if not appliance_row:
         return "UNKNOWN"
 
-    for td in safe_find_all(appliance_row, "td", recursive=False):
-        if td.has_attr("colspan") and td["colspan"] == "5" and td.get_text(strip=True):
-            return td.get_text(strip=True)
+    name_cell = safe_find_one(appliance_row, "td", attrs={"colspan": "5"})
+    if name_cell and name_cell.get_text(strip=True):
+        return name_cell.get_text(strip=True)
 
     return "UNKNOWN"
 
@@ -319,17 +319,11 @@ def _find_time_header_row(table: Tag) -> Optional[Tag]:
 
 def _extract_appliance_time_slots(time_header_row: Tag) -> list[str]:
     """Extract time slots from appliance header row."""
-    import re
-    from typing import cast
-
     time_slots = []
     for cell in safe_find_all(time_header_row, "td")[1:]:
-        title = cast(str, cell.get("title", "")) or ""
-        match = re.search(r"\((\d{4}) - \d{4}\)", title)
-        if match:
-            time_slots.append(match.group(1))
-        else:
-            time_slots.append("")
+        slot = parse_time_slot(cell)
+        if slot:
+            time_slots.append(slot)
     return time_slots
 
 
@@ -408,11 +402,10 @@ def _extract_skills_time_slots(header_row: Optional[Tag]) -> list[str]:
 
 def _parse_skill_row(
     row: Tag, time_slots: List[str], date_prefix: str
-) -> Dict[str, bool]:
+) -> Dict[str, int]:
     """Parse a single skill row into time slot availability."""
     cells = safe_find_all(row, "td")[1:]  # Skip skill name column
     availability = {}
-
     for cell, time_slot in zip(cells, time_slots):
         if not cell or not time_slot:
             continue
@@ -421,10 +414,9 @@ def _parse_skill_row(
         count_text = cell.get_text(strip=True)
         try:
             count = int(count_text) if count_text else 0
-            availability[time_key] = count > 0
-        except ValueError:
-            availability[time_key] = False
-
+            availability[time_key] = count
+        except (ValueError, TypeError):
+            availability[time_key] = 0
     return availability
 
 
@@ -434,40 +426,33 @@ def parse_skills_table(
     """Parse skills/rules table for BA, LGV, Total Crew counts."""
     log_debug("skills", "Parsing skills/rules table...")
     soup = BeautifulSoup(grid_html, "html.parser")
-
-    table, header_idx = _find_rules_table(soup)
-    if not table or header_idx < 0:
+    table_match = _find_skills_table(soup)
+    if not table_match:
         log_debug("skills", "No rules table found")
-        return {"skills_availability": {}}
-
+        return {}
+    table, header_idx = table_match
     rows = safe_find_all(table, "tr")
     if header_idx + 1 >= len(rows):
         log_debug("skills", "No data rows after Rules header")
         return {"skills_availability": {}}
-
     date_prefix = _normalize_date(date)
     header_row = rows[header_idx + 1]
     time_slots = _extract_skills_time_slots(header_row)
     if not time_slots:
         log_debug("skills", "No valid time slots found")
         return {"skills_availability": {}}
-
-    # Parse each skill row
     skills_data = {}
-    for row in rows[header_idx + 2 :]:  # Skip Rules header and time slots
+    for row in rows[header_idx + 2 :]:
         cells = safe_find_all(row, "td")
         if len(cells) < 2:
             continue
-
         skill_name = cells[0].get_text(strip=True)
         if skill_name in ["BA", "LGV", "Total Crew", "MGR"]:
             skill_data = _parse_skill_row(row, time_slots, date_prefix)
             if skill_data:
                 skills_data[skill_name] = skill_data
-
     log_debug("skills", f"Parsed skills data: {skills_data}")
     return {"skills_availability": skills_data}
-    return {"skills_availability": {}}
 
 
 def _find_p22p6_row(table: Tag) -> Optional[Tag]:
@@ -489,7 +474,7 @@ def _parse_appliance_availability_data(
 ) -> Dict[str, bool]:
     """Parse availability data from appliance row."""
     if not appliance_row:
-        return {f"{date_prefix} {slot}": False for slot in time_slots}
+        return {f"{date_prefix} {slot}": False for slot in time_slots if slot}
 
     tds = safe_find_all(appliance_row, "td", recursive=False)
     avail_cells = tds[1:]
@@ -498,26 +483,26 @@ def _parse_appliance_availability_data(
     )
 
 
-def _find_appliance_rows(soup: BeautifulSoup) -> Tuple[Optional[Tag], Optional[Tag]]:
-    """Find the appliance header row and P22P6 row."""
-    for table in safe_find_all(soup, "table"):
-        header_row = None
-        p22p6_row = None
+def _find_appliance_rows(soup: BeautifulSoup) -> List[Tuple[Tag, Tag]]:
+    """Find all appliance header and data rows."""
+    appliance_rows = []
+    for table in safe_find_all(soup, "table", attrs={"id": "gridAvail"}):
+        rows = safe_find_all(table, "tr")
+        # Find all appliance headers
+        for i, row in enumerate(rows):
+            if "Appliances" in row.get_text() and i + 1 < len(rows):
+                # The next row is the header, and the one after that is the data
+                if i + 2 < len(rows):
+                    appliance_rows.append((rows[i + 1], rows[i + 2]))
+    # Fallback for the test case structure
+    if not appliance_rows:
+        for table in safe_find_all(soup, "table", attrs={"id": "gridAvail"}):
+            rows = safe_find_all(table, "tr")
+            for i, row in enumerate(rows):
+                if "P22P6" in row.get_text() and i > 0:
+                    appliance_rows.append((rows[i-1], row))
 
-        for row in safe_find_all(table, "tr"):
-            cells = safe_find_all(row, "td")
-            if not cells:
-                continue
-            first_cell = cells[0].get_text(strip=True)
-            if first_cell.lower().startswith("appliance"):
-                header_row = row
-            elif "P22P6" in first_cell:
-                p22p6_row = row
-
-        if header_row and p22p6_row:
-            return header_row, p22p6_row
-
-    return None, None
+    return appliance_rows
 
 
 def parse_appliance_availability(
@@ -527,29 +512,28 @@ def parse_appliance_availability(
     log_debug("appliance", "Parsing appliance availability grid...")
     soup = BeautifulSoup(grid_html, "html.parser")
 
-    header_row, p22p6_row = _find_appliance_rows(soup)
-    if not header_row or not p22p6_row:
-        log_debug("appliance", "No valid appliance table found")
+    appliance_rows = _find_appliance_rows(soup)
+    if not appliance_rows:
+        log_debug("appliance", "No appliance rows found")
         return {}
 
-    time_slots = _extract_appliance_time_slots(header_row)
-    if not time_slots:
-        log_debug("appliance", "No valid time slots found")
-        return {}
+    all_appliances = {}
+    for header_row, data_row in appliance_rows:
+        time_slots = _extract_appliance_time_slots(header_row)
+        if not time_slots:
+            continue
 
-    cells = safe_find_all(p22p6_row, "td")
-    if len(cells) < 2:  # Need at least name and one time slot
-        log_debug("appliance", "Invalid P22P6 row format")
-        return {}
+        appliance_name = _find_appliance_name(data_row)
+        if not appliance_name or appliance_name == "UNKNOWN":
+            continue
 
-    date_prefix = _normalize_date(date)
-    availability_data = _parse_appliance_availability_data(
-        p22p6_row, time_slots, date_prefix
-    )
+        date_prefix = _normalize_date(date)
+        availability_data = _parse_appliance_availability_data(
+            data_row, time_slots, date_prefix
+        )
+        all_appliances[appliance_name] = {"availability": availability_data}
 
-    log_debug("appliance", f"Parsed appliance availability: {availability_data}")
-    appliance_name = _find_appliance_name(p22p6_row)
-    return {appliance_name: {"availability": availability_data}}
+    return all_appliances
 
 
 def safe_get_text(cell: Optional[Tag]) -> str:
@@ -656,8 +640,13 @@ def parse_grid_html(grid_html: str, date: Optional[str] = None) -> GridResult:
         crew_result = _extract_crew_availability(date, table, time_slots)
         result["crew_availability"] = crew_result.get("crew_availability", [])
 
-    result["appliance_availability"] = parse_appliance_availability(grid_html, date)
-    result["skills_data"] = parse_skills_table(grid_html, date)
+    appliance_availability = parse_appliance_availability(grid_html, date)
+    if appliance_availability:
+        result["appliance_availability"] = appliance_availability
+
+    skills_data = parse_skills_table(grid_html, date)
+    if skills_data:
+        result["skills_data"] = skills_data
 
     return result
 

@@ -3,6 +3,7 @@
 import logging
 from logging.handlers import RotatingFileHandler
 from typing import Optional
+import os
 
 from config import config
 
@@ -18,6 +19,11 @@ def setup_logging(log_level: int = logging.DEBUG) -> None:
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
     console_formatter = logging.Formatter("%(levelname)s: %(message)s")
+
+    # Create the log directory if it doesn't exist
+    log_dir = os.path.dirname(config.log_file)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
     # File handler with rotation
     file_handler = RotatingFileHandler(

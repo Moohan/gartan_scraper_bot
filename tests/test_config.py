@@ -35,10 +35,15 @@ class TestConfig:
 
     def test_container_environment_paths(self):
         """Test paths when in container environment."""
-        # Mock /app directory existence
-        with patch("os.path.exists") as mock_exists:
-            mock_exists.return_value = True
+        # Create a copy of the environment without the pytest variable
+        # to simulate a non-test container environment.
+        test_environ = os.environ.copy()
+        test_environ.pop("PYTEST_CURRENT_TEST", None)
 
+        # Mock /app directory existence and the modified environment
+        with patch("os.path.exists", return_value=True), patch.dict(
+            os.environ, test_environ, clear=True
+        ):
             config = Config()
 
             assert config.db_path == "/app/data/gartan_availability.db"
