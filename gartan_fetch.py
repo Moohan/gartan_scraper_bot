@@ -280,7 +280,7 @@ def gartan_login_and_get_session():
     log_debug("session", "Creating new authenticated session")
 
     # Attempt login with retry limit
-    form, resp = _get_login_form(session)
+    form, _ = _get_login_form(session)
     post_url = _get_login_post_url(form)
     payload = _build_login_payload(form, username, password)
     headers = _get_login_headers()
