@@ -1,9 +1,9 @@
 """Logging configuration for Gartan Scraper Bot."""
 
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from typing import Optional
-import os
 
 from config import config
 

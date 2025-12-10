@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Tests for parse_grid.py edge cases and error conditions."""
-import pytest
 from datetime import datetime as dt
+
+import pytest
 
 from parse_grid import (
     aggregate_appliance_availability,

@@ -500,7 +500,7 @@ def _find_appliance_rows(soup: BeautifulSoup) -> List[Tuple[Tag, Tag]]:
             rows = safe_find_all(table, "tr")
             for i, row in enumerate(rows):
                 if "P22P6" in row.get_text() and i > 0:
-                    appliance_rows.append((rows[i-1], row))
+                    appliance_rows.append((rows[i - 1], row))
 
     return appliance_rows
 

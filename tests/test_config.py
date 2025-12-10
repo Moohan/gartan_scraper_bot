@@ -41,8 +41,9 @@ class TestConfig:
         test_environ.pop("PYTEST_CURRENT_TEST", None)
 
         # Mock /app directory existence and the modified environment
-        with patch("os.path.exists", return_value=True), patch.dict(
-            os.environ, test_environ, clear=True
+        with (
+            patch("os.path.exists", return_value=True),
+            patch.dict(os.environ, test_environ, clear=True),
         ):
             config = Config()
 
