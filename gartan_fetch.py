@@ -222,10 +222,10 @@ class AuthenticationError(Exception):
 # Load environment variables
 load_dotenv()
 
-LOGIN_URL = (
-    "https://grampianrds.firescotland.gov.uk/GartanAvailability/Account/Login.aspx"
-)
-DATA_URL = "https://grampianrds.firescotland.gov.uk/GartanAvailability/Availability/Schedule/AvailabilityMain1.aspx?UseDefaultStation=1"
+BASE_URL = "https://scottishfrs-availability.gartantech.com/"
+LOGIN_URL = f"{BASE_URL}Account/Login.aspx"
+DATA_URL = f"{BASE_URL}Availability/Schedule/AvailabilityMain1.aspx?UseDefaultStation=1"
+SCHEDULE_URL = f"{BASE_URL}Availability/Schedule/AvailabilityMain1.aspx/GetSchedule"
 
 
 def _get_credentials():
@@ -279,28 +279,20 @@ def gartan_login_and_get_session():
     session = requests.Session()
     log_debug("session", "Creating new authenticated session")
 
-    try:
-        # Attempt login with retry limit
-        form, resp = _get_login_form(session)
-        post_url = _get_login_post_url(form)
-        payload = _build_login_payload(form, username, password)
-        headers = _get_login_headers()
+    # Attempt login with retry limit
+    form, _ = _get_login_form(session)
+    post_url = _get_login_post_url(form)
+    payload = _build_login_payload(form, username, password)
+    headers = _get_login_headers()
 
-        _post_login(session, post_url, payload, headers)
-        _get_data_page(session, headers)
+    _post_login(session, post_url, payload, headers)
+    _get_data_page(session, headers)
 
-        # Cache the authenticated session on success
-        _authenticated_session = session
-        _session_authenticated_time = current_time
+    # Cache the authenticated session on success
+    _authenticated_session = session
+    _session_authenticated_time = current_time
 
-        return session
-
-    except AuthenticationError as e:
-        log_debug("error", f"Authentication failed: {str(e)}")
-        raise  # Re-raise auth errors to stop retries
-    except Exception as e:
-        log_debug("error", f"Unexpected error during login: {str(e)}")
-        raise AuthenticationError(f"Login failed due to unexpected error: {str(e)}")
+    return session
 
 
 def _get_login_form(session):
@@ -309,7 +301,8 @@ def _get_login_form(session):
     Returns the form element and the response object.
     """
     resp = session.get(LOGIN_URL)
-    soup = BeautifulSoup(resp.content, "html.parser")
+    log_debug("session", f"Initial cookies: {session.cookies.get_dict()}")
+    soup = BeautifulSoup(resp.content, "lxml")
     form = soup.find("form")
     if not form:
         raise Exception("[ERROR] Login form not found in login page HTML.")
@@ -335,38 +328,17 @@ def _build_login_payload(form, username, password):
     """
     Build the payload dictionary for the login POST request.
     """
-    # TODO: Refactor to reduce complexity (pylint R0912/R0915)
-    # pylint: disable=too-many-branches,too-many-statements,too-complex
-    payload = {}
-    try:
-        input_tags = list(form.find_all("input"))
-    except Exception:
-        input_tags = [
-            el for el in form.descendants if getattr(el, "name", None) == "input"
-        ]
-    for input_tag in input_tags:
-        try:
-            name = input_tag.get("name") if hasattr(input_tag, "get") else None
-            if not name:
-                continue
-            value = input_tag.get("value", "") if hasattr(input_tag, "get") else ""
-            payload[name] = value
-        except Exception:
-            continue
-    # Overwrite with provided credentials
-    payload["txt_userid"] = username
-    payload["txt_pword"] = password
-    # Ensure login button is present
-    if "btnLogin" not in payload:
-        login_button_value = "Sign In"
-        for input_tag in input_tags:
-            try:
-                if hasattr(input_tag, "get") and input_tag.get("name") == "btnLogin":
-                    login_button_value = input_tag.get("value", "Sign In")
-                    break
-            except Exception:
-                continue
-        payload["btnLogin"] = login_button_value
+    soup = form  # The 'form' is already a BeautifulSoup object
+    payload = {
+        '__LASTFOCUS': '',
+        '__EVENTTARGET': '',
+        '__VIEWSTATE': soup.find('input', {'name': '__VIEWSTATE'})['value'],
+        '__VIEWSTATEGENERATOR': soup.find('input', {'name': '__VIEWSTATEGENERATOR'})['value'],
+        '__EVENTVALIDATION': soup.find('input', {'name': '__EVENTVALIDATION'})['value'],
+        'txt_userid': username,
+        'txt_pword': password,
+        'btnLogin': 'Sign In'
+    }
     return payload
 
 
@@ -376,18 +348,25 @@ def _get_login_headers():
     """
     return {
         "Referer": LOGIN_URL,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0",
+        "Content-Type": "application/x-www-form-urlencoded",
     }
 
+
+from urllib.parse import urlencode
 
 def _post_login(session, post_url, payload, headers):
     """
     Perform the login POST request and verify success.
     Raises AuthenticationError if login fails.
     """
-    login_resp = session.post(post_url, data=payload, headers=headers)
+    encoded_payload = urlencode(payload)
+    log_debug("session", f"Cookies before login POST: {session.cookies.get_dict()}")
+    login_resp = session.post(post_url, data=encoded_payload, headers=headers, allow_redirects=True)
+    log_debug("session", f"Cookies after login POST: {session.cookies.get_dict()}")
     if login_resp.status_code != 200:
         log_debug("error", f"Login POST failed with status: {login_resp.status_code}")
+        log_debug("error", f"Response content: {login_resp.text}")
         raise AuthenticationError("Login request failed - incorrect credentials")
 
     # Check for login failure indicators in response
@@ -429,7 +408,7 @@ def fetch_grid_html_for_date(session, booking_date):
     Given an authenticated session and a booking_date (str, dd/mm/yyyy), fetch the grid HTML for that date.
     Returns grid_html or None.
     """
-    schedule_url = "https://grampianrds.firescotland.gov.uk/GartanAvailability/Availability/Schedule/AvailabilityMain1.aspx/GetSchedule"
+    schedule_url = SCHEDULE_URL
     payload = _build_schedule_payload(booking_date)
     headers = _get_schedule_headers()
     return _post_schedule_request(session, schedule_url, payload, headers, booking_date)
