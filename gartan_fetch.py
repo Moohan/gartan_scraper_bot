@@ -330,14 +330,16 @@ def _build_login_payload(form, username, password):
     """
     soup = form  # The 'form' is already a BeautifulSoup object
     payload = {
-        '__LASTFOCUS': '',
-        '__EVENTTARGET': '',
-        '__VIEWSTATE': soup.find('input', {'name': '__VIEWSTATE'})['value'],
-        '__VIEWSTATEGENERATOR': soup.find('input', {'name': '__VIEWSTATEGENERATOR'})['value'],
-        '__EVENTVALIDATION': soup.find('input', {'name': '__EVENTVALIDATION'})['value'],
-        'txt_userid': username,
-        'txt_pword': password,
-        'btnLogin': 'Sign In'
+        "__LASTFOCUS": "",
+        "__EVENTTARGET": "",
+        "__VIEWSTATE": soup.find("input", {"name": "__VIEWSTATE"})["value"],
+        "__VIEWSTATEGENERATOR": soup.find("input", {"name": "__VIEWSTATEGENERATOR"})[
+            "value"
+        ],
+        "__EVENTVALIDATION": soup.find("input", {"name": "__EVENTVALIDATION"})["value"],
+        "txt_userid": username,
+        "txt_pword": password,
+        "btnLogin": "Sign In",
     }
     return payload
 
@@ -355,6 +357,7 @@ def _get_login_headers():
 
 from urllib.parse import urlencode
 
+
 def _post_login(session, post_url, payload, headers):
     """
     Perform the login POST request and verify success.
@@ -362,7 +365,9 @@ def _post_login(session, post_url, payload, headers):
     """
     encoded_payload = urlencode(payload)
     log_debug("session", f"Cookies before login POST: {session.cookies.get_dict()}")
-    login_resp = session.post(post_url, data=encoded_payload, headers=headers, allow_redirects=True)
+    login_resp = session.post(
+        post_url, data=encoded_payload, headers=headers, allow_redirects=True
+    )
     log_debug("session", f"Cookies after login POST: {session.cookies.get_dict()}")
     if login_resp.status_code != 200:
         log_debug("error", f"Login POST failed with status: {login_resp.status_code}")
