@@ -651,6 +651,48 @@ def parse_grid_html(grid_html: str, date: Optional[str] = None) -> GridResult:
     return result
 
 
+def parse_station_feed_html(html_content: str) -> Dict[str, Dict[str, Any]]:
+    """
+    Parses the HTML from the station feed to extract appliance availability.
+
+    Args:
+        html_content: The HTML content of the station feed page.
+
+    Returns:
+        A dictionary with appliance names as keys and their availability data.
+        Example:
+        {
+            "P22P6": {"availability": True},
+        }
+    """
+    soup = BeautifulSoup(html_content, "html.parser")
+    availability_data = {}
+
+    # This parsing is based on the specific structure of the ScheduleDisplay.aspx page.
+    # It looks for a table with a specific structure to find appliance status.
+    table = soup.find("table", {"id": "tblSchedule"})
+    if table and isinstance(table, Tag):
+        rows = safe_find_all(table, "tr")
+        for row in rows:
+            cells = safe_find_all(row, "td")
+            if len(cells) > 1:
+                appliance_name_tag = cells[0].find("span")
+                if appliance_name_tag:
+                    appliance_name = appliance_name_tag.get_text(strip=True)
+                    # The availability is indicated by the background color of the second cell.
+                    # Green indicates available, Red indicates unavailable.
+                    status_cell = cells[1]
+                    style = status_cell.get("style", "")
+                    if isinstance(style, str):
+                        style = style.lower()
+                        if "background-color:green" in style.replace(" ", ""):
+                            availability_data[appliance_name] = {"availability": True}
+                        elif "background-color:red" in style.replace(" ", ""):
+                            availability_data[appliance_name] = {"availability": False}
+
+    return availability_data
+
+
 def _is_crew_available_in_cell(cell: Optional[Tag]) -> bool:
     """Check if crew member is available based on cell content."""
     if cell is None:
