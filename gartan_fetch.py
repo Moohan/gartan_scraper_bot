@@ -226,6 +226,26 @@ BASE_URL = "https://scottishfrs-availability.gartantech.com/"
 LOGIN_URL = f"{BASE_URL}Account/Login.aspx"
 DATA_URL = f"{BASE_URL}Availability/Schedule/AvailabilityMain1.aspx?UseDefaultStation=1"
 SCHEDULE_URL = f"{BASE_URL}Availability/Schedule/AvailabilityMain1.aspx/GetSchedule"
+STATION_FEED_URL = f"{BASE_URL}ScheduleDisplay.aspx?BrigadeID=P22"
+
+
+def fetch_station_feed_html(session):
+    """
+    Fetches the HTML content of the station feed display.
+
+    Args:
+        session (requests.Session): An authenticated session.
+
+    Returns:
+        str: The HTML content of the page, or None if the request fails.
+    """
+    try:
+        response = session.get(STATION_FEED_URL)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        return response.text
+    except requests.exceptions.RequestException as e:
+        log_debug("error", f"Failed to fetch station feed: {e}")
+        return None
 
 
 def _get_credentials():

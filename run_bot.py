@@ -20,12 +20,18 @@ from gartan_fetch import (
     AuthenticationError,
     fetch_and_cache_grid_html,
     gartan_login_and_get_session,
+    fetch_station_feed_html,
 )
 from logging_config import get_logger, setup_logging
 from parse_grid import (
     aggregate_appliance_availability,
     aggregate_crew_availability,
     parse_grid_html,
+    parse_station_feed_html,
+)
+from station_feed_verification import (
+    setup_verification_logger,
+    compare_and_log_discrepancies,
 )
 from utils import get_week_aligned_date_range, log_debug
 
@@ -235,6 +241,20 @@ if __name__ == "__main__":
             "ok",
             f"Saved appliance availability for {len(appliance_agg)} appliances to gartan_availability.db",
         )
+
+        # Station feed verification
+        verification_logger = setup_verification_logger()
+        station_feed_html = fetch_station_feed_html(session)
+        if station_feed_html:
+            station_feed_data = parse_station_feed_html(station_feed_html)
+            if station_feed_data:
+                compare_and_log_discrepancies(
+                    station_feed_data, appliance_agg_dict, verification_logger
+                )
+            else:
+                logger.warning("Could not parse station feed data for verification.")
+        else:
+            logger.warning("Could not fetch station feed for verification.")
 
         undetermined = [
             crew["name"]
