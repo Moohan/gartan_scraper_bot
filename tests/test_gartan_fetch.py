@@ -1,3 +1,4 @@
+
 import importlib
 import os
 from unittest.mock import MagicMock, patch
@@ -5,7 +6,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import gartan_fetch
-from gartan_fetch import fetch_and_cache_grid_html
+from gartan_fetch import (
+    fetch_and_cache_grid_html,
+    _get_login_post_url,
+    _get_login_headers,
+    _get_schedule_headers,
+    _build_schedule_payload,
+)
 
 
 def test_gartan_login_and_get_session(monkeypatch):
@@ -287,3 +294,38 @@ def test_fetch_and_cache_grid_html_empty_html(tmp_path, monkeypatch):
         cache_mode="cache-preferred",
     )
     assert html == ""
+
+
+def test_get_login_post_url():
+    """Test that the login post URL is correct."""
+    from bs4 import BeautifulSoup
+
+    html = '<form action="/login"></form>'
+    soup = BeautifulSoup(html, "html.parser")
+    form = soup.find("form")
+    url = _get_login_post_url(form)
+    assert url == "https://scottishfrs-availability.gartantech.com/login"
+
+
+def test_get_login_headers():
+    """Test that the login headers are correct."""
+    headers = _get_login_headers()
+    assert "Referer" in headers
+    assert "User-Agent" in headers
+    assert "Content-Type" in headers
+
+
+def test_get_schedule_headers():
+    """Test that the schedule headers are correct."""
+    headers = _get_schedule_headers()
+    assert "Referer" in headers
+    assert "User-Agent" in headers
+    assert "Content-Type" in headers
+    assert "X-Requested-With" in headers
+
+
+def test_build_schedule_payload():
+    """Test that the schedule payload is correct."""
+    payload = _build_schedule_payload("01/01/2025")
+    assert payload["bookingDate"] == "01/01/2025"
+    assert payload["brigadeId"] == 47
