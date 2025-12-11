@@ -29,6 +29,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from flask import Flask, jsonify, render_template_string
 
 from config import config
+from fetch_station_display import fetch_station_display_html
+from parse_station_display import parse_station_display_html
 
 # Configure sqlite3 datetime adapters for Python 3.12+ compatibility
 sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
@@ -1273,6 +1275,24 @@ def get_appliance_available(appliance_name: str):
         return jsonify(result["available"])
     except Exception as e:
         logger.error(f"Error checking appliance {appliance_name} availability: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/station/now", methods=["GET"])
+def get_station_now():
+    """Get real-time station data."""
+    try:
+        html = fetch_station_display_html()
+        if not html:
+            return jsonify({"error": "Failed to fetch station display HTML"}), 500
+
+        data = parse_station_display_html(html)
+        if not data:
+            return jsonify({"error": "Failed to parse station display HTML"}), 500
+
+        return jsonify(data)
+    except Exception as e:
+        logger.error(f"Error getting real-time station data: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
 
