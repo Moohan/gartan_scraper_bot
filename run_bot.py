@@ -19,8 +19,8 @@ from db_store import (
 from gartan_fetch import (
     AuthenticationError,
     fetch_and_cache_grid_html,
-    gartan_login_and_get_session,
     fetch_station_feed_html,
+    gartan_login_and_get_session,
 )
 from logging_config import get_logger, setup_logging
 from parse_grid import (
@@ -30,8 +30,8 @@ from parse_grid import (
     parse_station_feed_html,
 )
 from station_feed_verification import (
-    setup_verification_logger,
     compare_and_log_discrepancies,
+    setup_verification_logger,
 )
 from utils import get_week_aligned_date_range, log_debug
 

@@ -1,4 +1,3 @@
-
 import importlib
 import os
 from unittest.mock import MagicMock, patch
@@ -7,11 +6,11 @@ import pytest
 
 import gartan_fetch
 from gartan_fetch import (
-    fetch_and_cache_grid_html,
-    _get_login_post_url,
-    _get_login_headers,
-    _get_schedule_headers,
     _build_schedule_payload,
+    _get_login_headers,
+    _get_login_post_url,
+    _get_schedule_headers,
+    fetch_and_cache_grid_html,
 )
 
 

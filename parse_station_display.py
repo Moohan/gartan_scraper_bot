@@ -1,10 +1,12 @@
 """
 Parses the HTML of the real-time station display page to extract crewing information.
 """
+
 import re
 from typing import Any, Dict, List, Optional
 
 from bs4 import BeautifulSoup, Tag
+
 from utils import log_debug
 
 
