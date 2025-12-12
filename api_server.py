@@ -23,6 +23,7 @@ Design notes:
 import logging
 import os
 import sqlite3
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -214,6 +215,97 @@ def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
         return {"error": "Internal server error"}
 
 
+def get_all_crew_availability_data() -> Dict[int, Dict[str, Any]]:
+    """Check availability for all crew members right now in a single query."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            now = datetime.now()
+            cursor.execute(
+                """
+                SELECT
+                    c.id,
+                    COUNT(ca.crew_id) > 0 as is_available
+                FROM
+                    crew c
+                LEFT JOIN
+                    crew_availability ca ON c.id = ca.crew_id
+                    AND datetime(ca.start_time) <= datetime(?)
+                    AND datetime(ca.end_time) > datetime(?)
+                    AND (julianday(ca.end_time) - julianday(ca.start_time)) <= 7.0
+                    AND date(ca.start_time) >= date('now', '-7 days')
+                GROUP BY
+                    c.id
+            """,
+                (now, now),
+            )
+            results = {}
+            for row in cursor.fetchall():
+                results[row["id"]] = {"available": bool(row["is_available"])}
+            return results
+    except Exception as e:
+        logger.error(f"Error checking all crew availability: {e}")
+        return {}
+
+
+def get_all_crew_duration_data() -> Dict[int, Dict[str, Any]]:
+    """Get the current availability duration for all crew members in a single query."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            now = datetime.now()
+            cursor.execute(
+                """
+                WITH RankedAvailability AS (
+                    SELECT
+                        crew_id,
+                        start_time,
+                        end_time,
+                        ROW_NUMBER() OVER(PARTITION BY crew_id ORDER BY start_time) as rn
+                    FROM crew_availability
+                    WHERE
+                        datetime(start_time) <= datetime(?)
+                        AND datetime(end_time) > datetime(?)
+                        AND (julianday(end_time) - julianday(start_time)) <= 7.0
+                        AND date(start_time) >= date('now', '-7 days')
+                )
+                SELECT
+                    crew_id,
+                    start_time,
+                    end_time
+                FROM RankedAvailability
+                WHERE rn = 1
+            """,
+                (now, now),
+            )
+
+            results = {}
+            for row in cursor.fetchall():
+                crew_id = row["crew_id"]
+                end_time = datetime.fromisoformat(row["end_time"])
+                duration_minutes = int((end_time - now).total_seconds() / 60)
+
+                # Format end time for display
+                end_time_str = end_time.strftime("%H:%M")
+                if end_time.date() == now.date():
+                    end_time_display = f"{end_time_str} today"
+                elif end_time.date() == (now + timedelta(days=1)).date():
+                    end_time_display = f"{end_time_str} tomorrow"
+                else:
+                    end_time_display = end_time.strftime("%H:%M on %d/%m")
+
+                results[crew_id] = {
+                    "duration": _format_duration_minutes_to_hours_string(
+                        max(0, duration_minutes)
+                    ),
+                    "end_time_display": end_time_display,
+                }
+            return results
+    except Exception as e:
+        logger.error(f"Error getting all crew duration: {e}")
+        return {}
+
+
 def get_week_boundaries() -> tuple[datetime, datetime]:
     """Get start (Monday 00:00) and end (Sunday 23:59:59) of current week."""
     now = datetime.now()
@@ -356,11 +448,14 @@ def check_p22p6_business_rules() -> Dict[str, Any]:
         # Get all crew data
         crew_data = get_crew_list_data()
 
+        # --- Performance Optimization: Fetch all availability data at once ---
+        all_availability_data = get_all_crew_availability_data()
+
         # Check availability for each crew member and build available crew list
         available_crew = []
         for crew in crew_data:
-            crew_availability = get_crew_available_data(crew["id"])
-            if crew_availability.get("available", False):
+            crew_id = crew["id"]
+            if all_availability_data.get(crew_id, {}).get("available", False):
                 available_crew.append(crew)
 
         # Count skills for available crew
@@ -690,18 +785,28 @@ def health_check():
 @app.route("/", methods=["GET"])
 def root():
     """Root endpoint - Visual dashboard of all API data"""
+    start_time_req = time.time()
     try:
         # Get all crew data
         crew_list = get_crew_list_data()
         current_time = datetime.now()
+
+        # --- Performance Optimization: Fetch all data in bulk ---
+        all_availability_data = get_all_crew_availability_data()
+        all_duration_data = get_all_crew_duration_data()
 
         # Collect all crew availability and duration data
         crew_data = []
         for crew in crew_list:
             if isinstance(crew, dict) and "id" in crew:
                 crew_id = crew["id"]
-                availability_data = get_crew_available_data(crew_id)
-                duration_data = get_crew_duration_data(crew_id)
+                # Use pre-fetched data
+                availability_data = all_availability_data.get(
+                    crew_id, {"available": False}
+                )
+                duration_data = all_duration_data.get(
+                    crew_id, {"duration": None, "end_time_display": None}
+                )
 
                 crew_info = {
                     "id": crew_id,
@@ -711,21 +816,9 @@ def root():
                     ),
                     "role": crew.get("role", "Unknown"),
                     "skills": crew.get("skills", "None"),
-                    "available": (
-                        availability_data.get("available", False)
-                        if "available" in availability_data
-                        else False
-                    ),
-                    "duration": (
-                        duration_data.get("duration")
-                        if "duration" in duration_data
-                        else None
-                    ),
-                    "end_time_display": (
-                        duration_data.get("end_time_display")
-                        if "end_time_display" in duration_data
-                        else None
-                    ),
+                    "available": availability_data.get("available", False),
+                    "duration": duration_data.get("duration"),
+                    "end_time_display": duration_data.get("end_time_display"),
                     "contract_hours": crew.get("contract_hours", "Unknown"),
                 }
                 crew_data.append(crew_info)
@@ -789,6 +882,11 @@ def root():
         business_rules_result = check_p22p6_business_rules()
         business_rules = business_rules_result.get("rules", {})
         all_rules_pass = business_rules_result.get("rules_pass", False)
+
+        # --- Performance Logging ---
+        end_time_req = time.time()
+        duration_ms = (end_time_req - start_time_req) * 1000
+        logger.info(f"Dashboard generated in {duration_ms:.2f} ms")
 
         html_template = """
 <!DOCTYPE html>
