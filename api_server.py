@@ -1309,6 +1309,14 @@ def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
 
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    return response
+
+
 if __name__ == "__main__":
     # Production configuration
     port = int(os.environ.get("PORT", 5000))
