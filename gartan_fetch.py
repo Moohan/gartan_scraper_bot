@@ -229,7 +229,7 @@ SCHEDULE_URL = f"{BASE_URL}Availability/Schedule/AvailabilityMain1.aspx/GetSched
 STATION_FEED_URL = f"{BASE_URL}ScheduleDisplay.aspx?BrigadeID=P22"
 
 
-def fetch_station_feed_html(session):
+def fetch_station_feed_html(session) -> str | None:
     """
     Fetches the HTML content of the station feed display.
 
