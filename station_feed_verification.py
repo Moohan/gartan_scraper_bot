@@ -12,7 +12,9 @@ def setup_verification_logger():
         logger.addHandler(handler)
     return logger
 
-def compare_and_log_discrepancies(station_feed_data, calculated_states, logger):
+def compare_and_log_discrepancies(
+    station_feed_data: dict, calculated_states: dict, logger: logging.Logger
+) -> None:
     """
     Compares station feed data with calculated states and logs discrepancies.
 
