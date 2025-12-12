@@ -1,11 +1,13 @@
 """
 Verifies the calculated schedule data against the real-time station display.
 """
+
 import json
 import logging
 from datetime import datetime
 
 import requests
+
 from api_server import get_crew_available_data, get_crew_list_data
 
 
@@ -53,9 +55,7 @@ def compare_data(real_time_data, calculated_data):
         logging.error("One of the data sources is unavailable for comparison.")
         return
 
-    real_time_crew = {
-        crew["name"] for crew in real_time_data["available_firefighters"]
-    }
+    real_time_crew = {crew["name"] for crew in real_time_data["available_firefighters"]}
     calculated_crew = {crew["name"] for crew in calculated_data}
 
     discrepancies = []

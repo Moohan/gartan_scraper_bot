@@ -1,4 +1,5 @@
 """Integration tests for the API server."""
+
 import os
 import unittest
 from unittest.mock import patch

@@ -1,6 +1,8 @@
 """Unit tests for the parse_station_display module."""
+
 import os
 import unittest
+
 from parse_station_display import parse_station_display_html
 
 

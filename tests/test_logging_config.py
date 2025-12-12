@@ -1,7 +1,8 @@
-
 import logging
-from unittest.mock import patch, MagicMock
-from logging_config import setup_logging, get_logger
+from unittest.mock import MagicMock, patch
+
+from logging_config import get_logger, setup_logging
+
 
 @patch("logging.getLogger")
 def test_setup_logging(mock_get_logger):
@@ -11,6 +12,7 @@ def test_setup_logging(mock_get_logger):
     setup_logging()
     mock_logger.setLevel.assert_called_with(logging.DEBUG)
     assert mock_logger.addHandler.call_count == 2
+
 
 @patch("logging.getLogger")
 def test_get_logger(mock_get_logger):
