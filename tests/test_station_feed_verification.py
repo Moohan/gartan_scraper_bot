@@ -41,5 +41,40 @@ class TestStationFeedVerification(unittest.TestCase):
         # Assert that the logger was not called
         mock_logger.info.assert_not_called()
 
+    def test_appliance_not_in_calculated_states(self):
+        """Test that appliances only in station feed don't cause errors."""
+        mock_logger = MagicMock(spec=logging.Logger)
+        station_feed_data = {
+            "P22P6": {"availability": True},
+            "P22P7": {"availability": False}
+        }
+        calculated_states = {
+            "P22P6": {"available_now": True}
+        }
+        compare_and_log_discrepancies(station_feed_data, calculated_states, mock_logger)
+        mock_logger.info.assert_not_called()
+
+    def test_empty_inputs(self):
+        """Test with empty dictionaries as input."""
+        mock_logger = MagicMock(spec=logging.Logger)
+        compare_and_log_discrepancies({}, {}, mock_logger)
+        mock_logger.info.assert_not_called()
+
+    def test_multiple_appliances_mixed_results(self):
+        """Test with multiple appliances, some with discrepancies."""
+        mock_logger = MagicMock(spec=logging.Logger)
+        station_feed_data = {
+            "P22P6": {"availability": True},
+            "P22P7": {"availability": False}
+        }
+        calculated_states = {
+            "P22P6": {"available_now": False}, # Discrepancy
+            "P22P7": {"available_now": False}  # Match
+        }
+        compare_and_log_discrepancies(station_feed_data, calculated_states, mock_logger)
+        mock_logger.info.assert_called_once()
+        self.assertIn("P22P6", mock_logger.info.call_args[0][0])
+        self.assertNotIn("P22P7", mock_logger.info.call_args[0][0])
+
 if __name__ == '__main__':
     unittest.main()

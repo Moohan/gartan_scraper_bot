@@ -251,6 +251,7 @@ if __name__ == "__main__":
                 compare_and_log_discrepancies(
                     station_feed_data, appliance_agg_dict, verification_logger
                 )
+                logger.info("Station feed verification completed successfully.")
             else:
                 logger.warning("Could not parse station feed data for verification.")
         else:
