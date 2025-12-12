@@ -9,7 +9,7 @@ def test_setup_logging(mock_get_logger):
     mock_logger = MagicMock()
     mock_get_logger.return_value = mock_logger
     setup_logging()
-    assert mock_logger.setLevel.called_with(logging.DEBUG)
+    mock_logger.setLevel.assert_called_with(logging.DEBUG)
     assert mock_logger.addHandler.call_count == 2
 
 @patch("logging.getLogger")
