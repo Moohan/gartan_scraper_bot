@@ -444,21 +444,24 @@ def get_crew_hours_planned_week_data(crew_id: int) -> Dict[str, Any]:
         return {"error": "Internal server error"}
 
 
-def check_p22p6_business_rules() -> Dict[str, Any]:
-    """Check P22P6 business rules against available crew."""
+def check_p22p6_business_rules(
+    available_crew: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Check P22P6 business rules against available crew.
+    - If `available_crew` is provided, it's used directly.
+    - Otherwise, crew data is fetched from the database.
+    """
     try:
-        # Get all crew data
-        crew_data = get_crew_list_data()
-
-        # --- Performance Optimization: Fetch all availability data at once ---
-        all_availability_data = get_all_crew_availability_data()
-
-        # Check availability for each crew member and build available crew list
-        available_crew = []
-        for crew in crew_data:
-            crew_id = crew["id"]
-            if all_availability_data.get(crew_id, {}).get("available", False):
-                available_crew.append(crew)
+        # --- Performance Optimization ---
+        # If available_crew isn't provided, fetch it from the database.
+        if available_crew is None:
+            crew_data = get_crew_list_data()
+            all_availability_data = get_all_crew_availability_data()
+            available_crew = [
+                crew
+                for crew in crew_data
+                if all_availability_data.get(crew["id"], {}).get("available", False)
+            ]
 
         # Count skills for available crew
         skill_counts = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -511,7 +514,9 @@ def check_p22p6_business_rules() -> Dict[str, Any]:
         return {"rules_pass": False, "error": "Error checking business rules"}
 
 
-def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
+def get_appliance_available_data(
+    appliance_name: str, available_crew: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
     """Check if appliance is available right now."""
     try:
         with get_db_connection() as conn:
@@ -548,8 +553,10 @@ def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
                     # If appliance itself isn't available, don't bother checking crew
                     return {"available": False}
 
-                # Check business rules for crew capability
-                business_rules = check_p22p6_business_rules()
+                # Check business rules for crew capability, passing pre-fetched data
+                business_rules = check_p22p6_business_rules(
+                    available_crew=available_crew
+                )
                 if "error" in business_rules:
                     return {"error": business_rules["error"]}
 
@@ -564,7 +571,9 @@ def get_appliance_available_data(appliance_name: str) -> Dict[str, Any]:
         return {"error": "Internal server error"}
 
 
-def get_appliance_duration_data(appliance_name: str) -> Dict[str, Any]:
+def get_appliance_duration_data(
+    appliance_name: str, available_crew: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
     """Get how long appliance is available for (string hours or null)."""
     try:
         with get_db_connection() as conn:
@@ -597,7 +606,9 @@ def get_appliance_duration_data(appliance_name: str) -> Dict[str, Any]:
             if result:
                 # For P22P6, check business rules before returning duration
                 if appliance_name == "P22P6":
-                    business_rules = check_p22p6_business_rules()
+                    business_rules = check_p22p6_business_rules(
+                        available_crew=available_crew
+                    )
                     if "error" in business_rules:
                         return {"error": business_rules["error"]}
 
@@ -840,9 +851,17 @@ def root():
 
         crew_data.sort(key=sort_crew_key)
 
-        # Get appliance data
-        p22p6_available_data = get_appliance_available_data("P22P6")
-        p22p6_duration_data = get_appliance_duration_data("P22P6")
+        # Calculate dashboard statistics
+        available_crew = [crew for crew in crew_data if crew["available"]]
+        total_available = len(available_crew)
+
+        # Get appliance data by passing in the already-calculated available_crew list
+        p22p6_available_data = get_appliance_available_data(
+            "P22P6", available_crew=available_crew
+        )
+        p22p6_duration_data = get_appliance_duration_data(
+            "P22P6", available_crew=available_crew
+        )
 
         appliance_data = {
             "available": (
@@ -856,10 +875,6 @@ def root():
                 else None
             ),
         }
-
-        # Calculate dashboard statistics
-        available_crew = [crew for crew in crew_data if crew["available"]]
-        total_available = len(available_crew)
 
         # Count skills
         skill_counts = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -881,7 +896,9 @@ def root():
         )
 
         # Get business rules results
-        business_rules_result = check_p22p6_business_rules()
+        business_rules_result = check_p22p6_business_rules(
+            available_crew=available_crew
+        )
         business_rules = business_rules_result.get("rules", {})
         all_rules_pass = business_rules_result.get("rules_pass", False)
 
