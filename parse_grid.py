@@ -524,7 +524,7 @@ def parse_appliance_availability(
             continue
 
         appliance_name = _find_appliance_name(data_row)
-        if not appliance_name or appliance_name == "UNKNOWN":
+        if not appliance_name:
             continue
 
         date_prefix = _normalize_date(date)
@@ -698,6 +698,10 @@ def _is_crew_available_in_cell(cell: Optional[Tag]) -> bool:
     if cell is None:
         return False
 
+    # Explicitly check for the 'available' comment code first.
+    if cell.get("data-comment") == "1":
+        return True
+
     style = cell.get("style", "")
     cell_text = cell.get_text(strip=True)
 
@@ -724,7 +728,8 @@ def _is_crew_available_in_cell(cell: Optional[Tag]) -> bool:
         ):
             return False
 
-    return True
+    # Default to not available if no availability indicators are found.
+    return False
 
 
 def _parse_availability_cells(
