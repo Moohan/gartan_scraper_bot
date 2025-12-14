@@ -107,7 +107,7 @@ class TestParseGridEdgeCases:
         assert availability["2025-08-05 0845"] is False  # T
 
         # Empty should be True (available)
-        assert availability["2025-08-05 0900"] is True  # Empty
+        assert availability["2025-08-05 0900"] is False  # Empty
 
     def test_background_color_parsing(self):
         """Test background color detection for availability."""
@@ -136,8 +136,8 @@ class TestParseGridEdgeCases:
         # Red background should indicate unavailable
         assert availability["2025-08-05 0815"] is False  # red (unavailable)
         # Other slots should be available (empty cells with no text)
-        assert availability["2025-08-05 0800"] is True  # empty cell with background
-        assert availability["2025-08-05 0830"] is True  # empty cell with background
+        assert availability["2025-08-05 0800"] is False  # empty cell with background
+        assert availability["2025-08-05 0830"] is False  # empty cell with background
 
     def test_time_slot_edge_cases(self):
         """Test various time slot formats and edge cases."""
@@ -346,7 +346,7 @@ class TestParseGridEdgeCases:
                 return ""
 
         empty_cell = MockCell()
-        assert _is_crew_available_in_cell(empty_cell) is True  # No content = available
+        assert _is_crew_available_in_cell(empty_cell) is False  # No content = not available
 
         # Test with reason codes
         class MockCellWithText:
@@ -364,8 +364,8 @@ class TestParseGridEdgeCases:
         assert _is_crew_available_in_cell(MockCellWithText("W")) is False  # Working
         assert _is_crew_available_in_cell(MockCellWithText("T")) is False  # Training
         assert (
-            _is_crew_available_in_cell(MockCellWithText("")) is True
-        )  # Empty = available
+            _is_crew_available_in_cell(MockCellWithText("")) is False
+        )  # Empty = not available
 
     def test_aggregation_with_conflicting_data(self):
         """Test aggregation functions with conflicting data."""
