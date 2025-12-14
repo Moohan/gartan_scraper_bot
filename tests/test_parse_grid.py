@@ -184,13 +184,9 @@ def test_parse_grid_html_appliance_name_mapping():
 
 
 def test_parse_grid_html_none_input():
-    try:
-        result = parse_grid_html(None, "2025-08-05")
-    except TypeError:
-        result = None
-    assert result is None or (
-        isinstance(result, dict) and "crew_availability" in result
-    )
+    """Verifies that parse_grid_html raises TypeError for None input."""
+    with pytest.raises(TypeError):
+        parse_grid_html(None, "2025-08-05")
 
 
 def test_parse_grid_html_empty_input():
