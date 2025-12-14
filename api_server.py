@@ -700,12 +700,15 @@ def get_crew_hours_achieved_data(crew_id: int) -> Dict[str, Any]:
 
 
 def get_crew_hours_remaining_data(crew_id: int) -> Dict[str, Any]:
-    """Get hours remaining for crew member to fulfill contract this week."""
+    """
+    Get hours remaining for crew to fulfill contract this week.
+    - Performance: Calculates achieved hours using the same DB connection to avoid a second DB call.
+    """
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            # Check if crew exists and get contract hours
+            # Check if crew exists and get contract hours in one go
             cursor.execute(
                 "SELECT name, contract_hours FROM crew WHERE id = ?", (crew_id,)
             )
@@ -713,22 +716,43 @@ def get_crew_hours_remaining_data(crew_id: int) -> Dict[str, Any]:
             if not crew:
                 return {"error": f"Crew ID {crew_id} not found"}
 
-            contract_hours_str = crew[1]
+            contract_hours_str = crew[1]  # Access by index
             if not contract_hours_str:
                 return {"hours_remaining": None}
 
-            # Parse contract hours (format: "61 (159)" -> extract first number)
+            # Parse contract hours (e.g., "61 (159)" -> 61.0)
             try:
                 contract_hours = float(contract_hours_str.split()[0])
             except (ValueError, IndexError):
                 return {"hours_remaining": None}
 
-            # Get hours achieved this week
-            achieved_result = get_crew_hours_achieved_data(crew_id)
-            if "error" in achieved_result:
-                return achieved_result
+            # --- Start of inlined `get_crew_hours_achieved_data` logic ---
+            week_start, week_end = get_week_boundaries()
 
-            hours_achieved = achieved_result.get("hours_achieved", 0)
+            cursor.execute(
+                """
+                SELECT start_time, end_time FROM crew_availability
+                WHERE crew_id = ?
+                AND datetime(start_time) >= datetime(?)
+                AND datetime(end_time) <= datetime(?)
+                AND datetime(end_time) <= datetime('now')
+                AND (julianday(end_time) - julianday(start_time)) <= 14.0
+                ORDER BY start_time
+            """,
+                (crew_id, week_start, week_end),
+            )
+
+            periods = [
+                (datetime.fromisoformat(row[0]), datetime.fromisoformat(row[1]))
+                for row in cursor.fetchall()
+            ]
+
+            merged_periods = merge_time_periods(periods)
+            hours_achieved = sum(
+                (end - start).total_seconds() / 3600.0 for start, end in merged_periods
+            )
+            # --- End of inlined logic ---
+
             hours_remaining = max(0, contract_hours - hours_achieved)
 
             return {"hours_remaining": round(hours_remaining, 2)}
