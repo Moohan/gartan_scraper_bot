@@ -101,6 +101,7 @@ def test_aggregate_appliance_availability_mixed():
 
 
 def test_parse_grid_html_invalid_slot_data():
+    """Verifies that a slot with unrecognized data is parsed as not available."""
     html = """
     <table id='gridAvail'>
       <tr class='gridheader'><td>Role</td><td>Name</td><td>Skill</td><td>0800</td></tr>
@@ -109,8 +110,9 @@ def test_parse_grid_html_invalid_slot_data():
     """
     result = parse_grid_html(html, "2025-08-05")
     crew_list = result["crew_availability"]
-    # Should handle invalid slot data gracefully
-    assert "2025-08-05 0800" in crew_list[0]["availability"]  # type: ignore
+    # Should handle invalid slot data gracefully, defaulting to False.
+    assert "2025-08-05 0800" in crew_list[0]["availability"]
+    assert crew_list[0]["availability"]["2025-08-05 0800"] is False
 
 
 def test_aggregate_crew_availability_empty():
