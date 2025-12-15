@@ -346,7 +346,9 @@ class TestParseGridEdgeCases:
                 return ""
 
         empty_cell = MockCell()
-        assert _is_crew_available_in_cell(empty_cell) is False  # No content = not available
+        assert (
+            _is_crew_available_in_cell(empty_cell) is False
+        )  # No content = not available
 
         # Test with reason codes
         class MockCellWithText:
