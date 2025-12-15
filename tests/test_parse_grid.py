@@ -196,3 +196,21 @@ def test_parse_grid_html_empty_input():
     assert isinstance(result, dict)
     assert result["crew_availability"] == []
     assert result["appliance_availability"] == {}
+
+
+def test_parse_grid_html_missing_data_comment_attribute():
+    """
+    Verifies that a slot missing the 'data-comment' attribute is parsed as not available.
+    """
+    html = """
+    <table id='gridAvail'>
+      <tr class='gridheader'><td>Role</td><td>Name</td><td>Skill</td><td>0800</td></tr>
+      <tr class='employee'><td data-role='Firefighter'>Tom</td><td>Tom</td><td class='skillCol'>Skill</td><td></td></tr>
+    </table>
+    """
+    result = parse_grid_html(html, "2025-08-05")
+    crew_list = result["crew_availability"]
+    assert len(crew_list) == 1
+    availability = crew_list[0]["availability"]
+    assert "2025-08-05 0800" in availability
+    assert availability["2025-08-05 0800"] is False
