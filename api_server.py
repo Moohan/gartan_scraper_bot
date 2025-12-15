@@ -68,7 +68,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Create Flask app
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/static', static_folder='static')
 
 # Database path
 DB_PATH = config.db_path
@@ -1075,10 +1075,7 @@ def root():
             }
         }
     </style>
-    <script>
-        // Auto-refresh every 30 seconds
-        setTimeout(() => window.location.reload(), 30000);
-    </script>
+    <script src="/static/js/refresh.js"></script>
 </head>
 <body>
     <div class="container">
@@ -1458,8 +1455,9 @@ def add_security_headers(response):
     )
     response.headers["Referrer-Policy"] = "no-referrer"
     # SECURE: Add CSP to protect against XSS. Allows inline styles and the auto-refresh script.
+    # SECURE: Add CSP to protect against XSS. Allows inline styles.
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
     )
     return response
 
