@@ -68,7 +68,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Create Flask app
-app = Flask(__name__, static_url_path='/static', static_folder='static')
+app = Flask(__name__, static_url_path="/static", static_folder="static")
 
 # Database path
 DB_PATH = config.db_path
