@@ -1,0 +1,3 @@
+## 2024-07-25 - Use Composite Indexes for Multi-Column Queries
+**Learning:** When queries frequently filter on multiple columns (e.g., `WHERE user_id = ? AND created_at > ?`), a single composite index (`CREATE INDEX ON table(user_id, created_at)`) is far more performant than multiple separate indexes on each column. The database can use the composite index to efficiently narrow down the search space using all criteria at once.
+**Action:** Prioritize creating composite indexes that match the order of columns in the `WHERE` clauses of frequent, high-impact queries. Analyze the application's query patterns before adding indexes.
