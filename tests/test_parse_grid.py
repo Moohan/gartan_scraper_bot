@@ -31,6 +31,7 @@ INVALID_GRID_HTML = "<html><body>No table here</body></html>"
     ],
 )
 def test_parse_grid_html_crew_count(html, expected_count):
+    """Verifies that parse_grid_html correctly counts crew members."""
     result = parse_grid_html(html, "2025-08-05")
     crew_list = result["crew_availability"]
     assert isinstance(crew_list, list)
@@ -39,65 +40,70 @@ def test_parse_grid_html_crew_count(html, expected_count):
 
 @pytest.mark.parametrize("html", [VALID_GRID_HTML, INVALID_GRID_HTML])
 def test_parse_grid_html_appliance(html):
+    """Verifies that parse_grid_html returns a dictionary for appliance availability."""
     result = parse_grid_html(html, "2025-08-05")
     appliance_obj = result["appliance_availability"]
     assert isinstance(appliance_obj, dict)
 
 
 @pytest.mark.parametrize(
-    "crew_lists",
+    "crew_lists, expected_names",
     [
-        ([[{"name": "John Doe", "availability": {"2025-08-05 0800": True}}]]),
-        ([[]]),
+        ([], []),
+        ([[]], []),
+        ([[{"name": "John Doe", "availability": {"2025-08-05 0800": True}}]], ["John Doe"]),
+        (
+            [
+                [
+                    {"name": "John", "availability": {"2025-08-05 0800": True}},
+                    {"name": "Jane", "availability": {"2025-08-05 0800": False}},
+                ],
+                [
+                    {"name": "John", "availability": {"2025-08-05 0815": True}},
+                ],
+            ],
+            ["John", "Jane"],
+        ),
     ],
 )
-def test_aggregate_crew_availability(crew_lists):
+def test_aggregate_crew_availability(crew_lists, expected_names):
+    """
+    Verifies that aggregate_crew_availability correctly aggregates crew data
+    across multiple lists, covering empty, single, and mixed data scenarios.
+    """
     agg = aggregate_crew_availability(crew_lists)
     assert isinstance(agg, list)
+    names = sorted([c["name"] for c in agg])
+    assert names == sorted(expected_names)
 
 
 @pytest.mark.parametrize(
-    "appliance_lists",
+    "appliance_lists, expected_appliances",
     [
-        ([{"Engine 1": {"availability": {"2025-08-05 0800": True}}}]),
-        ([{}]),
+        ([], []),
+        ([{}], []),
+        (
+            [{"Engine 1": {"availability": {"2025-08-05 0800": True}}}],
+            ["Engine 1"],
+        ),
+        (
+            [
+                {"Engine 1": {"availability": {"2025-08-05 0800": True}}},
+                {"Engine 2": {"availability": {"2025-08-05 0815": False}}},
+            ],
+            ["Engine 1", "Engine 2"],
+        ),
     ],
 )
-def test_aggregate_appliance_availability(appliance_lists):
+def test_aggregate_appliance_availability(appliance_lists, expected_appliances):
+    """
+    Verifies that aggregate_appliance_availability correctly aggregates appliance data
+    across multiple lists, covering empty, single, and mixed data scenarios.
+    """
     agg = aggregate_appliance_availability(appliance_lists)
     assert isinstance(agg, list)
-
-
-def test_aggregate_crew_availability_mixed():
-    crew_lists = [
-        [
-            {"name": "John", "availability": {"2025-08-05 0800": True}},
-            {"name": "Jane", "availability": {"2025-08-05 0800": False}},
-        ],
-        [
-            {"name": "John", "availability": {"2025-08-05 0815": True}},
-        ],
-    ]
-    agg = aggregate_crew_availability(crew_lists)
-    names = [c["name"] for c in agg]
-    assert "John" in names and "Jane" in names
-
-
-def test_aggregate_appliance_availability_mixed():
-    appliance_lists = [
-        {"Engine 1": {"availability": {"2025-08-05 0800": True}}},
-        {"Engine 2": {"availability": {"2025-08-05 0815": False}}},
-    ]
-    agg = aggregate_appliance_availability(appliance_lists)
-    # Verify both appliances are included
-    found_engine1 = False
-    found_engine2 = False
-    for entry in agg:
-        if entry.get("appliance") == "Engine 1":
-            found_engine1 = True
-        elif entry.get("appliance") == "Engine 2":
-            found_engine2 = True
-    assert found_engine1 and found_engine2
+    appliance_names = sorted([a["appliance"] for a in agg])
+    assert appliance_names == sorted(expected_appliances)
 
 
 def test_parse_grid_html_invalid_slot_data():
@@ -115,17 +121,8 @@ def test_parse_grid_html_invalid_slot_data():
     assert crew_list[0]["availability"]["2025-08-05 0800"] is False
 
 
-def test_aggregate_crew_availability_empty():
-    agg = aggregate_crew_availability([[], []])
-    assert agg == []
-
-
-def test_aggregate_appliance_availability_empty():
-    agg = aggregate_appliance_availability([{}, {}])
-    assert agg == []
-
-
 def test_parse_grid_html_missing_columns():
+    """Verifies parsing works even with missing metadata columns."""
     html = """
     <table id='gridAvail'>
       <tr class='gridheader'><td>Employee</td><td>Role</td></tr>
@@ -139,6 +136,7 @@ def test_parse_grid_html_missing_columns():
 
 
 def test_parse_grid_html_extra_columns():
+    """Verifies parsing is robust to extra, unexpected columns."""
     html = """
     <table id='gridAvail'>
       <tr class='gridheader'><td>Employee</td><td>Role</td><td>Contract Hours</td><td>Skills</td><td>Extra</td><td>0800</td></tr>
@@ -152,6 +150,7 @@ def test_parse_grid_html_extra_columns():
 
 
 def test_parse_grid_html_slot_alignment():
+    """Verifies that availability slots are correctly aligned with headers."""
     html = """
     <table id='gridAvail'>
       <tr class='gridheader'><td>Role</td><td>Name</td><td>Skill</td><td>0800</td><td>0815</td></tr>
@@ -166,6 +165,7 @@ def test_parse_grid_html_slot_alignment():
 
 
 def test_parse_grid_html_appliance_name_mapping():
+    """Verifies that a realistic appliance name (P22P6) is correctly parsed."""
     html = """
     <table id='gridAvail'>
       <tr class='gridheader'><td>Role</td><td>Name</td><td>Skill</td><td>Other</td><td>Other</td><td>0800</td></tr>
@@ -192,6 +192,7 @@ def test_parse_grid_html_none_input():
 
 
 def test_parse_grid_html_empty_input():
+    """Verifies that parse_grid_html handles empty string input gracefully."""
     result = parse_grid_html("", "2025-08-05")
     assert isinstance(result, dict)
     assert result["crew_availability"] == []
