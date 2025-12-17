@@ -80,6 +80,12 @@ def init_db(db_path: str = DB_PATH, reset: bool = False):
     c.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_appliance_block ON appliance_availability(appliance_id,start_time,end_time)"
     )
+    # ⚡ Performance: Add a composite index on (crew_id, start_time, end_time).
+    # This is the most effective indexing strategy for the common API query
+    # pattern, which filters by crew member and a specific time range.
+    c.execute(
+        "CREATE INDEX IF NOT EXISTS idx_crew_availability_crew_times ON crew_availability(crew_id, start_time, end_time)"
+    )
     conn.commit()
     return conn
 
