@@ -51,7 +51,10 @@ def test_parse_grid_html_appliance(html):
     [
         ([], []),
         ([[]], []),
-        ([[{"name": "John Doe", "availability": {"2025-08-05 0800": True}}]], ["John Doe"]),
+        (
+            [[{"name": "John Doe", "availability": {"2025-08-05 0800": True}}]],
+            ["John Doe"],
+        ),
         (
             [
                 [
