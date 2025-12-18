@@ -303,26 +303,26 @@ def gartan_login_and_get_session():
         return _authenticated_session
 
     # Create new session
-    import requests
+    try:
+        import requests
 
-    session = requests.Session()
-    log_debug("session", "Creating new authenticated session")
+        session = requests.Session()
+        log_debug("session", "Creating new authenticated session")
 
-    # Attempt login with retry limit
-    form, _ = _get_login_form(session)
-    post_url = _get_login_post_url(form)
-    payload = _build_login_payload(form, username, password)
-    headers = _get_login_headers()
+        # Attempt login with retry limit
+        form, _ = _get_login_form(session)
+        post_url = _get_login_post_url(form)
+        payload = _build_login_payload(form, username, password)
+        headers = _get_login_headers()
 
-    _post_login(session, post_url, payload, headers)
-    _get_data_page(session, headers)
+        _post_login(session, post_url, payload, headers)
+        _get_data_page(session, headers)
 
-    # Cache the authenticated session on success
-    _authenticated_session = session
-    _session_authenticated_time = current_time
+        # Cache the authenticated session on success
+        _authenticated_session = session
+        _session_authenticated_time = current_time
 
-    return session
-
+        return session
     except AuthenticationError as e:
         log_debug("error", f"Authentication failed: {str(e)}")
         raise  # Re-raise auth errors to stop retries
