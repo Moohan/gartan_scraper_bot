@@ -154,3 +154,45 @@ body {
         font-size: 2em;
     }
 }
+/* API Endpoints Section */
+.api-endpoints-container {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.api-endpoints-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 15px;
+}
+
+.api-endpoints-heading {
+    margin-top: 0;
+    color: #495057;
+}
+
+.api-endpoints-list {
+    list-style: none;
+    padding: 0;
+}
+
+.api-endpoints-list-item {
+    margin: 8px 0;
+}
+
+.api-endpoints-link {
+    text-decoration: none;
+    color: #007bff;
+}
+
+.api-endpoints-path {
+    color: #007bff;
+}
+
+.api-endpoints-note {
+    margin-top: 15px;
+    font-size: 0.9em;
+    color: #6c757d;
+}

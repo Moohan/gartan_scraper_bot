@@ -1034,38 +1034,38 @@ def root():
 
         <div class="section">
             <h2>🔗 API Endpoints</h2>
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 15px;">
+            <div class="api-endpoints-container">
+                <div class="api-endpoints-grid">
                     <div>
-                        <h3 style="margin-top: 0; color: #495057;">Service Information</h3>
-                        <ul style="list-style: none; padding: 0;">
-                            <li style="margin: 8px 0;"><a href="/health" style="text-decoration: none; color: #007bff;">/health</a> - Service and database status</li>
+                        <h3 class="api-endpoints-heading">Service Information</h3>
+                        <ul class="api-endpoints-list">
+                            <li class="api-endpoints-list-item"><a href="/health" class="api-endpoints-link">/health</a> - Service and database status</li>
                         </ul>
 
-                        <h3 style="color: #495057;">Crew Information</h3>
-                        <ul style="list-style: none; padding: 0;">
-                            <li style="margin: 8px 0;"><a href="/crew" style="text-decoration: none; color: #007bff;">/crew</a> - List all crew members with details</li>
-                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/available</span> - Check if crew member is available now</li>
-                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/duration</span> - How long crew member is available for</li>
-                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/hours-this-week</span> - Hours available since Monday</li>
-                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/contract-hours</span> - Contract hours information</li>
+                        <h3 class="api-endpoints-heading">Crew Information</h3>
+                        <ul class="api-endpoints-list">
+                            <li class="api-endpoints-list-item"><a href="/crew" class="api-endpoints-link">/crew</a> - List all crew members with details</li>
+                            <li class="api-endpoints-list-item"><span class="api-endpoints-path">/crew/{id}/available</span> - Check if crew member is available now</li>
+                            <li class="api-endpoints-list-item"><span class="api-endpoints-path">/crew/{id}/duration</span> - How long crew member is available for</li>
+                            <li class="api-endpoints-list-item"><span class="api-endpoints-path">/crew/{id}/hours-this-week</span> - Hours available since Monday</li>
+                            <li class="api-endpoints-list-item"><span class="api-endpoints-path">/crew/{id}/contract-hours</span> - Contract hours information</li>
                         </ul>
                     </div>
                     <div>
-                        <h3 style="margin-top: 0; color: #495057;">Appliance Information</h3>
-                        <ul style="list-style: none; padding: 0;">
-                            <li style="margin: 8px 0;"><a href="/appliances/P22P6/available" style="text-decoration: none; color: #007bff;">/appliances/P22P6/available</a> - Check if P22P6 is operational</li>
-                            <li style="margin: 8px 0;"><a href="/appliances/P22P6/duration" style="text-decoration: none; color: #007bff;">/appliances/P22P6/duration</a> - How long P22P6 is available for</li>
+                        <h3 class="api-endpoints-heading">Appliance Information</h3>
+                        <ul class="api-endpoints-list">
+                            <li class="api-endpoints-list-item"><a href="/appliances/P22P6/available" class="api-endpoints-link">/appliances/P22P6/available</a> - Check if P22P6 is operational</li>
+                            <li class="api-endpoints-list-item"><a href="/appliances/P22P6/duration" class="api-endpoints-link">/appliances/P22P6/duration</a> - How long P22P6 is available for</li>
                         </ul>
 
-                        <h3 style="color: #495057;">Weekly Hours Tracking</h3>
-                        <ul style="list-style: none; padding: 0;">
-                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/hours-planned-week</span> - Total planned hours this week</li>
-                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/hours-achieved</span> - Hours worked so far this week</li>
-                            <li style="margin: 8px 0;"><span style="color: #007bff;">/crew/{id}/hours-remaining</span> - Hours remaining to fulfill contract</li>
+                        <h3 class="api-endpoints-heading">Weekly Hours Tracking</h3>
+                        <ul class="api-endpoints-list">
+                            <li class="api-endpoints-list-item"><span class="api-endpoints-path">/crew/{id}/hours-planned-week</span> - Total planned hours this week</li>
+                            <li class="api-endpoints-list-item"><span class="api-endpoints-path">/crew/{id}/hours-achieved</span> - Hours worked so far this week</li>
+                            <li class="api-endpoints-list-item"><span class="api-endpoints-path">/crew/{id}/hours-remaining</span> - Hours remaining to fulfill contract</li>
                         </ul>
 
-                        <p style="margin-top: 15px; font-size: 0.9em; color: #6c757d;">
+                        <p class="api-endpoints-note">
                             <strong>Note:</strong> Replace {id} with actual crew member ID (e.g., /crew/1/available)
                         </p>
                     </div>
@@ -1323,9 +1323,9 @@ def add_security_headers(response):
     )
     response.headers["Referrer-Policy"] = "no-referrer"
     # SECURE: Add CSP to protect against XSS. Allows inline styles and the auto-refresh script.
-    # SECURE: Add CSP to protect against XSS. Allows inline styles.
+    # SECURE: Add CSP to protect against XSS. Allows only self-hosted styles.
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+        "default-src 'self'; script-src 'self'; style-src 'self'"
     )
     return response
 
