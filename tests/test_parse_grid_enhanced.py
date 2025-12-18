@@ -403,7 +403,7 @@ class TestParseGridEdgeCases:
             {"ENGINE": {"availability": {"2025-08-05 0800": False}}},
         ]
 
-        aggregated_appliances = aggregate_appliance_availability(conflicting_appliances)
+        aggregate_appliance_availability(conflicting_appliances)
         # Should handle gracefully without crashing
 
 

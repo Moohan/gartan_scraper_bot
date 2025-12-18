@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 import pytest
 
 from api_server import (
-    DB_PATH,
     get_crew_hours_planned_week_data,
     get_crew_hours_this_week_data,
     get_week_boundaries,

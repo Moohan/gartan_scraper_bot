@@ -16,15 +16,14 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scheduler import (
+from scheduler import (  # noqa: E402
     check_database_health,
     initial_data_check,
     main,
@@ -51,7 +50,7 @@ class TestScheduler(unittest.TestCase):
         """Clean up test fixtures"""
         try:
             os.unlink(self.temp_db.name)
-        except:
+        except OSError:
             pass
 
     def test_check_database_health_success(self):

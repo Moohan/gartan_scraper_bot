@@ -1,8 +1,6 @@
 import importlib
 import os
-from unittest.mock import MagicMock, patch
 
-import pytest
 
 import gartan_fetch
 from gartan_fetch import (

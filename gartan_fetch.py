@@ -9,6 +9,7 @@ Core responsibilities:
 
 import os
 from datetime import datetime as dt
+from urllib.parse import urlencode
 
 import requests
 from bs4 import BeautifulSoup  # type: ignore
@@ -365,19 +366,24 @@ def _build_login_payload(form, username, password):
     """
     Build the payload dictionary for the login POST request.
     """
-    soup = form  # The 'form' is already a BeautifulSoup object
+    soup = form
     payload = {
         "__LASTFOCUS": "",
         "__EVENTTARGET": "",
-        "__VIEWSTATE": soup.find("input", {"name": "__VIEWSTATE"})["value"],
-        "__VIEWSTATEGENERATOR": soup.find("input", {"name": "__VIEWSTATEGENERATOR"})[
-            "value"
-        ],
-        "__EVENTVALIDATION": soup.find("input", {"name": "__EVENTVALIDATION"})["value"],
         "txt_userid": username,
         "txt_pword": password,
         "btnLogin": "Sign In",
     }
+    for input_tag in soup.find_all("input"):
+        name = input_tag.get("name")
+        value = input_tag.get("value", "")
+        if name:
+            payload[name] = value
+    for select_tag in soup.find_all("select"):
+        name = select_tag.get("name")
+        selected_option = select_tag.find("option", selected=True)
+        if name and selected_option:
+            payload[name] = selected_option.get("value", "")
     return payload
 
 
@@ -390,9 +396,6 @@ def _get_login_headers():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0",
         "Content-Type": "application/x-www-form-urlencoded",
     }
-
-
-from urllib.parse import urlencode
 
 
 def _post_login(session, post_url, payload, headers):

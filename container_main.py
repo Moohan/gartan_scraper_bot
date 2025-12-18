@@ -8,7 +8,6 @@ Runs both the periodic scheduler and API server in a single container
 import logging
 import os
 import signal
-import subprocess
 import sys
 import threading
 import time

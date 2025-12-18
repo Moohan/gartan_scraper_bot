@@ -1,10 +1,6 @@
 import logging
-import os
-import tempfile
 
-import pytest
 
-from logging_config import setup_logging
 from utils import delay, log_debug
 
 

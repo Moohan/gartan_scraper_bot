@@ -2,7 +2,6 @@
 """Tests for parse_grid.py edge cases and error conditions."""
 from datetime import datetime as dt
 
-import pytest
 
 from parse_grid import (
     aggregate_appliance_availability,
@@ -201,14 +200,15 @@ class TestParseGridEdgeCases:
         boundary_html = """
         <html>
             <body>
-                <table>
+                <table id="gridAvail">
+                    <tr><td colspan="5">Appliances</td></tr>
                     <tr class="gridheader">
                         <td>Time Slots</td>
                         <td title="P22P6 (2345 - 0000) Available">23:45</td>
                         <td title="P22P6 (0000 - 0015) Available">00:00</td>
                     </tr>
                     <tr>
-                        <td>P22P6</td>
+                        <td colspan="5">P22P6</td>
                         <td style="background-color: #009933"></td>
                         <td style="background-color: #009933"></td>
                     </tr>
