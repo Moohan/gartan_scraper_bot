@@ -24,22 +24,14 @@ class TestGartanFetchErrorHandling:
     def setup_method(self):
         """Set up test environment."""
         os.makedirs("_cache", exist_ok=True)
-
-    def teardown_method(self):
-        """Clean up test environment."""
-        if os.path.exists("_cache"):
-            shutil.rmtree("_cache")
-
-    def setup_method(self):
-        """Set up test environment."""
         # Create temporary directory for cache testing
         self.temp_dir = tempfile.mkdtemp()
 
     def teardown_method(self):
         """Clean up test environment."""
+        if os.path.exists("_cache"):
+            shutil.rmtree("_cache")
         # Clean up temp files
-        import shutil
-
         try:
             shutil.rmtree(self.temp_dir)
         except OSError:

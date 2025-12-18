@@ -276,8 +276,8 @@ class TestConnectionManagerIntegration:
         with patch.object(connection_manager, "DB_PATH", invalid_path):
             # Should handle connection errors gracefully
             with pytest.raises(sqlite3.OperationalError):
-                with get_database_pool() as conn:
+                with get_database_pool():
                     pass
 
             with pytest.raises(sqlite3.OperationalError):
-                conn = get_connection()
+                get_connection()

@@ -21,18 +21,6 @@ class TestGartanFetchErrorHandling:
 
     def setUp(self):
         """Set up test environment."""
-        self.test_cache_dir = "_cache"
-        os.makedirs(self.test_cache_dir, exist_ok=True)
-
-    def tearDown(self):
-        """Clean up test environment."""
-        if os.path.exists(self.test_cache_dir):
-            for f in os.listdir(self.test_cache_dir):
-                os.remove(os.path.join(self.test_cache_dir, f))
-            os.rmdir(self.test_cache_dir)
-
-    def setUp(self):
-        """Set up test environment."""
         # Create _cache directory before tests
         os.makedirs("_cache", exist_ok=True)
 

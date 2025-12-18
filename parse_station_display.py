@@ -3,9 +3,9 @@ Parses the HTML of the real-time station display page to extract crewing informa
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 
 from utils import log_debug
 

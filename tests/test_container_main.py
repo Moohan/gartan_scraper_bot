@@ -15,11 +15,8 @@ import signal
 import sqlite3
 import sys
 import tempfile
-import threading
-import time
 import unittest
-from multiprocessing import Process
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -58,7 +55,7 @@ class TestContainerMain(unittest.TestCase):
         """Clean up test fixtures"""
         try:
             os.unlink(self.temp_db.name)
-        except:
+        except OSError:
             pass
 
     @patch("container_main.sys.exit")

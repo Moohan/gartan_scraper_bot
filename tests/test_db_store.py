@@ -1,6 +1,5 @@
 import os
 
-import pytest
 
 from db_store import (
     init_db,

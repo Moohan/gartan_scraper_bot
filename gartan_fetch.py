@@ -9,6 +9,7 @@ Core responsibilities:
 
 import os
 from datetime import datetime as dt
+from urllib.parse import urlencode
 
 import requests
 from bs4 import BeautifulSoup  # type: ignore
@@ -137,9 +138,7 @@ def fetch_and_cache_grid_html(
     log_debug("fetch", f"Fetching grid HTML for {booking_date}...")
     grid_html = _fetch_and_write_cache(session, booking_date, cache_file)
     _perform_delay(min_delay, max_delay, base)
-    # If fetch failed (None), return empty string as a graceful fallback for callers that
-    # expect a non-None value after cache corruption handling tests.
-    return grid_html if grid_html is not None else ""
+    return grid_html
 
 
 def _is_cache_valid(cache_file: str, cache_minutes: int) -> bool:
@@ -161,14 +160,7 @@ def _is_cache_valid(cache_file: str, cache_minutes: int) -> bool:
         return True
 
     # Time-based cache expiry for current/future data
-    try:
-        mtime = os.path.getmtime(cache_file)
-    except FileNotFoundError:
-        # File does not exist on filesystem though os.path.exists may have been mocked.
-        return False
-    except OSError:
-        # Propagate permission and other OS-level errors for caller to handle/tests
-        raise
+    mtime = os.path.getmtime(cache_file)
     if (dt.now() - dt.fromtimestamp(mtime)).total_seconds() / 60 < cache_minutes:
         return True
     return False
@@ -194,8 +186,7 @@ def _fetch_and_write_cache(session, booking_date, cache_file):
             try:
                 with open(cache_file, "w", encoding="utf-8") as f:
                     f.write(grid_html)
-            except Exception as e:
-                # Catch any error writing cache (permission, encoding, etc.)
+            except OSError as e:
                 log_debug("cache", f"Failed writing cache file {cache_file}: {e}")
     return grid_html
 
@@ -288,8 +279,9 @@ def gartan_login_and_get_session():
     username, password = _get_credentials()
     if not username or not password:
         log_debug("error", "Missing Gartan credentials in environment")
-        # Tests expect an AuthenticationError when credentials are missing
-        raise AuthenticationError("GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment")
+        raise AssertionError(
+            "GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment (not committed)"
+        )
 
     current_time = time.time()
 
@@ -323,13 +315,6 @@ def gartan_login_and_get_session():
 
     return session
 
-    except AuthenticationError as e:
-        log_debug("error", f"Authentication failed: {str(e)}")
-        raise  # Re-raise auth errors to stop retries
-    except Exception as e:
-        log_debug("error", f"Unexpected error during login: {str(e)}")
-        raise AuthenticationError(f"Login failed due to unexpected error: {str(e)}")
-
 
 def _get_login_form(session):
     """
@@ -341,8 +326,7 @@ def _get_login_form(session):
     soup = BeautifulSoup(resp.content, "lxml")
     form = soup.find("form")
     if not form:
-        # Normalize to AuthenticationError for callers/tests
-        raise AuthenticationError("Login form not found")
+        raise Exception("[ERROR] Login form not found in login page HTML.")
     return form, resp
 
 
@@ -365,19 +349,24 @@ def _build_login_payload(form, username, password):
     """
     Build the payload dictionary for the login POST request.
     """
-    soup = form  # The 'form' is already a BeautifulSoup object
+    soup = form
     payload = {
         "__LASTFOCUS": "",
         "__EVENTTARGET": "",
-        "__VIEWSTATE": soup.find("input", {"name": "__VIEWSTATE"})["value"],
-        "__VIEWSTATEGENERATOR": soup.find("input", {"name": "__VIEWSTATEGENERATOR"})[
-            "value"
-        ],
-        "__EVENTVALIDATION": soup.find("input", {"name": "__EVENTVALIDATION"})["value"],
         "txt_userid": username,
         "txt_pword": password,
         "btnLogin": "Sign In",
     }
+    for input_tag in soup.find_all("input"):
+        name = input_tag.get("name")
+        value = input_tag.get("value", "")
+        if name:
+            payload[name] = value
+    for select_tag in soup.find_all("select"):
+        name = select_tag.get("name")
+        selected_option = select_tag.find("option", selected=True)
+        if name and selected_option:
+            payload[name] = selected_option.get("value", "")
     return payload
 
 
@@ -390,9 +379,6 @@ def _get_login_headers():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0",
         "Content-Type": "application/x-www-form-urlencoded",
     }
-
-
-from urllib.parse import urlencode
 
 
 def _post_login(session, post_url, payload, headers):
@@ -427,22 +413,16 @@ def _get_data_page(session, headers):
     Raises:
         AuthenticationError: If authentication check fails.
     """
-    try:
-        data_resp = session.get(DATA_URL, headers=headers)
-        if data_resp.status_code != 200:
-            log_debug("error", f"Failed to retrieve data page: {data_resp.status_code}")
-            raise AuthenticationError(f"Access denied (HTTP {data_resp.status_code})")
+    data_resp = session.get(DATA_URL, headers=headers)
+    if data_resp.status_code != 200:
+        log_debug("error", f"Failed to retrieve data page: {data_resp.status_code}")
+        raise AuthenticationError(f"Access denied (HTTP {data_resp.status_code})")
 
-        # Check if we were redirected to login page or access denied
-        if "Login.aspx" in data_resp.url or "Access Denied" in data_resp.text:
-            log_debug("error", "Login verification failed - redirected to login page")
-            raise AuthenticationError("Login failed - session not authenticated")
+    # Check if we were redirected to login page or access denied
+    if "Login.aspx" in data_resp.url or "Access Denied" in data_resp.text:
+        log_debug("error", "Login verification failed - redirected to login page")
+        raise AuthenticationError("Login failed - session not authenticated")
 
-    except AuthenticationError:
-        raise
-    except Exception as e:
-        log_debug("error", f"Unexpected error checking authentication: {str(e)}")
-        raise AuthenticationError(f"Failed to verify login: {str(e)}")
 
 def fetch_grid_html_for_date(session, booking_date):
     """
@@ -462,6 +442,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Test grid HTML fetch/caching with cache modes."
     )
+    parser.add_argument("date", help="Booking date (dd/mm/yyyy)")
     parser.add_argument(
         "--no-cache", action="store_true", help="Always download, ignore cache"
     )

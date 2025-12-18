@@ -2,9 +2,7 @@
 Verifies the calculated schedule data against the real-time station display.
 """
 
-import json
 import logging
-from datetime import datetime
 
 import requests
 

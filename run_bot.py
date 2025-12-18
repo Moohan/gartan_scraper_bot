@@ -5,12 +5,9 @@ import logging
 import os
 import re
 import time
-import asyncio
-import aiohttp
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-from async_gartan_fetch import fetch_grid_html_for_date_async
 from cli import CliArgs, create_argument_parser
 from config import config
 from db_store import (
@@ -60,22 +57,7 @@ def cleanup_old_cache_files(cache_dir: str, today: datetime) -> None:
                 logger.warning(f"Failed to process cache file {fname}: {e}")
 
 
-def _is_cache_valid(cache_file: str, cache_minutes: int) -> bool:
-    """
-    Check if the cache file exists and is not expired.
-    """
-    if not os.path.exists(cache_file):
-        return False
-
-    if cache_minutes == -1:
-        return True
-
-    mtime = os.path.getmtime(cache_file)
-    if (datetime.now() - datetime.fromtimestamp(mtime)).total_seconds() / 60 < cache_minutes:
-        return True
-    return False
-
-async def main():
+if __name__ == "__main__":
     # Set up logging
     setup_logging(log_level=logging.DEBUG)
 
@@ -89,7 +71,6 @@ async def main():
 
     today = datetime.now()
     try:
-        # Authenticate using the synchronous requests library
         session = gartan_login_and_get_session()
     except AuthenticationError as e:
         logger.error(f"🔒 Authentication failed: {str(e)}")
@@ -106,7 +87,10 @@ async def main():
     if args.cache_mode is None:
         cleanup_old_cache_files(config.cache_dir, today)
 
+    day_offset = 0
+    all_statuses_determined = False
     daily_crew_lists: List[List[Dict[str, Any]]] = []
+    crew_list_agg: List[Dict[str, Any]] = []
     daily_appliance_lists: List[Dict[str, Any]] = []
 
     logger.info(f"Fetching {effective_max_days} days of availability (week-aligned)...")
@@ -124,77 +108,92 @@ async def main():
 
     db_conn = init_db(reset=reset)
     try:
-        # Bolt ⚡: Using asyncio to fetch all days of availability concurrently,
-        # which is much faster than the previous sequential approach.
-        # A semaphore is used to limit the number of concurrent requests to 10.
-        cookies = session.cookies.get_dict()
-        semaphore = asyncio.Semaphore(10)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=config.max_workers
+        ) as executor:
+            parse_futures = []
+            booking_dates = []
+            while not all_statuses_determined and day_offset < effective_max_days:
+                booking_date = (start_date + timedelta(days=day_offset)).strftime(
+                    "%d/%m/%Y"
+                )
+                logger.info(
+                    f"Processing day {day_offset+1}/{effective_max_days}: {booking_date}"
+                )
 
-        async with aiohttp.ClientSession(cookies=cookies) as aio_session:
-            booking_dates = [
-                (start_date + timedelta(days=i)).strftime("%d/%m/%Y")
-                for i in range(effective_max_days)
-            ]
+                # Get cache minutes from config based on actual date
+                current_date = start_date + timedelta(days=day_offset)
+                days_from_today = (current_date.date() - today.date()).days
+                cache_minutes = config.get_cache_minutes(days_from_today)
 
-            grid_htmls = [""] * len(booking_dates)
-            fetch_tasks = []
-
-            async def fetch_and_cache(date, index):
-                async with semaphore:
-                    logger.info(
-                        f"Processing day {index+1}/{effective_max_days}: {date}"
+                # Log cache strategy
+                if cache_minutes == -1:
+                    logger.debug(
+                        f"Using infinite cache for historic date: {booking_date}"
                     )
-                    cache_file = os.path.join(config.cache_dir, f"grid_{date.replace('/', '-')}.html")
-                    days_from_today = (datetime.strptime(date, "%d/%m/%Y").date() - today.date()).days
-                    cache_minutes = config.get_cache_minutes(days_from_today)
-
-                    if args.cache_mode != 'no-cache' and _is_cache_valid(cache_file, cache_minutes):
-                        logger.debug(f"Using cached data for {date}")
-                        with open(cache_file, 'r', encoding='utf-8') as f:
-                            grid_htmls[index] = f.read()
-                    else:
-                        logger.debug(f"Fetching data for {date}")
-                        html = await fetch_grid_html_for_date_async(aio_session, date)
-                        if html:
-                            grid_htmls[index] = html
-                            with open(cache_file, 'w', encoding='utf-8') as f:
-                                f.write(html)
-
-            for i, date in enumerate(booking_dates):
-                task = fetch_and_cache(date, i)
-                fetch_tasks.append(task)
-
-            # Run all fetching tasks concurrently
-            await asyncio.gather(*fetch_tasks)
-
-            # Use a ThreadPoolExecutor for the CPU-bound parsing task
-            with concurrent.futures.ThreadPoolExecutor(max_workers=config.max_workers) as executor:
-                parse_futures = {
-                    executor.submit(parse_grid_html, html, date): date
-                    for html, date in zip(grid_htmls, booking_dates) if html
-                }
-
-                for i, future in enumerate(concurrent.futures.as_completed(parse_futures)):
-                    date = parse_futures[future]
-                    try:
-                        result = future.result()
-                        crew_list = result.get("crew_availability", [])
-                        appliance_obj = result.get("appliance_availability", {})
-                        daily_crew_lists.append(crew_list)
-                        daily_appliance_lists.append(appliance_obj)
-                    except Exception as exc:
-                        logger.error(f"Error parsing data for {date}: {exc}")
-
-                    # Log progress
-                    elapsed = time.time() - start_time
-                    avg_per_day = elapsed / (i + 1)
-                    eta = avg_per_day * (len(booking_dates) - (i + 1))
-                    logger.info(
-                        f"Progress: {i+1}/{len(booking_dates)} days | ETA: {int(eta)}s"
+                else:
+                    logger.debug(
+                        f"Cache duration for {booking_date}: {cache_minutes} minutes"
                     )
 
-        # All data is fetched and parsed, now process it
-        crew_list_agg = aggregate_crew_availability(daily_crew_lists)
+                grid_html = fetch_and_cache_grid_html(
+                    session,
+                    booking_date,
+                    cache_dir=config.cache_dir,
+                    cache_minutes=cache_minutes,
+                    min_delay=1,
+                    max_delay=10,
+                    base=1.5,
+                    cache_mode=args.cache_mode,
+                )
+
+                if not grid_html:
+                    logger.error(f"Failed to get grid HTML for {booking_date}.")
+                    day_offset += 1
+                    continue
+
+                # Start parsing in background
+                future = executor.submit(parse_grid_html, grid_html, booking_date)
+                parse_futures.append(future)
+                booking_dates.append(booking_date)
+
+                # Calculate and display progress
+                elapsed = time.time() - start_time
+                avg_per_day = elapsed / (day_offset + 1)
+                eta = avg_per_day * (effective_max_days - (day_offset + 1))
+                logger.info(
+                    f"Progress: {day_offset+1}/{effective_max_days} days | ETA: {int(eta)}s"
+                )
+                day_offset += 1
+
+            # Collect results as they complete
+            for i, future in enumerate(concurrent.futures.as_completed(parse_futures)):
+                try:
+                    result = future.result()
+                    crew_list = result.get("crew_availability", [])
+                    appliance_obj = result.get("appliance_availability", {})
+                    daily_crew_lists.append(crew_list)
+                    daily_appliance_lists.append(appliance_obj)
+                except Exception as e:
+                    # Find the booking date corresponding to the failed future
+                    failed_booking_date = "Unknown"
+                    for j, f in enumerate(parse_futures):
+                        if f == future:
+                            failed_booking_date = booking_dates[j]
+                            break
+                    log_debug(
+                        "error",
+                        f"Failed to parse grid for {failed_booking_date}: {e}",
+                    )
+
+            crew_list_agg = aggregate_crew_availability(daily_crew_lists)
+            all_statuses_determined = all(
+                (
+                    crew["next_available"] is not None
+                    and crew["next_available_until"] is not None
+                )
+                for crew in crew_list_agg
+            )
 
         # Read crew contact info from crew_details.local
         contact_map = {}
@@ -205,25 +204,42 @@ async def main():
                     if not line or line.startswith("#"):
                         continue
                     parts = line.split("|")
-                    if len(parts) >= 3:
-                        crew_id, display_name, phone = parts[0], parts[1], parts[2]
+                    if (
+                        len(parts) >= 3
+                    ):  # Support both old format (3 parts) and new format (5 parts)
+                        crew_id = parts[0]
+                        display_name = parts[1]
+                        phone = parts[2]
                         email = parts[3] if len(parts) > 3 else ""
                         position = parts[4] if len(parts) > 4 else ""
-                        contact_map[crew_id] = f"{display_name}|{phone}|{email}|{position}"
+                        # Store enhanced contact info
+                        contact_map[crew_id] = (
+                            f"{display_name}|{phone}|{email}|{position}"
+                        )
 
         insert_crew_details(crew_list_agg, contact_map, db_conn=db_conn)
         insert_crew_availability(crew_list_agg, db_conn=db_conn)
         print(
             f"Saved crew availability for {len(crew_list_agg)} crew members to gartan_availability.db"
         )
+        log_debug(
+            "ok",
+            f"Saved crew availability for {len(crew_list_agg)} crew members to gartan_availability.db",
+        )
 
+        # Aggregate and store appliance availability in SQLite
         appliance_agg = aggregate_appliance_availability(daily_appliance_lists)
+        # Convert list of dicts to a single dict keyed by appliance name
         appliance_agg_dict = {
             item["appliance"]: item for item in appliance_agg if "appliance" in item
         }
         insert_appliance_availability(appliance_agg_dict, db_conn=db_conn)
         print(
             f"Saved appliance availability for {len(appliance_agg)} appliances to gartan_availability.db"
+        )
+        log_debug(
+            "ok",
+            f"Saved appliance availability for {len(appliance_agg)} appliances to gartan_availability.db",
         )
 
         # Station feed verification
@@ -241,7 +257,6 @@ async def main():
         else:
             logger.warning("Could not fetch station feed for verification.")
 
-        # Final summary logging
         undetermined = [
             crew["name"]
             for crew in crew_list_agg
@@ -250,15 +265,25 @@ async def main():
                 and crew.get("available_for") != ">72h"
             )
         ]
-        if undetermined:
+        got_72h = [
+            crew["name"]
+            for crew in crew_list_agg
+            if crew.get("available_for") == ">72h"
+        ]
+        if all_statuses_determined:
+            logger.info(
+                f"All upcoming crew availability determined after {day_offset} days."
+            )
+        elif undetermined:
             logger.warning(
                 f"Could not get all upcoming availability after searching {effective_max_days} days "
                 f"for crew members: {', '.join(undetermined)}"
             )
-
+        elif got_72h:
+            logger.info(
+                f"Got at least 72 hours availability for crew after searching {day_offset} days: "
+                f"{', '.join(got_72h)}"
+            )
     finally:
         if db_conn:
             db_conn.close()
-
-if __name__ == "__main__":
-    asyncio.run(main())
