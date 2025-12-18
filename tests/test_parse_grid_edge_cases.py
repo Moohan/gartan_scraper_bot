@@ -201,14 +201,14 @@ class TestParseGridEdgeCases:
         <html>
             <body>
                 <table id="gridAvail">
-                    <tr><td colspan="5">Appliances</td></tr>
+                    <tr><td colspan="3">Appliances</td></tr>
                     <tr class="gridheader">
                         <td>Time Slots</td>
                         <td title="P22P6 (2345 - 0000) Available">23:45</td>
                         <td title="P22P6 (0000 - 0015) Available">00:00</td>
                     </tr>
                     <tr>
-                        <td colspan="5">P22P6</td>
+                        <td colspan="3">P22P6</td>
                         <td style="background-color: #009933"></td>
                         <td style="background-color: #009933"></td>
                     </tr>

@@ -1,5 +1,3 @@
-## 2024-07-17 - Don't Break Caching in the Name of Speed
-
-**Learning:** I implemented a major performance improvement by switching to asynchronous fetching, but in the process, I completely broke the existing caching mechanism. This was a critical regression that would have negated the performance gains on subsequent runs and put unnecessary load on the external service.
-
-**Action:** When refactoring for performance, always ensure that existing functionality, especially caching, is preserved. I need to be more careful about the scope of my changes and not get so focused on one aspect of performance that I break another.
+## 2024-07-25 - Use Composite Indexes for Multi-Column Queries
+**Learning:** When queries frequently filter on multiple columns (e.g., `WHERE user_id = ? AND created_at > ?`), a single composite index (`CREATE INDEX ON table(user_id, created_at)`) is far more performant than multiple separate indexes on each column. The database can use the composite index to efficiently narrow down the search space using all criteria at once.
+**Action:** Prioritize creating composite indexes that match the order of columns in the `WHERE` clauses of frequent, high-impact queries. Analyze the application's query patterns before adding indexes.

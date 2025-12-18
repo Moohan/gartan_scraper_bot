@@ -21,7 +21,7 @@ from unittest.mock import Mock, patch
 # Add the project root to the Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from container_main import (  # noqa: E402
+from container_main import (
     main,
     processes,
     run_api_server,

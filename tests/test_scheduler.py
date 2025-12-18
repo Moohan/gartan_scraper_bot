@@ -23,7 +23,7 @@ from unittest.mock import Mock, patch
 # Add the project root to the Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scheduler import (  # noqa: E402
+from scheduler import (
     check_database_health,
     initial_data_check,
     main,

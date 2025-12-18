@@ -5,8 +5,8 @@ import tempfile
 from datetime import datetime, timedelta
 
 sys.path.insert(0, ".")
-import api_server  # noqa: E402
-from api_server import get_appliance_duration_data, get_crew_duration_data  # noqa: E402
+import api_server
+from api_server import get_appliance_duration_data, get_crew_duration_data
 
 
 def setup_temp_db():
