@@ -80,27 +80,26 @@ def delay(
     day_offset: int = 0,
 ) -> None:
     """
-    Implements delay with optional exponential backoff.
+    Implements an efficient delay with optional exponential backoff.
 
     Args:
-        min_delay: Minimum delay time in seconds
-        max_delay: Maximum delay time in seconds (optional)
-        base: Base for exponential backoff (default: 1.5)
-        day_offset: Current day offset for backoff calculation
+        min_delay: Minimum delay time in seconds.
+        max_delay: Maximum delay time in seconds (optional).
+        base: Base for exponential backoff (default: 1.5).
+        day_offset: Current day offset for backoff calculation.
     """
     if max_delay is None:
         actual_delay = min_delay
     else:
-        delay = min(max_delay, min_delay * (base ** max(0, day_offset)))
-        actual_delay = random.uniform(min_delay, delay)
+        # Calculate delay with exponential backoff and add jitter
+        backoff_delay = min_delay * (base**max(0, day_offset))
+        capped_delay = min(max_delay, backoff_delay)
+        actual_delay = random.uniform(min_delay, capped_delay)
 
-    if actual_delay >= 2:
-        logger.debug(f"Waiting {actual_delay:.1f}s before next operation.")
-        for i in range(int(actual_delay), 0, -1):
-            logger.debug(f"{i} seconds left.")
-            time.sleep(1)
-        leftover = actual_delay - int(actual_delay)
-        if leftover > 0:
-            time.sleep(leftover)
-    else:
+    # Bolt ⚡: Replaced an inefficient countdown loop with a single time.sleep() call.
+    # The previous implementation woke the CPU every second, leading to unnecessary
+    # context switching. This change reduces CPU usage and improves timer accuracy
+    # by sleeping for the entire duration in one go.
+    if actual_delay > 0:
+        logger.debug(f"Waiting {actual_delay:.2f}s before next operation.")
         time.sleep(actual_delay)
