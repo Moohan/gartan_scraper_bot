@@ -92,7 +92,7 @@ def delay(
         actual_delay = min_delay
     else:
         # Calculate delay with exponential backoff and add jitter
-        backoff_delay = min_delay * (base ** max(0, day_offset))
+        backoff_delay = min_delay * (base**max(0, day_offset))
         capped_delay = min(max_delay, backoff_delay)
         actual_delay = random.uniform(min_delay, capped_delay)
 
