@@ -165,7 +165,7 @@ def aggregate_appliance_availability(
 
 def _get_table_and_header(grid_html: str) -> tuple[Optional[Tag], Optional[Tag]]:
     """Extract main table and header row."""
-    soup = BeautifulSoup(grid_html, "html.parser")
+    soup = BeautifulSoup(grid_html, "lxml")
     table = safe_find_one(soup, "table", attrs={"id": "gridAvail"})
     if not table:
         return None, None
@@ -425,7 +425,7 @@ def parse_skills_table(
 ) -> Dict[str, Dict[str, Any]]:
     """Parse skills/rules table for BA, LGV, Total Crew counts."""
     log_debug("skills", "Parsing skills/rules table...")
-    soup = BeautifulSoup(grid_html, "html.parser")
+    soup = BeautifulSoup(grid_html, "lxml")
     table_match = _find_skills_table(soup)
     if not table_match:
         log_debug("skills", "No rules table found")
@@ -510,7 +510,7 @@ def parse_appliance_availability(
 ) -> Dict[str, Dict[str, Any]]:
     """Parse appliance availability grid and returns dictionary of time slots with availability."""
     log_debug("appliance", "Parsing appliance availability grid...")
-    soup = BeautifulSoup(grid_html, "html.parser")
+    soup = BeautifulSoup(grid_html, "lxml")
 
     appliance_rows = _find_appliance_rows(soup)
     if not appliance_rows:
@@ -665,7 +665,7 @@ def parse_station_feed_html(html_content: str) -> Dict[str, Dict[str, Any]]:
             "P22P6": {"availability": True},
         }
     """
-    soup = BeautifulSoup(html_content, "html.parser")
+    soup = BeautifulSoup(html_content, "lxml")
     availability_data = {}
 
     # This parsing is based on the specific structure of the ScheduleDisplay.aspx page.
