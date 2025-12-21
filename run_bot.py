@@ -1,15 +1,14 @@
 """Main entry point for Gartan Scraper Bot."""
 
-import asyncio
 import concurrent.futures
 import logging
 import os
 import re
 import time
+import asyncio
+import aiohttp
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
-
-import aiohttp
 
 from async_gartan_fetch import fetch_grid_html_for_date_async
 from cli import CliArgs, create_argument_parser
@@ -72,12 +71,9 @@ def _is_cache_valid(cache_file: str, cache_minutes: int) -> bool:
         return True
 
     mtime = os.path.getmtime(cache_file)
-    if (
-        datetime.now() - datetime.fromtimestamp(mtime)
-    ).total_seconds() / 60 < cache_minutes:
+    if (datetime.now() - datetime.fromtimestamp(mtime)).total_seconds() / 60 < cache_minutes:
         return True
     return False
-
 
 async def main():
     # Set up logging
@@ -148,26 +144,20 @@ async def main():
                     logger.info(
                         f"Processing day {index+1}/{effective_max_days}: {date}"
                     )
-                    cache_file = os.path.join(
-                        config.cache_dir, f"grid_{date.replace('/', '-')}.html"
-                    )
-                    days_from_today = (
-                        datetime.strptime(date, "%d/%m/%Y").date() - today.date()
-                    ).days
+                    cache_file = os.path.join(config.cache_dir, f"grid_{date.replace('/', '-')}.html")
+                    days_from_today = (datetime.strptime(date, "%d/%m/%Y").date() - today.date()).days
                     cache_minutes = config.get_cache_minutes(days_from_today)
 
-                    if args.cache_mode != "no-cache" and _is_cache_valid(
-                        cache_file, cache_minutes
-                    ):
+                    if args.cache_mode != 'no-cache' and _is_cache_valid(cache_file, cache_minutes):
                         logger.debug(f"Using cached data for {date}")
-                        with open(cache_file, "r", encoding="utf-8") as f:
+                        with open(cache_file, 'r', encoding='utf-8') as f:
                             grid_htmls[index] = f.read()
                     else:
                         logger.debug(f"Fetching data for {date}")
                         html = await fetch_grid_html_for_date_async(aio_session, date)
                         if html:
                             grid_htmls[index] = html
-                            with open(cache_file, "w", encoding="utf-8") as f:
+                            with open(cache_file, 'w', encoding='utf-8') as f:
                                 f.write(html)
 
             for i, date in enumerate(booking_dates):
@@ -178,18 +168,13 @@ async def main():
             await asyncio.gather(*fetch_tasks)
 
             # Use a ThreadPoolExecutor for the CPU-bound parsing task
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=config.max_workers
-            ) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=config.max_workers) as executor:
                 parse_futures = {
                     executor.submit(parse_grid_html, html, date): date
-                    for html, date in zip(grid_htmls, booking_dates)
-                    if html
+                    for html, date in zip(grid_htmls, booking_dates) if html
                 }
 
-                for i, future in enumerate(
-                    concurrent.futures.as_completed(parse_futures)
-                ):
+                for i, future in enumerate(concurrent.futures.as_completed(parse_futures)):
                     date = parse_futures[future]
                     try:
                         result = future.result()
@@ -224,9 +209,7 @@ async def main():
                         crew_id, display_name, phone = parts[0], parts[1], parts[2]
                         email = parts[3] if len(parts) > 3 else ""
                         position = parts[4] if len(parts) > 4 else ""
-                        contact_map[crew_id] = (
-                            f"{display_name}|{phone}|{email}|{position}"
-                        )
+                        contact_map[crew_id] = f"{display_name}|{phone}|{email}|{position}"
 
         insert_crew_details(crew_list_agg, contact_map, db_conn=db_conn)
         insert_crew_availability(crew_list_agg, db_conn=db_conn)
@@ -276,7 +259,6 @@ async def main():
     finally:
         if db_conn:
             db_conn.close()
-
 
 if __name__ == "__main__":
     asyncio.run(main())
