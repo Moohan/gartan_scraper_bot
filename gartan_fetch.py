@@ -289,7 +289,9 @@ def gartan_login_and_get_session():
     if not username or not password:
         log_debug("error", "Missing Gartan credentials in environment")
         # Tests expect an AuthenticationError when credentials are missing
-        raise AuthenticationError("GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment")
+        raise AuthenticationError(
+            "GARTAN_USERNAME and GARTAN_PASSWORD must be set in environment"
+        )
 
     current_time = time.time()
 
@@ -443,6 +445,7 @@ def _get_data_page(session, headers):
     except Exception as e:
         log_debug("error", f"Unexpected error checking authentication: {str(e)}")
         raise AuthenticationError(f"Failed to verify login: {str(e)}")
+
 
 def fetch_grid_html_for_date(session, booking_date):
     """
