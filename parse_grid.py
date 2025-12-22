@@ -29,13 +29,31 @@ class GridResult(TypedDict):
 
 
 def safe_find_one(element: Tag, name: str, **kwargs) -> Optional[Tag]:
-    """Safely find one element, ensuring it is a Tag."""
+    """Safely find one element, ensuring it is a Tag.
+
+    Args:
+        element: BeautifulSoup Tag to search within
+        name: HTML element name to find
+        **kwargs: Additional search parameters
+
+    Returns:
+        Tag element if found and valid, None otherwise
+    """
     result = element.find(name, **kwargs)
     return result if isinstance(result, Tag) else None
 
 
 def safe_find_all(element: Union[Tag, BeautifulSoup], name: str, **kwargs) -> List[Tag]:
-    """Safely find all elements, ensuring they are Tags."""
+    """Safely find all elements, ensuring they are Tags.
+
+    Args:
+        element: BeautifulSoup element/document to search within
+        name: HTML element name to find
+        **kwargs: Additional search parameters
+
+    Returns:
+        List of Tag elements found
+    """
     results = element.find_all(name, **kwargs)
     return [r for r in results if isinstance(r, Tag)]
 
