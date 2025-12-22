@@ -56,9 +56,7 @@ def read_crew_details_file() -> Dict[str, str]:
                     crew_id, display_name, phone = parts[0], parts[1], parts[2]
                     email = parts[3] if len(parts) > 3 else ""
                     position = parts[4] if len(parts) > 4 else ""
-                    contact_map[crew_id] = (
-                        f"{display_name}|{phone}|{email}|{position}"
-                    )
+                    contact_map[crew_id] = f"{display_name}|{phone}|{email}|{position}"
     return contact_map
 
 
