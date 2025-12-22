@@ -1325,7 +1325,8 @@ def add_security_headers(response):
     # SECURE: Add CSP to protect against XSS. Allows inline styles and the auto-refresh script.
     # SECURE: Add CSP to protect against XSS. Allows only self-hosted styles.
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self'; style-src 'self'"
+        "default-src 'self'; script-src 'self'; style-src 'self'; "
+        "object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
     )
     return response
 
