@@ -3,6 +3,7 @@
 Transforms raw schedule grid HTML into structured availability blocks for
 crew and appliances, plus helper summarization (next available windows etc.).
 """
+
 import functools
 from datetime import datetime as dt
 from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
