@@ -3,7 +3,7 @@
 Transforms raw schedule grid HTML into structured availability blocks for
 crew and appliances, plus helper summarization (next available windows etc.).
 """
-
+import functools
 from datetime import datetime as dt
 from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
 
@@ -26,6 +26,18 @@ class GridResult(TypedDict):
     crew_availability: List[AvailabilityDict]
     appliance_availability: Dict[str, AvailabilityDict]
     skills_data: Dict[str, Dict[str, int]]
+
+
+# Bolt ⚡: Caching datetime parsing, as the same timestamps appear hundreds of
+# times, making this a major bottleneck. Using lru_cache for memoization avoids
+# re-parsing the same strings repeatedly, significantly speeding up the process.
+@functools.lru_cache(maxsize=1024)
+def _parse_slot_datetime(slot: str) -> Optional[dt]:
+    """Parse a slot string into a datetime object, with caching."""
+    try:
+        return dt.strptime(slot, "%d/%m/%Y %H%M")
+    except (ValueError, TypeError):
+        return None
 
 
 def safe_find_one(element: Tag, name: str, **kwargs) -> Optional[Tag]:
@@ -147,11 +159,9 @@ def aggregate_appliance_availability(
         availability = entry["availability"]
         slot_tuples = []
         for slot, avail in availability.items():
-            try:
-                slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+            slot_dt = _parse_slot_datetime(slot)
+            if slot_dt:
                 slot_tuples.append((slot_dt, avail))
-            except Exception:
-                continue
         slot_tuples.sort()
 
         summary = _calculate_availability_summary(slot_tuples, now)
@@ -181,11 +191,9 @@ def _get_slot_datetimes(availability: dict) -> list[tuple[dt, bool]]:
     """Convert dict of slots to sorted list of datetime tuples."""
     slot_datetimes = []
     for slot, is_avail in availability.items():
-        try:
-            slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+        slot_dt = _parse_slot_datetime(slot)
+        if slot_dt:
             slot_datetimes.append((slot_dt, is_avail))
-        except (ValueError, TypeError):
-            continue
     slot_datetimes.sort()
     return slot_datetimes
 
@@ -605,11 +613,9 @@ def aggregate_crew_availability(
     for crew in crew_dict.values():
         slot_tuples = []
         for slot, avail in crew["_all_slots"]:
-            try:
-                slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+            slot_dt = _parse_slot_datetime(slot)
+            if slot_dt:
                 slot_tuples.append((slot_dt, avail))
-            except Exception:
-                continue
         slot_tuples.sort()
 
         summary = _calculate_availability_summary(slot_tuples, now)
