@@ -5,11 +5,26 @@ crew and appliances, plus helper summarization (next available windows etc.).
 """
 
 from datetime import datetime as dt
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
 
 from bs4 import BeautifulSoup, NavigableString, Tag  # type: ignore
 
 from utils import log_debug
+
+
+# Bolt ⚡: Memoize datetime parsing to avoid expensive re-computation of the same date strings.
+# The `lru_cache` decorator stores the results of the function call, so subsequent calls
+# with the same `date_string` will return the cached result instantly, significantly
+# speeding up the parsing of availability data where the same timestamps appear frequently.
+@lru_cache(maxsize=None)
+def _parse_datetime_memoized(date_string: str) -> Optional[dt]:
+    """Parse a datetime string with memoization."""
+    try:
+        return dt.strptime(date_string, "%d/%m/%Y %H%M")
+    except (ValueError, TypeError):
+        return None
+
 
 # Type aliases for clarity
 GridElement = Union[Tag, NavigableString]
@@ -147,11 +162,9 @@ def aggregate_appliance_availability(
         availability = entry["availability"]
         slot_tuples = []
         for slot, avail in availability.items():
-            try:
-                slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+            slot_dt = _parse_datetime_memoized(slot)
+            if slot_dt:
                 slot_tuples.append((slot_dt, avail))
-            except Exception:
-                continue
         slot_tuples.sort()
 
         summary = _calculate_availability_summary(slot_tuples, now)
@@ -181,11 +194,9 @@ def _get_slot_datetimes(availability: dict) -> list[tuple[dt, bool]]:
     """Convert dict of slots to sorted list of datetime tuples."""
     slot_datetimes = []
     for slot, is_avail in availability.items():
-        try:
-            slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+        slot_dt = _parse_datetime_memoized(slot)
+        if slot_dt:
             slot_datetimes.append((slot_dt, is_avail))
-        except (ValueError, TypeError):
-            continue
     slot_datetimes.sort()
     return slot_datetimes
 
@@ -605,11 +616,9 @@ def aggregate_crew_availability(
     for crew in crew_dict.values():
         slot_tuples = []
         for slot, avail in crew["_all_slots"]:
-            try:
-                slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+            slot_dt = _parse_datetime_memoized(slot)
+            if slot_dt:
                 slot_tuples.append((slot_dt, avail))
-            except Exception:
-                continue
         slot_tuples.sort()
 
         summary = _calculate_availability_summary(slot_tuples, now)
