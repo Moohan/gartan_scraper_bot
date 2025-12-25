@@ -6,10 +6,15 @@ Scrapes Gartan Availability system and provides REST API for crew and appliance 
 
 **1. Set up credentials:**
 
+Create a `.env` file for your local environment variables. You can use the provided example file as a template:
+
 ```bash
-echo "GARTAN_USERNAME=your_username" > .env
-echo "GARTAN_PASSWORD=your_password" >> .env
+cp .env.example .env
 ```
+
+Next, open the `.env` file and replace the placeholder values with your actual Gartan username and password.
+
+**IMPORTANT:** The `.env` file is included in `.gitignore` and should never be committed to the repository to avoid exposing sensitive credentials.
 
 **2. Deploy container:**
 
