@@ -1334,7 +1334,10 @@ def add_security_headers(response):
 if __name__ == "__main__":
     # Production configuration
     port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    # SECURITY: Hardcode debug=False for production.
+    # The Flask debug mode should never be enabled in a production environment
+    # as it can expose critical vulnerabilities.
+    debug = False
 
     logger.info(f"Starting Gartan API Server on port {port}")
     logger.info(
