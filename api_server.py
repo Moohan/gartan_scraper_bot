@@ -1329,9 +1329,7 @@ def add_security_headers(response):
         "object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
     )
     # SECURE: Add Permissions-Policy to disable unnecessary and potentially risky browser features
-    response.headers["Permissions-Policy"] = (
-        "camera=(), microphone=(), geolocation=()"
-    )
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     return response
 
 
