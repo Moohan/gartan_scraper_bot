@@ -11,7 +11,7 @@ schedule==1.2.2
 
 # Testing
 pytest==7.4.4
-pytest-xdist==3.6.1
+pytest-xdist==3.8.0
 
 # Dev / Linting tools
 pylint==3.2.5
