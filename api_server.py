@@ -1334,9 +1334,12 @@ def add_security_headers(response):
 if __name__ == "__main__":
     # Production configuration
     port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    # SECURE: Harden debug mode. Only allow debug if FLASK_ENV is explicitly 'development'.
+    # This prevents accidental activation in production via FLASK_DEBUG env var.
+    is_development = os.environ.get("FLASK_ENV") == "development"
+    debug = is_development
 
-    logger.info(f"Starting Gartan API Server on port {port}")
+    logger.info(f"Starting Gartan API Server on port {port} (Debug: {debug})")
     logger.info(
         f"Database status: {'Ready' if db_exists() else 'No data - waiting for scraper'}"
     )
