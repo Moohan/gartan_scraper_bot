@@ -1328,13 +1328,18 @@ def add_security_headers(response):
         "default-src 'self'; script-src 'self'; style-src 'self'; "
         "object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
     )
+    # SECURE: Add Permissions-Policy to disable unnecessary browser features.
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=()"
+    )
     return response
 
 
 if __name__ == "__main__":
     # Production configuration
     port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    # SECURE: Tie debug mode to FLASK_ENV to prevent accidental activation in production.
+    debug = os.environ.get("FLASK_ENV") == "development"
 
     logger.info(f"Starting Gartan API Server on port {port}")
     logger.info(
