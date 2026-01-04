@@ -163,9 +163,10 @@ def aggregate_appliance_availability(
     return list(appliance_dict.values())
 
 
-def _get_table_and_header(grid_html: str) -> tuple[Optional[Tag], Optional[Tag]]:
-    """Extract main table and header row."""
-    soup = BeautifulSoup(grid_html, "lxml")
+def _get_table_and_header_from_soup(
+    soup: BeautifulSoup,
+) -> tuple[Optional[Tag], Optional[Tag]]:
+    """Extract main table and header row from a BeautifulSoup object."""
     table = safe_find_one(soup, "table", attrs={"id": "gridAvail"})
     if not table:
         return None, None
@@ -420,12 +421,11 @@ def _parse_skill_row(
     return availability
 
 
-def parse_skills_table(
-    grid_html: str, date: Optional[str] = None
+def parse_skills_table_from_soup(
+    soup: BeautifulSoup, date: Optional[str] = None
 ) -> Dict[str, Dict[str, Any]]:
-    """Parse skills/rules table for BA, LGV, Total Crew counts."""
+    """Parse skills/rules table from a BeautifulSoup object."""
     log_debug("skills", "Parsing skills/rules table...")
-    soup = BeautifulSoup(grid_html, "lxml")
     table_match = _find_skills_table(soup)
     if not table_match:
         log_debug("skills", "No rules table found")
@@ -505,12 +505,11 @@ def _find_appliance_rows(soup: BeautifulSoup) -> List[Tuple[Tag, Tag]]:
     return appliance_rows
 
 
-def parse_appliance_availability(
-    grid_html: str, date: Optional[str] = None
+def parse_appliance_availability_from_soup(
+    soup: BeautifulSoup, date: Optional[str] = None
 ) -> Dict[str, Dict[str, Any]]:
-    """Parse appliance availability grid and returns dictionary of time slots with availability."""
+    """Parse appliance availability grid from a BeautifulSoup object."""
     log_debug("appliance", "Parsing appliance availability grid...")
-    soup = BeautifulSoup(grid_html, "lxml")
 
     appliance_rows = _find_appliance_rows(soup)
     if not appliance_rows:
@@ -625,8 +624,15 @@ def aggregate_crew_availability(
 
 
 def parse_grid_html(grid_html: str, date: Optional[str] = None) -> GridResult:
-    """Parse grid HTML into structured crew/appliance availability data."""
-    table, header_row = _get_table_and_header(grid_html)
+    """
+    Bolt ⚡: This function is performance-critical.
+    It now parses the HTML with BeautifulSoup only ONCE, creating a `soup`
+    object that is passed to all sub-parsers. This avoids reparsing the same
+    HTML string multiple times, which is a significant performance bottleneck.
+    """
+    # Create the BeautifulSoup object once to avoid redundant parsing
+    soup = BeautifulSoup(grid_html, "lxml")
+    table, header_row = _get_table_and_header_from_soup(soup)
 
     result: GridResult = {
         "date": date,
@@ -640,11 +646,11 @@ def parse_grid_html(grid_html: str, date: Optional[str] = None) -> GridResult:
         crew_result = _extract_crew_availability(date, table, time_slots)
         result["crew_availability"] = crew_result.get("crew_availability", [])
 
-    appliance_availability = parse_appliance_availability(grid_html, date)
+    appliance_availability = parse_appliance_availability_from_soup(soup, date)
     if appliance_availability:
         result["appliance_availability"] = appliance_availability
 
-    skills_data = parse_skills_table(grid_html, date)
+    skills_data = parse_skills_table_from_soup(soup, date)
     if skills_data:
         result["skills_data"] = skills_data
 
