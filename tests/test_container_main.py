@@ -184,6 +184,7 @@ class TestContainerMain(unittest.TestCase):
                     result = wait_for_database()
                     self.assertFalse(result)
 
+    @patch("container_main.sys.exit")
     @patch("container_main.logger")
     @patch("container_main.Process")
     @patch("container_main.wait_for_database", return_value=True)
@@ -198,6 +199,7 @@ class TestContainerMain(unittest.TestCase):
         mock_wait_db,
         mock_process_class,
         mock_logger,
+        mock_exit,
     ):
         """Test successful main orchestration"""
         # Mock processes
@@ -227,6 +229,7 @@ class TestContainerMain(unittest.TestCase):
 
         mock_logger.info.assert_called()
 
+    @patch("container_main.sys.exit")
     @patch("container_main.logger")
     @patch("container_main.Process")
     @patch(
@@ -243,6 +246,7 @@ class TestContainerMain(unittest.TestCase):
         mock_wait_db,
         mock_process_class,
         mock_logger,
+        mock_exit,
     ):
         """Test main orchestration when database times out"""
         # Mock processes
@@ -273,11 +277,12 @@ class TestContainerMain(unittest.TestCase):
         # Verify warning was logged about database timeout
         mock_logger.warning.assert_called()
 
+    @patch("container_main.sys.exit")
     @patch("container_main.logger")
     @patch("container_main.Process")
     @patch("container_main.signal_handler")
     def test_main_process_failure_detection(
-        self, mock_signal_handler, mock_process_class, mock_logger
+        self, mock_signal_handler, mock_process_class, mock_logger, mock_exit
     ):
         """Test main orchestration detects process failures"""
         # Mock processes
@@ -300,9 +305,10 @@ class TestContainerMain(unittest.TestCase):
         # Verify shutdown was triggered due to dead process
         mock_logger.error.assert_called_with("Process api_server died unexpectedly")
 
+    @patch("container_main.sys.exit")
     @patch("container_main.logger")
     @patch("container_main.signal_handler")
-    def test_main_exception_handling(self, mock_signal_handler, mock_logger):
+    def test_main_exception_handling(self, mock_signal_handler, mock_logger, mock_exit):
         """Test main orchestration handles exceptions"""
         with patch("container_main.Process", side_effect=Exception("Test error")):
             main()

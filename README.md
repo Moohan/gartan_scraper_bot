@@ -65,6 +65,12 @@ docker-compose logs -f
 docker-compose pull && docker-compose up -d
 ```
 
+## Project Structure
+- `docs/`: Documentation and validation plans.
+- `logs/`: Application and debug logs.
+- `scripts/`: Utility scripts for deployment and verification.
+- `tests/`: Unit and integration tests.
+
 ## Local Development
 
 **Fresh start (clear database and rescrape):**
