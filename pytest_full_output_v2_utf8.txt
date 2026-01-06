@@ -1,0 +1,44 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0
+rootdir: D:\james\gartan_scraper_bot
+configfile: pytest.ini (WARNING: ignoring pytest config in pyproject.toml!)
+plugins: xdist-3.8.0
+collected 245 items
+
+scripts\test_async_fetch_manual.py F                                     [  0%]
+scripts\test_sync_fetch_manual.py .                                      [  0%]
+tests\test_api_endpoints.py ..................                           [  8%]
+tests\test_api_error_handling.py .................                       [ 15%]
+tests\test_api_server.py .                                               [ 15%]
+tests\test_api_simple.py .....                                           [ 17%]
+tests\test_business_rules.py ...................                         [ 25%]
+tests\test_cache_utils.py ..........                                     [ 29%]
+tests\test_cli.py ..........................                             [ 40%]
+tests\test_config.py ...............s......                              [ 48%]
+tests\test_connection_manager.py ..........                              [ 53%]
+tests\test_container_main.py ............                                [ 57%]
+tests\test_db_store.py ..........                                        [ 62%]
+tests\test_duration_endpoints.py ..                                      [ 62%]
+tests\test_gartan_fetch.py ...............                               [ 68%]
+tests\test_infinite_cache.py ......                                      [ 71%]
+tests\test_logging_config.py ..                                          [ 72%]
+tests\test_parse_grid.py ....................                            [ 80%]
+tests\test_parse_station_display.py .                                    [ 80%]
+tests\test_run_bot.py .......                                            [ 83%]
+tests\test_scheduler.py ..................                               [ 91%]
+tests\test_station_feed_verification.py ....                             [ 92%]
+tests\test_utils.py ...........                                          [ 97%]
+tests\test_weekly_api.py .......                                         [100%]
+
+================================== FAILURES ===================================
+______________________________ test_async_fetch _______________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+=========================== short test summary info ===========================
+FAILED scripts/test_async_fetch_manual.py::test_async_fetch - Failed: async d...
+============ 1 failed, 243 passed, 1 skipped in 172.84s (0:02:52) =============
