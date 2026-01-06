@@ -250,7 +250,10 @@ def fetch_station_feed_html(session) -> str | None:
         str: The HTML content of the page, or None if the request fails or session is not provided.
     """
     if not session:
-        log_debug("warn", "No session available for station feed fetch (running in cache-only or no-auth mode)")
+        log_debug(
+            "warn",
+            "No session available for station feed fetch (running in cache-only or no-auth mode)",
+        )
         return None
     try:
         response = session.get(STATION_FEED_URL)
@@ -290,7 +293,9 @@ def gartan_login_and_get_session():
 
     username, password = _get_credentials()
     # Temporary debug: log credentials and cached session presence for bisecting test-order flakiness
-    print(f"[DEBUG] gartan_login called: username={username!r}, password_set={'yes' if password else 'no'}, cached_session={'yes' if _authenticated_session is not None else 'no'}")
+    print(
+        f"[DEBUG] gartan_login called: username={username!r}, password_set={'yes' if password else 'no'}, cached_session={'yes' if _authenticated_session is not None else 'no'}"
+    )
     if not username or not password:
         log_debug("error", "Missing Gartan credentials in environment")
         # Clear any cached session to avoid cross-test pollution
@@ -351,6 +356,7 @@ def gartan_login_and_get_session():
         _session_authenticated_time = None
         raise AuthenticationError(f"Login failed due to unexpected error: {str(e)}")
 
+
 def _get_login_form(session):
     """
     Retrieve the login form from the login page.
@@ -368,7 +374,10 @@ def _get_login_form(session):
     try:
         soup = BeautifulSoup(resp.content, "lxml")
     except Exception:
-        log_debug("warn", "lxml parser not available for login form parsing, falling back to html.parser")
+        log_debug(
+            "warn",
+            "lxml parser not available for login form parsing, falling back to html.parser",
+        )
         soup = BeautifulSoup(resp.content, "html.parser")
 
     form = soup.find("form")
@@ -432,7 +441,9 @@ def _build_login_payload(form, username, password):
             payload[name] = selected.get("value")
         else:
             first = sel.find("option")
-            payload[name] = first.get("value") if first and first.get("value") is not None else ""
+            payload[name] = (
+                first.get("value") if first and first.get("value") is not None else ""
+            )
 
     # Ensure username/password fields exist with expected keys
     payload["txt_userid"] = username
@@ -628,9 +639,7 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
         "}"
     )
 
-    schedule_resp = session.post(
-        schedule_url, headers=headers, data=raw_payload
-    )
+    schedule_resp = session.post(schedule_url, headers=headers, data=raw_payload)
     if schedule_resp.status_code != 200:
         log_debug(
             "error",

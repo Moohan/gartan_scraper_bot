@@ -1,11 +1,14 @@
 import asyncio
-import aiohttp
 import os
-from gartan_fetch import gartan_login_and_get_session
-from async_gartan_fetch import fetch_grid_html_for_date_async
+
+import aiohttp
 from dotenv import load_dotenv
 
+from async_gartan_fetch import fetch_grid_html_for_date_async
+from gartan_fetch import gartan_login_and_get_session
+
 load_dotenv()
+
 
 async def test_async_fetch():
     print("Attempting login (sync) to get cookies...")
@@ -28,6 +31,7 @@ async def test_async_fetch():
             print(html[:200])
         else:
             print("Async fetch failed")
+
 
 if __name__ == "__main__":
     asyncio.run(test_async_fetch())

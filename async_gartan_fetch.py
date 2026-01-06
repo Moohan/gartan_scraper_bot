@@ -77,7 +77,9 @@ async def fetch_grid_html_for_date_async(
     )
 
     try:
-        async with session.post(SCHEDULE_URL, headers=headers, data=raw_payload) as response:
+        async with session.post(
+            SCHEDULE_URL, headers=headers, data=raw_payload
+        ) as response:
             if response.status != 200:
                 log_debug(
                     "error",
