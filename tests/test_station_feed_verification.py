@@ -2,7 +2,7 @@ import logging
 import unittest
 from unittest.mock import MagicMock
 
-from station_feed_verification import compare_and_log_discrepancies
+from scripts.station_feed_verification import compare_and_log_discrepancies
 
 
 class TestStationFeedVerification(unittest.TestCase):
