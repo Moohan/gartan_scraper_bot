@@ -5,6 +5,9 @@ import concurrent.futures
 import logging
 import os
 import re
+
+# Add scripts directory to path for utility modules
+import sys
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
@@ -33,14 +36,14 @@ from parse_grid import (
     parse_grid_html,
     parse_station_feed_html,
 )
-# Add scripts directory to path for utility modules
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'scripts'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
 
 from station_feed_verification import (
     compare_and_log_discrepancies,
     setup_verification_logger,
 )
+
 from utils import get_week_aligned_date_range, log_debug
 
 logger = get_logger()
