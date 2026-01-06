@@ -275,9 +275,15 @@ def _find_appliance_name(appliance_row: Optional[Tag]) -> str:
     if not appliance_row:
         return "UNKNOWN"
 
+    # Preferred: look for a cell with colspan=5 (typical in full tables)
     name_cell = safe_find_one(appliance_row, "td", attrs={"colspan": "5"})
     if name_cell and name_cell.get_text(strip=True):
         return name_cell.get_text(strip=True)
+
+    # Fallback: use the first td text (covers simplified test HTML)
+    first_td = safe_find_one(appliance_row, "td")
+    if first_td and first_td.get_text(strip=True):
+        return first_td.get_text(strip=True)
 
     return "UNKNOWN"
 
@@ -494,9 +500,9 @@ def _find_appliance_rows(soup: BeautifulSoup) -> List[Tuple[Tag, Tag]]:
                 # The next row is the header, and the one after that is the data
                 if i + 2 < len(rows):
                     appliance_rows.append((rows[i + 1], rows[i + 2]))
-    # Fallback for the test case structure
+    # Fallback for the test case structure: check all tables when no id-based table found
     if not appliance_rows:
-        for table in safe_find_all(soup, "table", attrs={"id": "gridAvail"}):
+        for table in safe_find_all(soup, "table"):
             rows = safe_find_all(table, "tr")
             for i, row in enumerate(rows):
                 if "P22P6" in row.get_text() and i > 0:
@@ -550,7 +556,9 @@ def has_available_style(cell: Optional[Tag]) -> bool:
     style = cell.get("style", "")
     if not isinstance(style, str):
         return False
-    return "background-color:#009933" in style.replace(" ", "").lower()
+    style_str = style.replace(" ", "").lower()
+    # Support multiple green shades found in different Gartan versions
+    return any(color in style_str for color in ["#009933", "#4ea72e"])
 
 
 def parse_time_slot(cell: Optional[Tag]) -> str:
@@ -724,9 +732,19 @@ def _is_crew_available_in_cell(cell: Optional[Tag]) -> bool:
         ):
             return False
         elif any(
-            color in style_str for color in ["#cccccc", "#999999", "gray", "grey"]
+            color in style_str for color in ["#cccccc", "#999999", "#d8dde1", "gray", "grey"]
         ):
             return False
+
+    # If the cell has class 'schTD_off', it's unavailable
+    classes = cell.get("class", [])
+    if isinstance(classes, list) and "schTD_off" in classes:
+        return False
+
+    # If the cell is 'schTD' and doesn't have a specific text code, assume available
+    # Our earlier data check showed empty schTD cells are available slots.
+    if isinstance(classes, list) and "schTD" in classes and cell_text == "":
+        return True
 
     # Default to not available if no availability indicators are found.
     return False

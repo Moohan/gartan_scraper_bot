@@ -19,17 +19,18 @@ def _build_schedule_payload(booking_date: str) -> dict:
     Build the payload for the schedule AJAX request.
     """
     return {
-        "brigadeId": 47,
-        "brigadeName": "P22 Dunkeld",
+        "brigadeId": "101",
+        "brigadeName": "P22",
         "employeeBrigadeId": 0,
         "bookingDate": booking_date,
-        "resolution": 15,
+        "resolution": 60,
         "dayCount": 0,
-        "showDetails": "true",
-        "showHours": "true",
-        "highlightContractDetails": "false",
-        "highlightEmployeesOffStation": "true",
-        "includeApplianceStatus": "true",
+        "showDetails": True,
+        "showHours": True,
+        "highlightContractDetails": False,
+        "highlightEmployeesOffStation": True,
+        "includeApplianceStatus": True,
+        "showEmpShiftTypes": False,
     }
 
 
@@ -56,17 +57,35 @@ async def fetch_grid_html_for_date_async(
     payload = _build_schedule_payload(booking_date)
     headers = _get_schedule_headers()
 
-    # Bolt ⚡: Asynchronously fetches daily schedule HTML, allowing for concurrent network requests.
-    # This is much more efficient than the previous threaded approach for I/O-bound tasks.
+    # Manually construct the payload string to match Gartan's frontend JS exactly (unquoted keys, single-quoted values)
+    # See js_fsi3.js line 275
+    raw_payload = (
+        "{"
+        f" brigadeId: {payload['brigadeId']},"
+        f" brigadeName: '{payload['brigadeName']}',"
+        f" employeeBrigadeId: {payload['employeeBrigadeId']},"
+        f" bookingDate: '{payload['bookingDate']}',"
+        f" resolution: {payload['resolution']},"
+        f" dayCount: {payload['dayCount']},"
+        f" showDetails: '{str(payload['showDetails']).lower()}',"
+        f" showHours: '{str(payload['showHours']).lower()}',"
+        f" highlightContractDetails: '{str(payload['highlightContractDetails']).lower()}',"
+        f" highlightEmployeesOffStation: '{str(payload['highlightEmployeesOffStation']).lower()}',"
+        f" includeApplianceStatus: '{str(payload['includeApplianceStatus']).lower()}',"
+        f" showEmpShiftTypes: '{str(payload['showEmpShiftTypes']).lower()}'"
+        "}"
+    )
+
     try:
-        async with session.post(
-            SCHEDULE_URL, headers=headers, json=payload
-        ) as response:
+        async with session.post(SCHEDULE_URL, headers=headers, data=raw_payload) as response:
             if response.status != 200:
                 log_debug(
                     "error",
                     f"Async schedule AJAX failed for {booking_date}: {response.status}",
                 )
+                # Log response body for debugging
+                body = await response.text()
+                log_debug("error", f"Response body: {body}")
                 return None
 
             # The response is JSON, with the HTML content in the 'd' key.

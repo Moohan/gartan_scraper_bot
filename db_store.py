@@ -93,57 +93,71 @@ def init_db(db_path: str = DB_PATH, reset: bool = False):
 def _convert_slots_to_blocks(
     availability: Dict[str, bool],
 ) -> List[Dict[str, datetime]]:
-    """Converts a dictionary of 15-minute slots into a list of continuous availability blocks."""
-    from logging_config import get_logger
+    """Converts a dictionary of slots into a list of continuous availability blocks.
 
+    Dynamically detects the resolution (e.g. 15m or 60m) and correctly handles
+    time gaps between blocks.
+    """
+    from logging_config import get_logger
     logger = get_logger()
 
     if not availability:
-        logger.debug("Availability data is empty, returning no blocks.")
         return []
 
-    # Convert slot strings to datetime objects and sort them
+    # Sort availability by timestamp
     sorted_slots = sorted(
         [
             (datetime.strptime(slot, "%d/%m/%Y %H%M"), is_available)
             for slot, is_available in availability.items()
         ]
     )
-    logger.debug(f"Processing {len(sorted_slots)} sorted slots.")
+
+    # 1. Determine Resolution (default to 60m if not detectable, as seen in Gartan)
+    resolution = timedelta(minutes=60)
+    if len(sorted_slots) > 1:
+        # Find the most common difference between adjacent slots
+        diffs = []
+        for i in range(len(sorted_slots) - 1):
+            diff = sorted_slots[i+1][0] - sorted_slots[i][0]
+            if diff > timedelta(0):
+                diffs.append(diff)
+
+        if diffs:
+            # Simple heuristic: use the minimum positive difference as the resolution
+            resolution = min(diffs)
+            logger.debug(f"Detected slot resolution: {resolution}")
 
     blocks = []
     in_block = False
     block_start = None
+    prev_slot_time = None
 
     for i, (slot_time, is_available) in enumerate(sorted_slots):
-        if is_available and not in_block:
-            in_block = True
-            block_start = slot_time
-            logger.debug(
-                f"Started a new block at {block_start.strftime('%Y-%m-%d %H:%M')}"
-            )
-        elif not is_available and in_block:
-            in_block = False
-            # The block ends at the start of the first unavailable slot
-            block_end = slot_time
-            if block_start:
-                blocks.append({"start_time": block_start, "end_time": block_end})
-                logger.debug(
-                    f"Closed block: {block_start.strftime('%Y-%m-%d %H:%M')} to {block_end.strftime('%Y-%m-%d %H:%M')}"
-                )
-            block_start = None
+        if is_available:
+            if not in_block:
+                # Start new block
+                in_block = True
+                block_start = slot_time
+            else:
+                # Already in a block, check for gaps
+                if prev_slot_time and (slot_time - prev_slot_time) > resolution:
+                    # Gap detected! Close previous block and start new one
+                    blocks.append({"start_time": block_start, "end_time": prev_slot_time + resolution})
+                    block_start = slot_time
+        else:
+            if in_block:
+                # Available -> Unavailable transition. Close block at the current unavailable slot.
+                blocks.append({"start_time": block_start, "end_time": slot_time})
+                in_block = False
+                block_start = None
 
-    # If the session ends while in an availability block, close it.
-    if in_block and block_start:
-        # The last block extends 15 minutes past the last slot's start time
-        last_slot_time = sorted_slots[-1][0]
-        block_end = last_slot_time + timedelta(minutes=15)
-        blocks.append({"start_time": block_start, "end_time": block_end})
-        logger.debug(
-            f"Closed final block: {block_start.strftime('%Y-%m-%d %H:%M')} to {block_end.strftime('%Y-%m-%d %H:%M')}"
-        )
+        prev_slot_time = slot_time
 
-    logger.debug(f"Converted {len(availability)} slots into {len(blocks)} blocks.")
+    # Close the last block if still open
+    if in_block and block_start and prev_slot_time:
+        blocks.append({"start_time": block_start, "end_time": prev_slot_time + resolution})
+
+    logger.debug(f"Converted {len(availability)} slots into {len(blocks)} blocks using {resolution} resolution.")
     return blocks
 
 
@@ -246,36 +260,25 @@ def insert_crew_availability(crew_list: List[Dict[str, Any]], db_conn=None):
 
             # Clean up existing blocks that overlap with the date range being processed
             if min_date and max_date:
-                logger.debug(
-                    f"Cleaning up existing blocks for {name} in date range {min_date} to {max_date}"
-                )
-                # Use datetime range comparison instead of SQL date() function to avoid deprecation warnings
-                min_datetime = f"{min_date} 00:00:00"
-                max_datetime = f"{max_date} 23:59:59"
+                # We use a half-open interval [start, end) for the processed range.
+                # A block is deleted if it has ANY overlap with this range.
+                # Logic: start_time < range_end AND end_time > range_start
+                range_start = datetime.combine(min_date, datetime.min.time())
+                range_end = datetime.combine(max_date + timedelta(days=1), datetime.min.time())
+
                 c.execute(
                     """
                     DELETE FROM crew_availability
                     WHERE crew_id = ?
-                    AND (
-                        start_time BETWEEN ? AND ?
-                        OR end_time BETWEEN ? AND ?
-                        OR (start_time <= ? AND end_time >= ?)
-                    )
+                    AND start_time < ?
+                    AND end_time > ?
                 """,
-                    (
-                        crew_id,
-                        min_datetime,
-                        max_datetime,
-                        min_datetime,
-                        max_datetime,
-                        min_datetime,
-                        max_datetime,
-                    ),
+                    (crew_id, range_end, range_start),
                 )
 
                 deleted_count = c.rowcount
                 if deleted_count > 0:
-                    logger.debug(f"Deleted {deleted_count} existing blocks for {name}")
+                    logger.debug(f"Deleted {deleted_count} existing blocks for {name} overlapping {min_date} to {max_date}")
 
             availability_blocks = _convert_slots_to_blocks(crew["availability"])
             logger.debug(
@@ -305,6 +308,7 @@ def insert_crew_availability(crew_list: List[Dict[str, Any]], db_conn=None):
             )
 
         conn.commit()
+        defrag_availability(db_conn=conn)
 
     finally:
         if should_close:
@@ -320,6 +324,21 @@ def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
         conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
         should_close = True
     c = conn.cursor()
+
+    # Identify the date range for cleanup based on keys in the data
+    all_dates = set()
+    for info in appliance_obj.values():
+        for slot in info.get("availability", {}).keys():
+            try:
+                date_str = slot.split(" ")[0]
+                date_obj = datetime.strptime(date_str, "%d/%m/%Y").date()
+                all_dates.add(date_obj)
+            except (ValueError, IndexError):
+                continue
+
+    min_date = min(all_dates) if all_dates else None
+    max_date = max(all_dates) if all_dates else None
+
     try:
         for appliance, info in appliance_obj.items():
             c.execute("INSERT OR IGNORE INTO appliance (name) VALUES (?)", (appliance,))
@@ -328,15 +347,91 @@ def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
             if not row:
                 continue
             appliance_id = row[0]
+
+            # Clean up existing blocks that overlap with the date range being processed
+            if min_date and max_date:
+                range_start = datetime.combine(min_date, datetime.min.time())
+                range_end = datetime.combine(max_date + timedelta(days=1), datetime.min.time())
+
+                c.execute(
+                    """
+                    DELETE FROM appliance_availability
+                    WHERE appliance_id = ?
+                    AND start_time < ?
+                    AND end_time > ?
+                """,
+                    (appliance_id, range_end, range_start),
+                )
+
             availability_blocks = _convert_slots_to_blocks(info["availability"])
             for block in availability_blocks:
                 c.execute(
                     """
-                    INSERT OR IGNORE INTO appliance_availability (appliance_id, start_time, end_time)
+                    INSERT OR REPLACE INTO appliance_availability (appliance_id, start_time, end_time)
                     VALUES (?, ?, ?)
                     """,
                     (appliance_id, block["start_time"], block["end_time"]),
                 )
+        conn.commit()
+        defrag_availability(db_conn=conn)
+    finally:
+        if should_close:
+            conn.close()
+
+
+def defrag_availability(db_conn=None):
+    """Merge touching or overlapping availability blocks in the database.
+
+    This joins blocks like [08:00, 10:00] and [10:00, 12:00] into [08:00, 12:00].
+    """
+    from logging_config import get_logger
+    logger = get_logger()
+
+    if db_conn is not None:
+        conn = db_conn
+        should_close = False
+    else:
+        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+        should_close = True
+    c = conn.cursor()
+
+    try:
+        for table in ["crew_availability", "appliance_availability"]:
+            id_col = "crew_id" if table == "crew_availability" else "appliance_id"
+
+            # Simple iterative merging logic:
+            # 1. Select all blocks sorted by id and start_time
+            c.execute(f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time")
+            rows = c.fetchall()
+
+            if not rows:
+                continue
+
+            merged_count = 0
+            prev_id, prev_start, prev_end, prev_row_id = rows[0][1], rows[0][2], rows[0][3], rows[0][0]
+
+            for i in range(1, len(rows)):
+                curr_row_id, curr_id, curr_start, curr_end = rows[i]
+
+                # Check for touch or overlap
+                if curr_id == prev_id and curr_start <= prev_end:
+                    # Overlap! Merge curr into prev
+                    new_end = max(prev_end, curr_end)
+                    if new_end != prev_end:
+                        # Update prev block
+                        c.execute(f"UPDATE {table} SET end_time = ? WHERE id = ?", (new_end, prev_row_id))
+                        prev_end = new_end
+
+                    # Delete current block
+                    c.execute(f"DELETE FROM {table} WHERE id = ?", (curr_row_id,))
+                    merged_count += 1
+                else:
+                    # Move to next block
+                    prev_id, prev_start, prev_end, prev_row_id = curr_id, curr_start, curr_end, curr_row_id
+
+            if merged_count > 0:
+                logger.info(f"Merged {merged_count} blocks in {table}")
+
         conn.commit()
     finally:
         if should_close:
