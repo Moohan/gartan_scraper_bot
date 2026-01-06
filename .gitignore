@@ -32,3 +32,16 @@ VALIDATION_*.md
 business_rules_validation.py
 test_api_validation.py
 run_api_test.py
+
+# Local database
+gartan_data.db
+
+# Debug files
+main_page_debug.html
+js_*.js
+download_js.py
+grid_debug.html
+repro_blocks.py
+
+# Tools
+tools/
