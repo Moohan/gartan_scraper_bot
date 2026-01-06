@@ -1,0 +1,50 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0
+rootdir: D:\james\gartan_scraper_bot
+configfile: pytest.ini (WARNING: ignoring pytest config in pyproject.toml!)
+plugins: xdist-3.8.0
+collected 7 items
+
+tests\test_run_bot.py FFFF.FF                                            [100%]
+
+================================== FAILURES ===================================
+______________________________ test_run_bot_cli _______________________________
+tests\test_run_bot.py:31: in test_run_bot_cli
+    assert result.returncode == 0
+E   AssertionError: assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\james\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe', 'run_bot.py', '--ca...rification import (\n    ...<2 lines>...\n    )\nModuleNotFoundError: No module named \'station_feed_verification\'\n').returncode
+______________________ test_run_bot_cli_cache_preferred _______________________
+tests\test_run_bot.py:49: in test_run_bot_cli_cache_preferred
+    assert result.returncode == 0
+E   AssertionError: assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\james\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe', 'run_bot.py', '--ca...rification import (\n    ...<2 lines>...\n    )\nModuleNotFoundError: No module named \'station_feed_verification\'\n').returncode
+_________________________ test_run_bot_cli_cache_off __________________________
+tests\test_run_bot.py:67: in test_run_bot_cli_cache_off
+    assert result.returncode == 0
+E   AssertionError: assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\james\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe', 'run_bot.py', '--ma...rification import (\n    ...<2 lines>...\n    )\nModuleNotFoundError: No module named \'station_feed_verification\'\n').returncode
+____________________ test_run_bot_cli_missing_crew_details ____________________
+tests\test_run_bot.py:84: in test_run_bot_cli_missing_crew_details
+    assert result.returncode == 0
+E   AssertionError: assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\james\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe', 'run_bot.py', '--ca...rification import (\n    ...<2 lines>...\n    )\nModuleNotFoundError: No module named \'station_feed_verification\'\n').returncode
+________________ test_cleanup_old_cache_files_nonexistent_dir _________________
+tests\test_run_bot.py:112: in test_cleanup_old_cache_files_nonexistent_dir
+    from run_bot import cleanup_old_cache_files
+run_bot.py:36: in <module>
+    from station_feed_verification import (
+E   ModuleNotFoundError: No module named 'station_feed_verification'
+___________________ test_cleanup_old_cache_files_with_error ___________________
+tests\test_run_bot.py:123: in test_cleanup_old_cache_files_with_error
+    from run_bot import cleanup_old_cache_files
+run_bot.py:36: in <module>
+    from station_feed_verification import (
+E   ModuleNotFoundError: No module named 'station_feed_verification'
+=========================== short test summary info ===========================
+FAILED tests/test_run_bot.py::test_run_bot_cli - AssertionError: assert 1 == 0
+FAILED tests/test_run_bot.py::test_run_bot_cli_cache_preferred - AssertionErr...
+FAILED tests/test_run_bot.py::test_run_bot_cli_cache_off - AssertionError: as...
+FAILED tests/test_run_bot.py::test_run_bot_cli_missing_crew_details - Asserti...
+FAILED tests/test_run_bot.py::test_cleanup_old_cache_files_nonexistent_dir - ...
+FAILED tests/test_run_bot.py::test_cleanup_old_cache_files_with_error - Modul...
+========================= 6 failed, 1 passed in 3.45s =========================
