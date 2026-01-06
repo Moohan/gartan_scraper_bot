@@ -118,13 +118,19 @@ async def main():
             # Authenticate using the synchronous requests library
             session = gartan_login_and_get_session()
         except AuthenticationError as e:
-            logger.warning(f"🔒 Authentication failed: {str(e)} — continuing without authenticated session")
+            logger.warning(
+                f"🔒 Authentication failed: {str(e)} — continuing without authenticated session"
+            )
             session = None
         except Exception as e:
-            logger.warning(f"⚠️ Unexpected error during login: {str(e)} — continuing without authenticated session")
+            logger.warning(
+                f"⚠️ Unexpected error during login: {str(e)} — continuing without authenticated session"
+            )
             session = None
     else:
-        logger.info("Running in cache-only mode: skipping authentication and network fetches.")
+        logger.info(
+            "Running in cache-only mode: skipping authentication and network fetches."
+        )
 
     # Calculate week-aligned date range for weekly availability tracking
     start_date, effective_max_days = get_week_aligned_date_range(args.max_days)
@@ -180,15 +186,19 @@ async def main():
                     cache_minutes = config.get_cache_minutes(days_from_today)
 
                     # Cache-only mode should never attempt network fetches
-                    if args.cache_mode == 'cache-only':
+                    if args.cache_mode == "cache-only":
                         if _is_cache_valid(cache_file, cache_minutes):
                             logger.debug(f"Using cached data for {date}")
-                            with open(cache_file, 'r', encoding='utf-8') as f:
+                            with open(cache_file, "r", encoding="utf-8") as f:
                                 grid_htmls[index] = f.read()
                         else:
-                            logger.debug(f"No cache for {date} and running in cache-only mode; skipping fetch.")
+                            logger.debug(
+                                f"No cache for {date} and running in cache-only mode; skipping fetch."
+                            )
                             return
-                    elif args.cache_mode != 'no-cache' and _is_cache_valid(cache_file, cache_minutes):
+                    elif args.cache_mode != "no-cache" and _is_cache_valid(
+                        cache_file, cache_minutes
+                    ):
                         logger.debug(f"Using cached data for {date}")
                         with open(cache_file, "r", encoding="utf-8") as f:
                             grid_htmls[index] = f.read()

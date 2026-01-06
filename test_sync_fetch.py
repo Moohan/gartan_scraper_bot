@@ -1,9 +1,16 @@
 import os
+
 import requests
-from gartan_fetch import gartan_login_and_get_session, fetch_grid_html_for_date, DATA_URL
 from dotenv import load_dotenv
 
+from gartan_fetch import (
+    DATA_URL,
+    fetch_grid_html_for_date,
+    gartan_login_and_get_session,
+)
+
 load_dotenv()
+
 
 def test_sync_fetch():
     print("Attempting login...")
@@ -34,6 +41,7 @@ def test_sync_fetch():
         print(html[:200])
     else:
         print("Fetch failed (returned None or empty)")
+
 
 if __name__ == "__main__":
     test_sync_fetch()

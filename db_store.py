@@ -99,6 +99,7 @@ def _convert_slots_to_blocks(
     time gaps between blocks.
     """
     from logging_config import get_logger
+
     logger = get_logger()
 
     if not availability:
@@ -118,7 +119,7 @@ def _convert_slots_to_blocks(
         # Find the most common difference between adjacent slots
         diffs = []
         for i in range(len(sorted_slots) - 1):
-            diff = sorted_slots[i+1][0] - sorted_slots[i][0]
+            diff = sorted_slots[i + 1][0] - sorted_slots[i][0]
             if diff > timedelta(0):
                 diffs.append(diff)
 
@@ -142,7 +143,12 @@ def _convert_slots_to_blocks(
                 # Already in a block, check for gaps
                 if prev_slot_time and (slot_time - prev_slot_time) > resolution:
                     # Gap detected! Close previous block and start new one
-                    blocks.append({"start_time": block_start, "end_time": prev_slot_time + resolution})
+                    blocks.append(
+                        {
+                            "start_time": block_start,
+                            "end_time": prev_slot_time + resolution,
+                        }
+                    )
                     block_start = slot_time
         else:
             if in_block:
@@ -155,9 +161,13 @@ def _convert_slots_to_blocks(
 
     # Close the last block if still open
     if in_block and block_start and prev_slot_time:
-        blocks.append({"start_time": block_start, "end_time": prev_slot_time + resolution})
+        blocks.append(
+            {"start_time": block_start, "end_time": prev_slot_time + resolution}
+        )
 
-    logger.debug(f"Converted {len(availability)} slots into {len(blocks)} blocks using {resolution} resolution.")
+    logger.debug(
+        f"Converted {len(availability)} slots into {len(blocks)} blocks using {resolution} resolution."
+    )
     return blocks
 
 
@@ -264,7 +274,9 @@ def insert_crew_availability(crew_list: List[Dict[str, Any]], db_conn=None):
                 # A block is deleted if it has ANY overlap with this range.
                 # Logic: start_time < range_end AND end_time > range_start
                 range_start = datetime.combine(min_date, datetime.min.time())
-                range_end = datetime.combine(max_date + timedelta(days=1), datetime.min.time())
+                range_end = datetime.combine(
+                    max_date + timedelta(days=1), datetime.min.time()
+                )
 
                 c.execute(
                     """
@@ -278,7 +290,9 @@ def insert_crew_availability(crew_list: List[Dict[str, Any]], db_conn=None):
 
                 deleted_count = c.rowcount
                 if deleted_count > 0:
-                    logger.debug(f"Deleted {deleted_count} existing blocks for {name} overlapping {min_date} to {max_date}")
+                    logger.debug(
+                        f"Deleted {deleted_count} existing blocks for {name} overlapping {min_date} to {max_date}"
+                    )
 
             availability_blocks = _convert_slots_to_blocks(crew["availability"])
             logger.debug(
@@ -351,7 +365,9 @@ def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
             # Clean up existing blocks that overlap with the date range being processed
             if min_date and max_date:
                 range_start = datetime.combine(min_date, datetime.min.time())
-                range_end = datetime.combine(max_date + timedelta(days=1), datetime.min.time())
+                range_end = datetime.combine(
+                    max_date + timedelta(days=1), datetime.min.time()
+                )
 
                 c.execute(
                     """
@@ -385,6 +401,7 @@ def defrag_availability(db_conn=None):
     This joins blocks like [08:00, 10:00] and [10:00, 12:00] into [08:00, 12:00].
     """
     from logging_config import get_logger
+
     logger = get_logger()
 
     if db_conn is not None:
@@ -401,14 +418,21 @@ def defrag_availability(db_conn=None):
 
             # Simple iterative merging logic:
             # 1. Select all blocks sorted by id and start_time
-            c.execute(f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time")
+            c.execute(
+                f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time"
+            )
             rows = c.fetchall()
 
             if not rows:
                 continue
 
             merged_count = 0
-            prev_id, prev_start, prev_end, prev_row_id = rows[0][1], rows[0][2], rows[0][3], rows[0][0]
+            prev_id, prev_start, prev_end, prev_row_id = (
+                rows[0][1],
+                rows[0][2],
+                rows[0][3],
+                rows[0][0],
+            )
 
             for i in range(1, len(rows)):
                 curr_row_id, curr_id, curr_start, curr_end = rows[i]
@@ -419,7 +443,10 @@ def defrag_availability(db_conn=None):
                     new_end = max(prev_end, curr_end)
                     if new_end != prev_end:
                         # Update prev block
-                        c.execute(f"UPDATE {table} SET end_time = ? WHERE id = ?", (new_end, prev_row_id))
+                        c.execute(
+                            f"UPDATE {table} SET end_time = ? WHERE id = ?",
+                            (new_end, prev_row_id),
+                        )
                         prev_end = new_end
 
                     # Delete current block
@@ -427,7 +454,12 @@ def defrag_availability(db_conn=None):
                     merged_count += 1
                 else:
                     # Move to next block
-                    prev_id, prev_start, prev_end, prev_row_id = curr_id, curr_start, curr_end, curr_row_id
+                    prev_id, prev_start, prev_end, prev_row_id = (
+                        curr_id,
+                        curr_start,
+                        curr_end,
+                        curr_row_id,
+                    )
 
             if merged_count > 0:
                 logger.info(f"Merged {merged_count} blocks in {table}")

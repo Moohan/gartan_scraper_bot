@@ -732,7 +732,8 @@ def _is_crew_available_in_cell(cell: Optional[Tag]) -> bool:
         ):
             return False
         elif any(
-            color in style_str for color in ["#cccccc", "#999999", "#d8dde1", "gray", "grey"]
+            color in style_str
+            for color in ["#cccccc", "#999999", "#d8dde1", "gray", "grey"]
         ):
             return False
 
