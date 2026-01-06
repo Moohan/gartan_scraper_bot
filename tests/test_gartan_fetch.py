@@ -327,4 +327,4 @@ def test_build_schedule_payload():
     """Test that the schedule payload is correct."""
     payload = _build_schedule_payload("01/01/2025")
     assert payload["bookingDate"] == "01/01/2025"
-    assert payload["brigadeId"] == 47
+    assert payload["brigadeId"] == 101
