@@ -1328,6 +1328,8 @@ def add_security_headers(response):
         "default-src 'self'; script-src 'self'; style-src 'self'; "
         "object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
     )
+    # SECURE: Harden security by disabling unnecessary browser features.
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     return response
 
 
