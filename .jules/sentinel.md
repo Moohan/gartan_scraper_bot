@@ -1,0 +1,7 @@
+## 2024-05-20 - Hardened Flask Debug Mode Configuration
+
+**Vulnerability:** The Flask application's debug mode was enabled based on the `FLASK_DEBUG` environment variable. This is a common pattern during development but is risky for production environments. If the `FLASK_DEBUG` variable were ever accidentally set to `true` in a production environment (e.g., through a misconfigured deployment script), the application would start in debug mode, exposing sensitive information, including stack traces and potentially environment variables.
+
+**Learning:** Relying on development-centric environment variables for production behavior can create security blind spots. A more secure approach is to use environment variables that explicitly define the environment itself (e.g., `development`, `staging`, `production`) and derive settings like debug mode from that. This makes the application's behavior more predictable and reduces the risk of accidental misconfiguration.
+
+**Prevention:** To prevent this vulnerability in the future, the application's startup logic in `api_server.py` was modified. Instead of checking for `FLASK_DEBUG`, the code now checks if the `FLASK_ENV` environment variable is set to `development`. This is a more intentional and safer way to enable debug mode, as it requires a deliberate action to set the environment to `development`. The default behavior is now to run in production mode unless explicitly told otherwise. All new services should adopt this pattern of using an environment-defining variable to control security-sensitive settings.
