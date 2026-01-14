@@ -5,11 +5,21 @@ crew and appliances, plus helper summarization (next available windows etc.).
 """
 
 from datetime import datetime as dt
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
 
 from bs4 import BeautifulSoup, NavigableString, Tag  # type: ignore
 
 from utils import log_debug
+
+
+# Bolt ⚡: Memoize strptime calls to avoid re-parsing the same date strings
+# repeatedly. This is a common performance bottleneck when processing
+# large amounts of structured text data.
+@lru_cache(maxsize=128)
+def _cached_strptime(date_string: str, format: str) -> dt:
+    """Cached version of datetime.strptime."""
+    return dt.strptime(date_string, format)
 
 # Type aliases for clarity
 GridElement = Union[Tag, NavigableString]
@@ -148,7 +158,7 @@ def aggregate_appliance_availability(
         slot_tuples = []
         for slot, avail in availability.items():
             try:
-                slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+                slot_dt = _cached_strptime(slot, "%d/%m/%Y %H%M")
                 slot_tuples.append((slot_dt, avail))
             except Exception:
                 continue
@@ -182,7 +192,7 @@ def _get_slot_datetimes(availability: dict) -> list[tuple[dt, bool]]:
     slot_datetimes = []
     for slot, is_avail in availability.items():
         try:
-            slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+            slot_dt = _cached_strptime(slot, "%d/%m/%Y %H%M")
             slot_datetimes.append((slot_dt, is_avail))
         except (ValueError, TypeError):
             continue
@@ -356,7 +366,7 @@ def _normalize_date(date: Optional[str]) -> str:
         return ""
 
     try:
-        date_obj = dt.strptime(str(date), "%d/%m/%Y")
+        date_obj = _cached_strptime(str(date), "%d/%m/%Y")
         return date_obj.strftime("%d/%m/%Y")
     except ValueError:
         return str(date)
@@ -614,7 +624,7 @@ def aggregate_crew_availability(
         slot_tuples = []
         for slot, avail in crew["_all_slots"]:
             try:
-                slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+                slot_dt = _cached_strptime(slot, "%d/%m/%Y %H%M")
                 slot_tuples.append((slot_dt, avail))
             except Exception:
                 continue
