@@ -21,6 +21,7 @@ def _cached_strptime(date_string: str, format: str) -> dt:
     """Cached version of datetime.strptime."""
     return dt.strptime(date_string, format)
 
+
 # Type aliases for clarity
 GridElement = Union[Tag, NavigableString]
 GridTable = Tag
