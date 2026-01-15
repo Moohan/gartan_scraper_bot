@@ -1334,7 +1334,8 @@ def add_security_headers(response):
 if __name__ == "__main__":
     # Production configuration
     port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    # SECURE: Tie debug mode to development environment, not a separate flag
+    debug = os.environ.get("FLASK_ENV") == "development"
 
     logger.info(f"Starting Gartan API Server on port {port}")
     logger.info(
