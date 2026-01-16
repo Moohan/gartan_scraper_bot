@@ -396,75 +396,84 @@ def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
 
 
 def defrag_availability(db_conn=None):
-    """Merge touching or overlapping availability blocks in the database.
+    """
+    Bolt ⚡: Merge touching or overlapping availability blocks using SQL window functions.
+    This is significantly faster than the old Python-based row-by-row merging.
 
-    This joins blocks like [08:00, 10:00] and [10:00, 12:00] into [08:00, 12:00].
+    The query works by:
+    1. Identifying "islands" of continuous availability. An island starts when a block's
+       start_time is after the previous block's end_time.
+    2. Grouping all blocks within the same island.
+    3. Merging the blocks in each group by taking the MIN(start_time) and MAX(end_time).
     """
     from logging_config import get_logger
 
     logger = get_logger()
 
-    if db_conn is not None:
-        conn = db_conn
-        should_close = False
-    else:
-        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
-        should_close = True
-    c = conn.cursor()
+    conn = (
+        db_conn
+        if db_conn
+        else sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+    )
+    should_close = not db_conn
 
     try:
-        for table in ["crew_availability", "appliance_availability"]:
-            id_col = "crew_id" if table == "crew_availability" else "appliance_id"
+        with conn:
+            for table in ["crew_availability", "appliance_availability"]:
+                id_col = "crew_id" if table == "crew_availability" else "appliance_id"
 
-            # Simple iterative merging logic:
-            # 1. Select all blocks sorted by id and start_time
-            c.execute(
-                f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time"
-            )
-            rows = c.fetchall()
+                # Mark the start of each continuous block "island"
+                c = conn.cursor()
+                c.execute(f"""
+                    CREATE TEMP TABLE block_islands AS
+                    SELECT
+                        {id_col},
+                        start_time,
+                        end_time,
+                        CASE
+                            WHEN LAG(end_time, 1, NULL) OVER (PARTITION BY {id_col} ORDER BY start_time) < start_time
+                            THEN 1
+                            ELSE 0
+                        END AS is_island_start
+                    FROM {table}
+                """)
 
-            if not rows:
-                continue
+                # Assign a group_id to each island
+                c.execute(f"""
+                    CREATE TEMP TABLE island_groups AS
+                    SELECT
+                        {id_col},
+                        start_time,
+                        end_time,
+                        SUM(is_island_start) OVER (PARTITION BY {id_col} ORDER BY start_time) as group_id
+                    FROM block_islands
+                """)
 
-            merged_count = 0
-            prev_id, prev_start, prev_end, prev_row_id = (
-                rows[0][1],
-                rows[0][2],
-                rows[0][3],
-                rows[0][0],
-            )
+                # Merge blocks within each group
+                c.execute(f"""
+                    CREATE TEMP TABLE merged_blocks AS
+                    SELECT
+                        {id_col},
+                        MIN(start_time) as start_time,
+                        MAX(end_time) as end_time
+                    FROM island_groups
+                    GROUP BY {id_col}, group_id
+                """)
 
-            for i in range(1, len(rows)):
-                curr_row_id, curr_id, curr_start, curr_end = rows[i]
+                # Replace old data with merged data
+                c.execute(f"DELETE FROM {table}")
+                c.execute(f"""
+                    INSERT INTO {table} ({id_col}, start_time, end_time)
+                    SELECT {id_col}, start_time, end_time FROM merged_blocks
+                """)
 
-                # Check for touch or overlap
-                if curr_id == prev_id and curr_start <= prev_end:
-                    # Overlap! Merge curr into prev
-                    new_end = max(prev_end, curr_end)
-                    if new_end != prev_end:
-                        # Update prev block
-                        c.execute(
-                            f"UPDATE {table} SET end_time = ? WHERE id = ?",
-                            (new_end, prev_row_id),
-                        )
-                        prev_end = new_end
+                logger.info(f"Defragmented and merged availability blocks in {table}.")
 
-                    # Delete current block
-                    c.execute(f"DELETE FROM {table} WHERE id = ?", (curr_row_id,))
-                    merged_count += 1
-                else:
-                    # Move to next block
-                    prev_id, prev_start, prev_end, prev_row_id = (
-                        curr_id,
-                        curr_start,
-                        curr_end,
-                        curr_row_id,
-                    )
+                # Clean up temp tables
+                c.execute("DROP TABLE block_islands")
+                c.execute("DROP TABLE island_groups")
+                c.execute("DROP TABLE merged_blocks")
 
-            if merged_count > 0:
-                logger.info(f"Merged {merged_count} blocks in {table}")
-
-        conn.commit()
     finally:
         if should_close:
             conn.close()
