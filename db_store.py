@@ -424,7 +424,8 @@ def defrag_availability(db_conn=None):
 
                 # Mark the start of each continuous block "island"
                 c = conn.cursor()
-                c.execute(f"""
+                c.execute(
+                    f"""
                     CREATE TEMP TABLE block_islands AS
                     SELECT
                         {id_col},
@@ -436,10 +437,12 @@ def defrag_availability(db_conn=None):
                             ELSE 0
                         END AS is_island_start
                     FROM {table}
-                """)
+                """
+                )
 
                 # Assign a group_id to each island
-                c.execute(f"""
+                c.execute(
+                    f"""
                     CREATE TEMP TABLE island_groups AS
                     SELECT
                         {id_col},
@@ -447,10 +450,12 @@ def defrag_availability(db_conn=None):
                         end_time,
                         SUM(is_island_start) OVER (PARTITION BY {id_col} ORDER BY start_time) as group_id
                     FROM block_islands
-                """)
+                """
+                )
 
                 # Merge blocks within each group
-                c.execute(f"""
+                c.execute(
+                    f"""
                     CREATE TEMP TABLE merged_blocks AS
                     SELECT
                         {id_col},
@@ -458,14 +463,17 @@ def defrag_availability(db_conn=None):
                         MAX(end_time) as end_time
                     FROM island_groups
                     GROUP BY {id_col}, group_id
-                """)
+                """
+                )
 
                 # Replace old data with merged data
                 c.execute(f"DELETE FROM {table}")
-                c.execute(f"""
+                c.execute(
+                    f"""
                     INSERT INTO {table} ({id_col}, start_time, end_time)
                     SELECT {id_col}, start_time, end_time FROM merged_blocks
-                """)
+                """
+                )
 
                 logger.info(f"Defragmented and merged availability blocks in {table}.")
 
