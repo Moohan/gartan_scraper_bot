@@ -1,7 +1,7 @@
 specification/*
 *.json
 .env
-__pycache__/*
+__pycache__/
 _cache/*
 logs/*
 gartan_debug.log
