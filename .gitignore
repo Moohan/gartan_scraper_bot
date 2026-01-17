@@ -1,8 +1,9 @@
 specification/*
 *.json
 .env
-__pycache__/*
-_cache/*
+__pycache__/
+*.pyc
+_cache/
 logs/*
 gartan_debug.log
 crew_details.local
