@@ -396,9 +396,13 @@ def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
 
 
 def defrag_availability(db_conn=None):
-    """Merge touching or overlapping availability blocks in the database.
+    """
+    Merge touching or overlapping availability blocks using a pure SQL approach.
 
-    This joins blocks like [08:00, 10:00] and [10:00, 12:00] into [08:00, 12:00].
+    This implementation uses window functions to identify and merge
+    continuous blocks of time directly within the database, which is
+    significantly more performant than processing the data in Python,
+    especially for large datasets.
     """
     from logging_config import get_logger
 
@@ -410,59 +414,86 @@ def defrag_availability(db_conn=None):
     else:
         conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
         should_close = True
-    c = conn.cursor()
 
     try:
+        c = conn.cursor()
         for table in ["crew_availability", "appliance_availability"]:
             id_col = "crew_id" if table == "crew_availability" else "appliance_id"
 
-            # Simple iterative merging logic:
-            # 1. Select all blocks sorted by id and start_time
+            # ⚡ Performance: This SQL query is the core of the optimization.
+            # It replaces an inefficient Python loop with a set-based database operation.
+            # 1. `prev_end`: For each row, finds the maximum end_time of all preceding rows for that person/appliance.
+            # 2. `island_starts`: Marks a row as the start of a new block if its start_time is after the max_prev_end.
+            # 3. `island_groups`: Assigns a unique ID to each continuous block of availability.
+            # 4. The final SELECT groups by this ID to merge the blocks into single, continuous intervals.
+            sql = f"""
+                CREATE TEMP TABLE temp_merged AS
+                WITH prev_end AS (
+                    SELECT
+                        {id_col},
+                        start_time,
+                        end_time,
+                        MAX(end_time) OVER (
+                            PARTITION BY {id_col}
+                            ORDER BY start_time, end_time
+                            ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                        ) AS max_prev_end
+                    FROM {table}
+                ),
+                island_starts AS (
+                    SELECT
+                        {id_col},
+                        start_time,
+                        end_time,
+                        CASE
+                            WHEN start_time > max_prev_end THEN 1
+                            ELSE 0
+                        END AS is_island_start
+                    FROM prev_end
+                ),
+                island_groups AS (
+                    SELECT
+                        {id_col},
+                        start_time,
+                        end_time,
+                        SUM(is_island_start) OVER (
+                            PARTITION BY {id_col}
+                            ORDER BY start_time, end_time
+                        ) AS island_id
+                    FROM island_starts
+                )
+                SELECT
+                    {id_col},
+                    MIN(start_time) AS merged_start,
+                    MAX(end_time) AS merged_end
+                FROM island_groups
+                GROUP BY {id_col}, island_id;
+            """
+            c.execute(sql)
+
+            # Get counts for logging the impact
+            initial_count_rows = c.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+            initial_count = initial_count_rows[0] if initial_count_rows else 0
+
+            # Replace old data with new merged data
+            c.execute(f"DELETE FROM {table};")
             c.execute(
-                f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time"
-            )
-            rows = c.fetchall()
-
-            if not rows:
-                continue
-
-            merged_count = 0
-            prev_id, prev_start, prev_end, prev_row_id = (
-                rows[0][1],
-                rows[0][2],
-                rows[0][3],
-                rows[0][0],
+                f"""
+                INSERT INTO {table} ({id_col}, start_time, end_time)
+                SELECT {id_col}, merged_start, merged_end FROM temp_merged;
+            """
             )
 
-            for i in range(1, len(rows)):
-                curr_row_id, curr_id, curr_start, curr_end = rows[i]
+            final_count_rows = c.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+            final_count = final_count_rows[0] if final_count_rows else 0
 
-                # Check for touch or overlap
-                if curr_id == prev_id and curr_start <= prev_end:
-                    # Overlap! Merge curr into prev
-                    new_end = max(prev_end, curr_end)
-                    if new_end != prev_end:
-                        # Update prev block
-                        c.execute(
-                            f"UPDATE {table} SET end_time = ? WHERE id = ?",
-                            (new_end, prev_row_id),
-                        )
-                        prev_end = new_end
+            c.execute("DROP TABLE temp_merged;")
 
-                    # Delete current block
-                    c.execute(f"DELETE FROM {table} WHERE id = ?", (curr_row_id,))
-                    merged_count += 1
-                else:
-                    # Move to next block
-                    prev_id, prev_start, prev_end, prev_row_id = (
-                        curr_id,
-                        curr_start,
-                        curr_end,
-                        curr_row_id,
-                    )
-
+            merged_count = initial_count - final_count
             if merged_count > 0:
-                logger.info(f"Merged {merged_count} blocks in {table}")
+                logger.info(
+                    f"Merged {merged_count} blocks in {table} (optimized from {initial_count} to {final_count} rows)"
+                )
 
         conn.commit()
     finally:

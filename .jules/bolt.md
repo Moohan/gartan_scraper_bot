@@ -1,5 +1,7 @@
-## 2024-07-17 - Don't Break Caching in the Name of Speed
+## 2024-05-20 - Initial Setup
+**Learning:** Bolt's journal has been created. I will use this to document critical performance learnings going forward.
+**Action:** Adhere to the journaling guidelines specified in the instructions.
 
-**Learning:** I implemented a major performance improvement by switching to asynchronous fetching, but in the process, I completely broke the existing caching mechanism. This was a critical regression that would have negated the performance gains on subsequent runs and put unnecessary load on the external service.
-
-**Action:** When refactoring for performance, always ensure that existing functionality, especially caching, is preserved. I need to be more careful about the scope of my changes and not get so focused on one aspect of performance that I break another.
+## 2024-05-20 - Gitignore Configuration is Critical
+**Learning:** A misconfigured `.gitignore` file led to a Python bytecode file (`.pyc`) being included in a commit. This is a serious anti-pattern that pollutes the repository.
+**Action:** Always ensure that `.gitignore` is correctly configured to exclude generated files, build artifacts, and local environment files before committing any changes. Specifically for Python, `__pycache__/` and `*.pyc` should always be included.
