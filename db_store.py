@@ -477,12 +477,10 @@ def defrag_availability(db_conn=None):
 
             # Replace old data with new merged data
             c.execute(f"DELETE FROM {table};")
-            c.execute(
-                f"""
+            c.execute(f"""
                 INSERT INTO {table} ({id_col}, start_time, end_time)
                 SELECT {id_col}, merged_start, merged_end FROM temp_merged;
-            """
-            )
+            """)
 
             final_count_rows = c.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
             final_count = final_count_rows[0] if final_count_rows else 0
