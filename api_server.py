@@ -1322,11 +1322,16 @@ def add_security_headers(response):
         "max-age=31536000; includeSubDomains"
     )
     response.headers["Referrer-Policy"] = "no-referrer"
-    # SECURE: Add CSP to protect against XSS. Allows inline styles and the auto-refresh script.
-    # SECURE: Add CSP to protect against XSS. Allows only self-hosted styles.
+    # SECURE: Harden CSP to protect against XSS, clickjacking, and other injection attacks.
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self'; style-src 'self'; "
-        "object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
+        "object-src 'none'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "img-src 'self' data:;"
     )
     return response
 
@@ -1334,7 +1339,8 @@ def add_security_headers(response):
 if __name__ == "__main__":
     # Production configuration
     port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    # SECURE: Tie debug mode to FLASK_ENV to prevent accidental activation in production.
+    debug = os.environ.get("FLASK_ENV") == "development"
 
     logger.info(f"Starting Gartan API Server on port {port}")
     logger.info(
