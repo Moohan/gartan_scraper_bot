@@ -1,13 +1,16 @@
 specification/*
 *.json
 .env
-__pycache__/*
-_cache/*
-logs/*
+
+# Python build artifacts
+__pycache__/
+*.pyc
+
+_cache/
+logs/
 gartan_debug.log
 crew_details.local
 gartan_availability.db
-tests/__pycache__/*
 .coverage
 # Ignore intentionally empty placeholder test stubs (avoid committing zero-content scaffolds)
 tests/test_*placeholder*.py
