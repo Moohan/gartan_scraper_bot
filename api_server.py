@@ -167,7 +167,6 @@ def get_all_crew_data() -> List[Dict[str, Any]]:
                 else:
                     crew_data["display_name"] = row["name"]
 
-
                 crew_list.append(crew_data)
 
             return crew_list
@@ -445,7 +444,8 @@ def check_p22p6_business_rules(
             "ba_non_ttr_ok": sum(
                 1
                 for c in available_crew
-                if "BA" in (c.get("skills") or "") and "TTR" not in (c.get("skills") or "")
+                if "BA" in (c.get("skills") or "")
+                and "TTR" not in (c.get("skills") or "")
             )
             >= 2,
             "ffc_with_ba": any(
@@ -792,8 +792,11 @@ def root():
         skill_counts = business_rules_result["details"]["skill_counts"]
         business_rules = business_rules_result["rules"]
         all_rules_pass = business_rules_result["rules_pass"]
-        ba_non_ttr = sum(1 for c in available_crew if "BA" in (c.get("skills") or "") and "TTR" not in (c.get("skills") or ""))
-
+        ba_non_ttr = sum(
+            1
+            for c in available_crew
+            if "BA" in (c.get("skills") or "") and "TTR" not in (c.get("skills") or "")
+        )
 
         # Get appliance data
         p22p6_available_data = get_appliance_available_data(
