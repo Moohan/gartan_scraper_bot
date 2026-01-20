@@ -1,7 +1,10 @@
+# Python cache files
+__pycache__/
+*.pyc
+
 specification/*
 *.json
 .env
-__pycache__/*
 _cache/*
 logs/*
 gartan_debug.log
