@@ -135,7 +135,9 @@ def get_dashboard_data() -> List[Dict[str, Any]]:
                 if is_available:
                     end_time = datetime.fromisoformat(end_time_str)
                     duration_minutes = int((end_time - now).total_seconds() / 60)
-                    duration = _format_duration_minutes_to_hours_string(max(0, duration_minutes))
+                    duration = _format_duration_minutes_to_hours_string(
+                        max(0, duration_minutes)
+                    )
 
                     # Format end time for display
                     end_time_str_fmt = end_time.strftime("%H:%M")
