@@ -145,8 +145,10 @@ def get_dashboard_data() -> List[Dict[str, Any]]:
                     else:
                         end_time_display = end_time.strftime("%H:%M on %d/%m")
 
-                    duration_data["duration"] = _format_duration_minutes_to_hours_string(
-                        max(0, duration_minutes)
+                    duration_data["duration"] = (
+                        _format_duration_minutes_to_hours_string(
+                            max(0, duration_minutes)
+                        )
                     )
                     duration_data["end_time_display"] = end_time_display
 
