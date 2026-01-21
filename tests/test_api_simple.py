@@ -5,18 +5,18 @@ import sqlite3
 from datetime import datetime
 from unittest.mock import patch
 
-from api_server import get_crew_list_data, merge_time_periods
+from api_server import get_dashboard_data, merge_time_periods
 
 
 class TestAPIErrorHandling:
     """Test error handling in API endpoints."""
 
-    def test_get_crew_list_data_database_error(self):
-        """Test get_crew_list_data with database connection error."""
+    def test_get_dashboard_data_database_error(self):
+        """Test get_dashboard_data with database connection error."""
         with patch("api_server.sqlite3.connect") as mock_connect:
             mock_connect.side_effect = sqlite3.Error("Database connection failed")
 
-            result = get_crew_list_data()
+            result = get_dashboard_data()
 
             # Should return empty list on database error
             assert result == []
