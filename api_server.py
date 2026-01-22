@@ -306,8 +306,6 @@ def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
         return {"error": "Internal server error"}
 
 
-
-
 def get_week_boundaries() -> tuple[datetime, datetime]:
     """Get start (Monday 00:00) and end (Sunday 23:59:59) of current week."""
     now = datetime.now()
@@ -859,9 +857,7 @@ def root():
         # The business rules result is required by multiple components on the dashboard.
         # We calculate it once here and pass it to the relevant functions to avoid
         # redundant computations, improving dashboard load time.
-        business_rules_result = check_p22p6_business_rules(
-            all_crew_data=crew_data
-        )
+        business_rules_result = check_p22p6_business_rules(all_crew_data=crew_data)
 
         # Get appliance data, passing in the pre-calculated business rules
         p22p6_available_data = get_appliance_available_data(
