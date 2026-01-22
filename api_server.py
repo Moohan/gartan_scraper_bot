@@ -81,6 +81,95 @@ def get_db_connection():
     return conn
 
 
+def get_dashboard_data() -> List[Dict[str, Any]]:
+    """
+    --- Performance Optimization ---
+    Fetches all data required for the main dashboard in a single, optimized query.
+    This replaces three separate functions (`get_crew_list_data`,
+    `get_all_crew_availability_data`, `get_all_crew_duration_data`) and reduces
+    database round-trips from 3 to 1, significantly speeding up the dashboard load time.
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            now = datetime.now()
+            cursor.execute(
+                """
+                SELECT
+                    c.id,
+                    c.name,
+                    c.contact,
+                    c.role,
+                    c.skills,
+                    c.contract_hours,
+                    -- Availability is true if a matching block is found
+                    CASE WHEN ca.crew_id IS NOT NULL THEN 1 ELSE 0 END as is_available,
+                    ca.end_time
+                FROM
+                    crew c
+                LEFT JOIN (
+                    -- This subquery finds the single current availability block for each crew member.
+                    -- It's more efficient than querying the whole table and filtering in Python.
+                    SELECT
+                        crew_id,
+                        end_time,
+                        -- ROW_NUMBER() ensures we only get one record per crew member even if data is dirty.
+                        ROW_NUMBER() OVER(PARTITION BY crew_id ORDER BY start_time) as rn
+                    FROM
+                        crew_availability
+                    WHERE
+                        datetime(start_time) <= datetime(?)
+                        AND datetime(end_time) > datetime(?)
+                        AND (julianday(end_time) - julianday(start_time)) <= 7.0
+                        AND date(start_time) >= date('now', '-7 days')
+                ) ca ON c.id = ca.crew_id AND ca.rn = 1
+                ORDER BY
+                    c.name
+            """,
+                (now, now),
+            )
+            rows = cursor.fetchall()
+
+            crew_list = []
+            for row in rows:
+                crew_data = dict(row)
+                crew_data["available"] = bool(crew_data.pop("is_available", 0))
+
+                # Calculate duration and end_time_display if available
+                crew_data["duration"] = None
+                crew_data["end_time_display"] = None
+                if crew_data["available"] and crew_data["end_time"]:
+                    end_time = datetime.fromisoformat(crew_data["end_time"])
+                    duration_minutes = int((end_time - now).total_seconds() / 60)
+
+                    end_time_str = end_time.strftime("%H:%M")
+                    if end_time.date() == now.date():
+                        end_time_display = f"{end_time_str} today"
+                    elif end_time.date() == (now + timedelta(days=1)).date():
+                        end_time_display = f"{end_time_str} tomorrow"
+                    else:
+                        end_time_display = end_time.strftime("%H:%M on %d/%m")
+
+                    crew_data["duration"] = _format_duration_minutes_to_hours_string(
+                        max(0, duration_minutes)
+                    )
+                    crew_data["end_time_display"] = end_time_display
+
+                # Extract display name from contact field if available
+                crew_data["display_name"] = crew_data["name"]  # Default
+                if row["contact"]:
+                    contact_parts = row["contact"].split("|")
+                    if len(contact_parts) >= 1 and contact_parts[0]:
+                        crew_data["display_name"] = contact_parts[0]
+
+                crew_list.append(crew_data)
+
+            return crew_list
+    except Exception as e:
+        logger.error(f"Error getting dashboard data: {e}")
+        return []
+
+
 def get_crew_list_data() -> List[Dict[str, Any]]:
     """Get list of all crew members with display names and enhanced details."""
     try:
@@ -217,95 +306,6 @@ def get_crew_duration_data(crew_id: int) -> Dict[str, Any]:
         return {"error": "Internal server error"}
 
 
-def get_all_crew_availability_data() -> Dict[int, Dict[str, Any]]:
-    """Check availability for all crew members right now in a single query."""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            now = datetime.now()
-            cursor.execute(
-                """
-                SELECT
-                    c.id,
-                    COUNT(ca.crew_id) > 0 as is_available
-                FROM
-                    crew c
-                LEFT JOIN
-                    crew_availability ca ON c.id = ca.crew_id
-                    AND datetime(ca.start_time) <= datetime(?)
-                    AND datetime(ca.end_time) > datetime(?)
-                    AND (julianday(ca.end_time) - julianday(ca.start_time)) <= 7.0
-                    AND date(ca.start_time) >= date('now', '-7 days')
-                GROUP BY
-                    c.id
-            """,
-                (now, now),
-            )
-            results = {}
-            for row in cursor.fetchall():
-                results[row["id"]] = {"available": bool(row["is_available"])}
-            return results
-    except Exception as e:
-        logger.error(f"Error checking all crew availability: {e}")
-        return {}
-
-
-def get_all_crew_duration_data() -> Dict[int, Dict[str, Any]]:
-    """Get the current availability duration for all crew members in a single query."""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            now = datetime.now()
-            cursor.execute(
-                """
-                WITH RankedAvailability AS (
-                    SELECT
-                        crew_id,
-                        start_time,
-                        end_time,
-                        ROW_NUMBER() OVER(PARTITION BY crew_id ORDER BY start_time) as rn
-                    FROM crew_availability
-                    WHERE
-                        datetime(start_time) <= datetime(?)
-                        AND datetime(end_time) > datetime(?)
-                        AND (julianday(end_time) - julianday(start_time)) <= 7.0
-                        AND date(start_time) >= date('now', '-7 days')
-                )
-                SELECT
-                    crew_id,
-                    start_time,
-                    end_time
-                FROM RankedAvailability
-                WHERE rn = 1
-            """,
-                (now, now),
-            )
-
-            results = {}
-            for row in cursor.fetchall():
-                crew_id = row["crew_id"]
-                end_time = datetime.fromisoformat(row["end_time"])
-                duration_minutes = int((end_time - now).total_seconds() / 60)
-
-                # Format end time for display
-                end_time_str = end_time.strftime("%H:%M")
-                if end_time.date() == now.date():
-                    end_time_display = f"{end_time_str} today"
-                elif end_time.date() == (now + timedelta(days=1)).date():
-                    end_time_display = f"{end_time_str} tomorrow"
-                else:
-                    end_time_display = end_time.strftime("%H:%M on %d/%m")
-
-                results[crew_id] = {
-                    "duration": _format_duration_minutes_to_hours_string(
-                        max(0, duration_minutes)
-                    ),
-                    "end_time_display": end_time_display,
-                }
-            return results
-    except Exception as e:
-        logger.error(f"Error getting all crew duration: {e}")
-        return {}
 
 
 def get_week_boundaries() -> tuple[datetime, datetime]:
@@ -445,23 +445,14 @@ def get_crew_hours_planned_week_data(crew_id: int) -> Dict[str, Any]:
 
 
 def check_p22p6_business_rules(
-    available_crew: Optional[List[Dict[str, Any]]] = None,
+    all_crew_data: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Check P22P6 business rules against available crew.
-    - If `available_crew` is provided, it's used directly.
-    - Otherwise, crew data is fetched from the database.
+    """Check P22P6 business rules against the provided crew data.
+    - Requires a list of crew members, typically from get_dashboard_data().
     """
     try:
-        # --- Performance Optimization ---
-        # If available_crew isn't provided, fetch it from the database.
-        if available_crew is None:
-            crew_data = get_crew_list_data()
-            all_availability_data = get_all_crew_availability_data()
-            available_crew = [
-                crew
-                for crew in crew_data
-                if all_availability_data.get(crew["id"], {}).get("available", False)
-            ]
+        # Filter for currently available crew from the provided data
+        available_crew = [crew for crew in all_crew_data if crew.get("available")]
 
         # Count skills for available crew
         skill_counts = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -516,7 +507,7 @@ def check_p22p6_business_rules(
 
 def get_appliance_available_data(
     appliance_name: str,
-    available_crew: Optional[List[Dict[str, Any]]] = None,
+    all_crew_data: Optional[List[Dict[str, Any]]] = None,
     business_rules_result: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Check if appliance is available right now."""
@@ -558,8 +549,11 @@ def get_appliance_available_data(
                 # --- Performance Optimization ---
                 # Use pre-calculated business rules if available, otherwise compute them.
                 if business_rules_result is None:
+                    # If crew data is not passed in, fetch it.
+                    if all_crew_data is None:
+                        all_crew_data = get_dashboard_data()
                     business_rules_result = check_p22p6_business_rules(
-                        available_crew=available_crew
+                        all_crew_data=all_crew_data
                     )
 
                 if "error" in business_rules_result:
@@ -578,7 +572,7 @@ def get_appliance_available_data(
 
 def get_appliance_duration_data(
     appliance_name: str,
-    available_crew: Optional[List[Dict[str, Any]]] = None,
+    all_crew_data: Optional[List[Dict[str, Any]]] = None,
     business_rules_result: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Get how long appliance is available for (string hours or null)."""
@@ -616,8 +610,10 @@ def get_appliance_duration_data(
                     # --- Performance Optimization ---
                     # Use pre-calculated business rules if available, otherwise compute them.
                     if business_rules_result is None:
+                        if all_crew_data is None:
+                            all_crew_data = get_dashboard_data()
                         business_rules_result = check_p22p6_business_rules(
-                            available_crew=available_crew
+                            all_crew_data=all_crew_data
                         )
 
                     if "error" in business_rules_result:
@@ -835,41 +831,10 @@ def root():
     """Root endpoint - Visual dashboard of all API data"""
     start_time_req = time.time()
     try:
-        # Get all crew data
-        crew_list = get_crew_list_data()
+        # --- Performance Optimization ---
+        # Get all crew data using the optimized single-query function.
+        crew_data = get_dashboard_data()
         current_time = datetime.now()
-
-        # --- Performance Optimization: Fetch all data in bulk ---
-        all_availability_data = get_all_crew_availability_data()
-        all_duration_data = get_all_crew_duration_data()
-
-        # Collect all crew availability and duration data
-        crew_data = []
-        for crew in crew_list:
-            if isinstance(crew, dict) and "id" in crew:
-                crew_id = crew["id"]
-                # Use pre-fetched data
-                availability_data = all_availability_data.get(
-                    crew_id, {"available": False}
-                )
-                duration_data = all_duration_data.get(
-                    crew_id, {"duration": None, "end_time_display": None}
-                )
-
-                crew_info = {
-                    "id": crew_id,
-                    "name": crew.get("name", "Unknown"),
-                    "display_name": crew.get(
-                        "display_name", crew.get("name", "Unknown")
-                    ),
-                    "role": crew.get("role", "Unknown"),
-                    "skills": crew.get("skills", "None"),
-                    "available": availability_data.get("available", False),
-                    "duration": duration_data.get("duration"),
-                    "end_time_display": duration_data.get("end_time_display"),
-                    "contract_hours": crew.get("contract_hours", "Unknown"),
-                }
-                crew_data.append(crew_info)
 
         # Sort crew data: 1st by availability (available first), 2nd by role, 3rd by surname
         def sort_crew_key(crew):
@@ -895,7 +860,7 @@ def root():
         # We calculate it once here and pass it to the relevant functions to avoid
         # redundant computations, improving dashboard load time.
         business_rules_result = check_p22p6_business_rules(
-            available_crew=available_crew
+            all_crew_data=crew_data
         )
 
         # Get appliance data, passing in the pre-calculated business rules
