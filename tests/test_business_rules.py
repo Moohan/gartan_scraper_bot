@@ -12,7 +12,7 @@ import pytest
 sys.path.insert(0, ".")
 # flake8: noqa: E402
 import api_server
-from api_server import get_appliance_available_data, get_crew_list_data
+from api_server import get_appliance_available_data, get_dashboard_data
 
 
 def setup_temp_db():
@@ -290,7 +290,7 @@ class TestAPIValidationScenarios:
             "James McMahon|07123456789|james@example.com|Firefighter",
         )
 
-        crew_list = get_crew_list_data()
+        crew_list = get_dashboard_data()
         assert len(crew_list) == 1
 
         crew = crew_list[0]
@@ -304,12 +304,12 @@ class TestAPIValidationScenarios:
         # Insert crew without contact information
         self._insert_crew_member("SMITH, AB", "FFT", "BA")
 
-        crew_list = get_crew_list_data()
+        crew_list = get_dashboard_data()
         assert len(crew_list) == 1
 
         crew = crew_list[0]
         assert crew["name"] == "SMITH, AB"
-        assert "display_name" not in crew or crew.get("display_name") == crew["name"]
+        assert "display_name" in crew and crew.get("display_name") == crew["name"]
 
     def test_skill_counting_accuracy(self):
         """Test accurate skill counting for business rules."""
@@ -326,13 +326,8 @@ class TestAPIValidationScenarios:
             "OFF_DUTY, E", "FFC", "TTR LGV BA", available=False
         )  # Unavailable (shouldn't count)
 
-        crew_list = get_crew_list_data()
-        available_crew = []
-
-        # Simulate the business rules logic
-        for crew in crew_list:
-            if crew["id"] <= 4:  # Only first 4 are available
-                available_crew.append(crew)
+        crew_list = get_dashboard_data()
+        available_crew = [c for c in crew_list if c.get("available")]
 
         # Count skills
         skill_counts = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -369,13 +364,11 @@ class TestAPIValidationScenarios:
             "SABA, JA", "FFT", "LGV BA", available=False
         )  # Working elsewhere
 
-        crew_list = get_crew_list_data()
+        crew_list = get_dashboard_data()
         assert len(crew_list) == 7, "Should have all 7 crew members in list"
 
         # Verify available crew count matches expected scenario
-        available_count = sum(
-            1 for i, crew in enumerate(crew_list) if i < 3
-        )  # First 3 are available
+        available_count = sum(1 for crew in crew_list if crew.get("available"))
         assert available_count == 3, "Should have exactly 3 available crew members"
 
     def test_reason_code_edge_cases(self):
@@ -526,7 +519,7 @@ class TestDataQualityValidation:
             )
         self.conn.commit()
 
-        crew_list = get_crew_list_data()
+        crew_list = get_dashboard_data()
 
         # Test that all crew endpoints respond without errors
         for crew in crew_list:
