@@ -49,12 +49,10 @@ def check_database_health() -> bool:
             return False
 
         # Check if we have recent availability data
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT COUNT(*) FROM crew_availability
             WHERE datetime(end_time) > datetime('now', '-1 day')
-        """
-        )
+        """)
         recent_blocks = cursor.fetchone()[0]
 
         conn.close()
