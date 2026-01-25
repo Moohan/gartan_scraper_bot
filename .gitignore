@@ -45,3 +45,4 @@ repro_blocks.py
 
 # Tools
 tools/
+\n# Python bytecode and cache\n__pycache__/\n*.pyc
