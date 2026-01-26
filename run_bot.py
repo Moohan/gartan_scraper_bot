@@ -1,20 +1,13 @@
 """Main entry point for Gartan Scraper Bot."""
 
-import asyncio
-import concurrent.futures
 import logging
 import os
 import re
-
-# Add scripts directory to path for utility modules
 import sys
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-import aiohttp
-
-from async_gartan_fetch import fetch_grid_html_for_date_async
 from cli import CliArgs, create_argument_parser
 from config import config
 from db_store import (
@@ -26,7 +19,6 @@ from db_store import (
 from gartan_fetch import (
     AuthenticationError,
     fetch_and_cache_grid_html,
-    fetch_station_feed_html,
     gartan_login_and_get_session,
 )
 from logging_config import get_logger, setup_logging
@@ -34,17 +26,9 @@ from parse_grid import (
     aggregate_appliance_availability,
     aggregate_crew_availability,
     parse_grid_html,
-    parse_station_feed_html,
 )
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
-
-from station_feed_verification import (
-    compare_and_log_discrepancies,
-    setup_verification_logger,
-)
-
-from utils import get_week_aligned_date_range, log_debug
+from utils import get_week_aligned_date_range
 
 logger = get_logger()
 
@@ -86,25 +70,7 @@ def cleanup_old_cache_files(cache_dir: str, today: datetime) -> None:
                 logger.warning(f"Failed to process cache file {fname}: {e}")
 
 
-def _is_cache_valid(cache_file: str, cache_minutes: int) -> bool:
-    """
-    Check if the cache file exists and is not expired.
-    """
-    if not os.path.exists(cache_file):
-        return False
-
-    if cache_minutes == -1:
-        return True
-
-    mtime = os.path.getmtime(cache_file)
-    if (
-        datetime.now() - datetime.fromtimestamp(mtime)
-    ).total_seconds() / 60 < cache_minutes:
-        return True
-    return False
-
-
-async def main():
+def main():
     # Set up logging
     setup_logging(log_level=logging.DEBUG)
 
@@ -114,7 +80,7 @@ async def main():
         args = CliArgs.from_args(parser.parse_args())
     except ValueError as e:
         logger.error(f"Invalid arguments: {e}")
-        exit(1)
+        sys.exit(1)
 
     today = datetime.now()
 
@@ -164,101 +130,50 @@ async def main():
 
     db_conn = init_db(reset=reset)
     try:
-        # Bolt ⚡: Using asyncio to fetch all days of availability concurrently,
-        # which is much faster than the previous sequential approach.
-        # A semaphore is used to limit the number of concurrent requests to 10.
-        cookies = session.cookies.get_dict() if session else {}
-        semaphore = asyncio.Semaphore(10)
+        booking_dates = [
+            (start_date + timedelta(days=i)).strftime("%d/%m/%Y")
+            for i in range(effective_max_days)
+        ]
 
-        async with aiohttp.ClientSession(cookies=cookies) as aio_session:
-            booking_dates = [
-                (start_date + timedelta(days=i)).strftime("%d/%m/%Y")
-                for i in range(effective_max_days)
-            ]
+        for i, date in enumerate(booking_dates):
+            logger.info(f"Processing day {i+1}/{effective_max_days}: {date}")
 
-            grid_htmls = [""] * len(booking_dates)
-            fetch_tasks = []
+            days_from_today = (
+                datetime.strptime(date, "%d/%m/%Y").date() - today.date()
+            ).days
+            cache_minutes = config.get_cache_minutes(days_from_today)
 
-            async def fetch_and_cache(date, index):
-                async with semaphore:
-                    logger.info(
-                        f"Processing day {index+1}/{effective_max_days}: {date}"
-                    )
-                    cache_file = os.path.join(
-                        config.cache_dir, f"grid_{date.replace('/', '-')}.html"
-                    )
-                    days_from_today = (
-                        datetime.strptime(date, "%d/%m/%Y").date() - today.date()
-                    ).days
-                    cache_minutes = config.get_cache_minutes(days_from_today)
+            # fetch_and_cache_grid_html handles cache logic internally
+            html = fetch_and_cache_grid_html(
+                session,
+                date,
+                cache_dir=config.cache_dir,
+                cache_minutes=cache_minutes,
+                cache_mode=args.cache_mode
+            )
 
-                    # Cache-only mode should never attempt network fetches
-                    if args.cache_mode == "cache-only":
-                        if _is_cache_valid(cache_file, cache_minutes):
-                            logger.debug(f"Using cached data for {date}")
-                            with open(cache_file, "r", encoding="utf-8") as f:
-                                grid_htmls[index] = f.read()
-                        else:
-                            logger.debug(
-                                f"No cache for {date} and running in cache-only mode; skipping fetch."
-                            )
-                            return
-                    elif args.cache_mode != "no-cache" and _is_cache_valid(
-                        cache_file, cache_minutes
-                    ):
-                        logger.debug(f"Using cached data for {date}")
-                        with open(cache_file, "r", encoding="utf-8") as f:
-                            grid_htmls[index] = f.read()
-                    else:
-                        logger.debug(f"Fetching data for {date}")
-                        html = await fetch_grid_html_for_date_async(aio_session, date)
-                        if html:
-                            grid_htmls[index] = html
-                            with open(cache_file, "w", encoding="utf-8") as f:
-                                f.write(html)
+            if html:
+                try:
+                    result = parse_grid_html(html, date)
+                    crew_list = result.get("crew_availability", [])
+                    appliance_obj = result.get("appliance_availability", {})
+                    daily_crew_lists.append(crew_list)
+                    daily_appliance_lists.append(appliance_obj)
+                except Exception as exc:
+                    logger.error(f"Error parsing data for {date}: {exc}")
 
-            for i, date in enumerate(booking_dates):
-                task = fetch_and_cache(date, i)
-                fetch_tasks.append(task)
-
-            # Run all fetching tasks concurrently
-            await asyncio.gather(*fetch_tasks)
-
-            # Use a ThreadPoolExecutor for the CPU-bound parsing task
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=config.max_workers
-            ) as executor:
-                parse_futures = {
-                    executor.submit(parse_grid_html, html, date): date
-                    for html, date in zip(grid_htmls, booking_dates)
-                    if html
-                }
-
-                for i, future in enumerate(
-                    concurrent.futures.as_completed(parse_futures)
-                ):
-                    date = parse_futures[future]
-                    try:
-                        result = future.result()
-                        crew_list = result.get("crew_availability", [])
-                        appliance_obj = result.get("appliance_availability", {})
-                        daily_crew_lists.append(crew_list)
-                        daily_appliance_lists.append(appliance_obj)
-                    except Exception as exc:
-                        logger.error(f"Error parsing data for {date}: {exc}")
-
-                    # Log progress
-                    elapsed = time.time() - start_time
-                    avg_per_day = elapsed / (i + 1)
-                    eta = avg_per_day * (len(booking_dates) - (i + 1))
-                    logger.info(
-                        f"Progress: {i+1}/{len(booking_dates)} days | ETA: {int(eta)}s"
-                    )
+            # Log progress
+            elapsed = time.time() - start_time
+            avg_per_day = elapsed / (i + 1)
+            eta = avg_per_day * (len(booking_dates) - (i + 1))
+            logger.info(
+                f"Progress: {i+1}/{len(booking_dates)} days | ETA: {int(eta)}s"
+            )
 
         # All data is fetched and parsed, now process it
         crew_list_agg = aggregate_crew_availability(daily_crew_lists)
 
-        contact_map = await asyncio.to_thread(read_crew_details_file)
+        contact_map = read_crew_details_file()
 
         insert_crew_details(crew_list_agg, contact_map, db_conn=db_conn)
         insert_crew_availability(crew_list_agg, db_conn=db_conn)
@@ -274,21 +189,6 @@ async def main():
         print(
             f"Saved appliance availability for {len(appliance_agg)} appliances to gartan_availability.db"
         )
-
-        # Station feed verification
-        verification_logger = setup_verification_logger()
-        station_feed_html = fetch_station_feed_html(session)
-        if station_feed_html:
-            station_feed_data = parse_station_feed_html(station_feed_html)
-            if station_feed_data:
-                compare_and_log_discrepancies(
-                    station_feed_data, appliance_agg_dict, verification_logger
-                )
-                logger.info("Station feed verification completed successfully.")
-            else:
-                logger.warning("Could not parse station feed data for verification.")
-        else:
-            logger.warning("Could not fetch station feed for verification.")
 
         # Final summary logging
         undetermined = [
@@ -311,4 +211,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
