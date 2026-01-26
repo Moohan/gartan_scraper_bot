@@ -100,9 +100,7 @@ def get_dashboard_data(now: datetime) -> List[Dict]:
     crew_data = []
     for r in rows:
         d = dict(r)
-        d["display_name"] = (
-            d["contact"].split("|")[0] if d["contact"] else d["name"]
-        )
+        d["display_name"] = d["contact"].split("|")[0] if d["contact"] else d["name"]
 
         available = d["end_time"] is not None
         d["available"] = available
