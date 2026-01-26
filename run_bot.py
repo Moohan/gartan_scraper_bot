@@ -27,7 +27,6 @@ from parse_grid import (
     aggregate_crew_availability,
     parse_grid_html,
 )
-
 from utils import get_week_aligned_date_range
 
 logger = get_logger()
@@ -149,7 +148,7 @@ def main():
                 date,
                 cache_dir=config.cache_dir,
                 cache_minutes=cache_minutes,
-                cache_mode=args.cache_mode
+                cache_mode=args.cache_mode,
             )
 
             if html:
@@ -166,9 +165,7 @@ def main():
             elapsed = time.time() - start_time
             avg_per_day = elapsed / (i + 1)
             eta = avg_per_day * (len(booking_dates) - (i + 1))
-            logger.info(
-                f"Progress: {i+1}/{len(booking_dates)} days | ETA: {int(eta)}s"
-            )
+            logger.info(f"Progress: {i+1}/{len(booking_dates)} days | ETA: {int(eta)}s")
 
         # All data is fetched and parsed, now process it
         crew_list_agg = aggregate_crew_availability(daily_crew_lists)
