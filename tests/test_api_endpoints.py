@@ -258,6 +258,7 @@ class TestAPIEndpoints:
     def test_week_boundaries_logic(self):
         """Test the internal week boundary calculation logic."""
         from api_server import get_week_boundaries
+
         start, end = get_week_boundaries()
         assert start.weekday() == 0  # Monday
         assert start.hour == 0
@@ -273,8 +274,13 @@ class TestAPIEndpoints:
         week_start, _ = api_server.get_week_boundaries()
         start = week_start + timedelta(hours=10)
         end = start + timedelta(minutes=90)
-        c.execute("INSERT INTO crew (id, name, contract_hours) VALUES (99, 'PRECISION', '56')")
-        c.execute("INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (99, ?, ?)", (start.isoformat(), end.isoformat()))
+        c.execute(
+            "INSERT INTO crew (id, name, contract_hours) VALUES (99, 'PRECISION', '56')"
+        )
+        c.execute(
+            "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (99, ?, ?)",
+            (start.isoformat(), end.isoformat()),
+        )
         conn.commit()
         conn.close()
 

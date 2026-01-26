@@ -259,7 +259,11 @@ def root():
         )
     except Exception as e:
         logger.error(f"Root error: {e}")
-        return jsonify({"error": "Internal Server Error", "Dashboard": "Unavailable"}), 500
+        return (
+            jsonify({"error": "Internal Server Error", "Dashboard": "Unavailable"}),
+            500,
+        )
+
 
 @app.route("/crew")
 def list_crew():
@@ -418,27 +422,59 @@ def station_now():
 
 
 # --- Compatibility Helpers for Tests ---
-def get_crew_list_data(): return get_crew_list()
-def get_crew_available_data(id): return get_availability(id, "crew_availability", datetime.now())
-def get_crew_duration_data(id): return get_availability(id, "crew_availability", datetime.now())
+def get_crew_list_data():
+    return get_crew_list()
+
+
+def get_crew_available_data(id):
+    return get_availability(id, "crew_availability", datetime.now())
+
+
+def get_crew_duration_data(id):
+    return get_availability(id, "crew_availability", datetime.now())
+
+
 def get_appliance_available_data(name):
     now = datetime.now()
     with get_db() as conn:
-        app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
-        if not app: return {"error": "Not found"}
+        app = conn.execute(
+            "SELECT id FROM appliance WHERE name = ?", (name,)
+        ).fetchone()
+        if not app:
+            return {"error": "Not found"}
         base = get_availability(app["id"], "appliance_availability", now)
         if name == "P22P6":
-            avail_ids = [r[0] for r in conn.execute("SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?", (now, now)).fetchall()]
-            return {"available": base["available"] and check_rules(avail_ids)["rules_pass"]}
+            avail_ids = [
+                r[0]
+                for r in conn.execute(
+                    "SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?",
+                    (now, now),
+                ).fetchall()
+            ]
+            return {
+                "available": base["available"] and check_rules(avail_ids)["rules_pass"]
+            }
         return {"available": base["available"]}
+
+
 def get_appliance_duration_data(name):
     now = datetime.now()
     with get_db() as conn:
-        app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
-        if not app: return {"error": "Not found"}
+        app = conn.execute(
+            "SELECT id FROM appliance WHERE name = ?", (name,)
+        ).fetchone()
+        if not app:
+            return {"error": "Not found"}
         return get_availability(app["id"], "appliance_availability", now)
-def get_crew_hours_this_week_data(id): return get_weekly_stats(id)
-def get_crew_hours_planned_week_data(id): return get_weekly_stats(id)
+
+
+def get_crew_hours_this_week_data(id):
+    return get_weekly_stats(id)
+
+
+def get_crew_hours_planned_week_data(id):
+    return get_weekly_stats(id)
+
 
 @app.after_request
 def add_security_headers(response):
