@@ -31,7 +31,7 @@ if [ -n "$staged_py" ]; then
     if command -v isort >/dev/null 2>&1; then
         echo "$staged_py" | xargs isort --quiet 2>/dev/null || true
     fi
-    
+
     # Re-stage any formatting changes
     if [ -n "$(git diff --name-only $staged_py 2>/dev/null || true)" ]; then
         git add $staged_py
@@ -42,7 +42,7 @@ fi
 core_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '(run_bot|api_server|db_store|parse_grid|gartan_fetch)\.py$' || true)
 if [ -n "$core_files" ]; then
     echo "🧪 Running core tests (core files modified)..."
-    python -m pytest tests/test_db_store.py tests/test_parse_grid.py -q || {
+    python -m pytest tests/test_parse_grid.py tests/test_api_endpoints.py -q || {
         echo "❌ Core tests failed"
         exit 1
     }

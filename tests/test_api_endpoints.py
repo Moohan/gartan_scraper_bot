@@ -255,6 +255,33 @@ class TestAPIEndpoints:
         assert "hours_remaining" in data
         assert isinstance(data["hours_remaining"], (int, float))
 
+    def test_week_boundaries_logic(self):
+        """Test the internal week boundary calculation logic."""
+        from api_server import get_week_boundaries
+        start, end = get_week_boundaries()
+        assert start.weekday() == 0  # Monday
+        assert start.hour == 0
+        assert end.weekday() == 6  # Sunday
+        assert end.hour == 23
+        assert (end - start).days == 6
+
+    def test_hours_precision_logic(self):
+        """Test that hours are calculated with proper precision."""
+        # Insert 90 minute block (1.5 hours)
+        conn = sqlite3.connect(self.temp_path)
+        c = conn.cursor()
+        week_start, _ = api_server.get_week_boundaries()
+        start = week_start + timedelta(hours=10)
+        end = start + timedelta(minutes=90)
+        c.execute("INSERT INTO crew (id, name, contract_hours) VALUES (99, 'PRECISION', '56')")
+        c.execute("INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (99, ?, ?)", (start.isoformat(), end.isoformat()))
+        conn.commit()
+        conn.close()
+
+        response = self.client.get("/crew/99/hours-planned-week")
+        data = json.loads(response.data)
+        assert data["hours_planned_week"] == 1.5
+
     def test_appliance_available_endpoint(self):
         """Test /appliances/<name>/available endpoint."""
         # Insert available appliance (not P22P6 to avoid business rules)
