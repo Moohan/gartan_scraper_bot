@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime
 
-conn = sqlite3.connect('gartan_availability.db')
+conn = sqlite3.connect("gartan_availability.db")
 cursor = conn.cursor()
 
 # Get recent/future availability

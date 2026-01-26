@@ -62,16 +62,14 @@ class TestScheduler(unittest.TestCase):
 
         # Create tables
         cursor.execute("CREATE TABLE crew (id INTEGER PRIMARY KEY, name TEXT)")
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE crew_availability (
                 id INTEGER PRIMARY KEY,
                 crew_id INTEGER,
                 start_time TEXT,
                 end_time TEXT
             )
-        """
-        )
+        """)
 
         # Add test data
         cursor.execute("INSERT INTO crew (name) VALUES ('Test Crew')")
@@ -120,16 +118,14 @@ class TestScheduler(unittest.TestCase):
         cursor = conn.cursor()
 
         cursor.execute("CREATE TABLE crew (id INTEGER PRIMARY KEY, name TEXT)")
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE crew_availability (
                 id INTEGER PRIMARY KEY,
                 crew_id INTEGER,
                 start_time TEXT,
                 end_time TEXT
             )
-        """
-        )
+        """)
 
         # Add old data (more than 1 day ago)
         cursor.execute("INSERT INTO crew (name) VALUES ('Test Crew')")

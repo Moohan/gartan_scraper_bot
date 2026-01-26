@@ -1,8 +1,8 @@
-import sqlite3
 import json
+import sqlite3
 from datetime import datetime
 
-conn = sqlite3.connect('gartan_availability.db')
+conn = sqlite3.connect("gartan_availability.db")
 cursor = conn.cursor()
 
 # Check specific crew member 4540 (HAYES, JA)
