@@ -74,6 +74,61 @@ def format_hours(minutes: Optional[int]) -> Optional[str]:
     return f"{minutes / 60.0:.2f}h"
 
 
+def get_dashboard_data(now: datetime) -> List[Dict]:
+    """
+    Fetches all crew and their current availability in a single, optimized query.
+    This avoids the N+1 problem by joining crew and crew_availability tables.
+    """
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                c.id,
+                c.name,
+                c.role,
+                c.skills,
+                c.contract_hours,
+                c.contact,
+                ca.end_time
+            FROM crew c
+            LEFT JOIN crew_availability ca ON c.id = ca.crew_id AND ca.start_time <= ? AND ca.end_time > ?
+            ORDER BY c.name
+            """,
+            (now, now),
+        ).fetchall()
+
+    crew_data = []
+    for r in rows:
+        d = dict(r)
+        d["display_name"] = (
+            d["contact"].split("|")[0] if d["contact"] else d["name"]
+        )
+
+        available = d["end_time"] is not None
+        d["available"] = available
+
+        if available:
+            end_time = parse_dt(d["end_time"])
+            duration_min = int((end_time - now).total_seconds() / 60)
+            d["duration"] = format_hours(duration_min)
+
+            display = end_time.strftime("%H:%M")
+            if end_time.date() == now.date():
+                display += " today"
+            elif end_time.date() == (now + timedelta(days=1)).date():
+                display += " tomorrow"
+            else:
+                display += end_time.strftime(" on %d/%m")
+            d["end_time_display"] = display
+        else:
+            d["duration"] = None
+            d["end_time_display"] = None
+
+        crew_data.append(d)
+
+    return crew_data
+
+
 def get_crew_list() -> List[Dict]:
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM crew ORDER BY name").fetchall()
@@ -228,11 +283,7 @@ def health():
 def root():
     try:
         now = datetime.now()
-        crew = get_crew_list()
-        crew_data = []
-        for c in crew:
-            avail = get_availability(c["id"], "crew_availability", now)
-            crew_data.append({**c, **avail})
+        crew_data = get_dashboard_data(now)
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
         crew_data.sort(
@@ -429,58 +480,9 @@ def station_now():
 
 
 # --- Compatibility Helpers for Tests ---
-def get_crew_list_data():
-    return get_crew_list()
-
-
-def get_crew_available_data(id):
-    return get_availability(id, "crew_availability", datetime.now())
-
-
-def get_crew_duration_data(id):
-    return get_availability(id, "crew_availability", datetime.now())
-
-
-def get_appliance_available_data(name):
-    now = datetime.now()
-    with get_db() as conn:
-        app = conn.execute(
-            "SELECT id FROM appliance WHERE name = ?", (name,)
-        ).fetchone()
-        if not app:
-            return {"error": "Not found"}
-        base = get_availability(app["id"], "appliance_availability", now)
-        if name == "P22P6":
-            avail_ids = [
-                r[0]
-                for r in conn.execute(
-                    "SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?",
-                    (now, now),
-                ).fetchall()
-            ]
-            return {
-                "available": base["available"] and check_rules(avail_ids)["rules_pass"]
-            }
-        return {"available": base["available"]}
-
-
-def get_appliance_duration_data(name):
-    now = datetime.now()
-    with get_db() as conn:
-        app = conn.execute(
-            "SELECT id FROM appliance WHERE name = ?", (name,)
-        ).fetchone()
-        if not app:
-            return {"error": "Not found"}
-        return get_availability(app["id"], "appliance_availability", now)
-
-
-def get_crew_hours_this_week_data(id):
-    return get_weekly_stats(id)
-
-
-def get_crew_hours_planned_week_data(id):
-    return get_weekly_stats(id)
+# This section is intentionally left blank.
+# The old helper functions were removed as part of the N+1 query optimization.
+# Tests now directly call API endpoints and validate their responses.
 
 
 @app.after_request
