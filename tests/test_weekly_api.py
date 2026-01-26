@@ -41,17 +41,14 @@ class TestWeeklyAPI:
         cursor = conn.cursor()
 
         # Create tables
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE crew (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE
             )
-        """
-        )
+        """)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE crew_availability (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 crew_id INTEGER NOT NULL,
@@ -59,8 +56,7 @@ class TestWeeklyAPI:
                 end_time DATETIME NOT NULL,
                 FOREIGN KEY (crew_id) REFERENCES crew (id)
             )
-        """
-        )
+        """)
 
         # Insert test crew
         cursor.execute("INSERT INTO crew (id, name) VALUES (1, 'TEST CREW')")
