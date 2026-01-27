@@ -74,6 +74,60 @@ def format_hours(minutes: Optional[int]) -> Optional[str]:
     return f"{minutes / 60.0:.2f}h"
 
 
+def get_dashboard_data(now: datetime) -> List[Dict]:
+    """
+    Fetches all crew and their current availability in a single query.
+    This is a performance optimization to solve the N+1 query problem.
+    """
+    query = """
+        SELECT
+            c.id, c.name, c.role, c.skills, c.contract_hours,
+            ca.end_time
+        FROM
+            crew c
+        LEFT JOIN
+            crew_availability ca ON c.id = ca.crew_id
+            AND ca.start_time <= ? AND ca.end_time > ?
+        ORDER BY
+            c.name;
+    """
+    with get_db() as conn:
+        rows = conn.execute(query, (now, now)).fetchall()
+
+    crew_data = []
+    for row in rows:
+        crew_member = dict(row)
+        end_time_val = crew_member.pop("end_time", None)
+
+        if end_time_val:
+            end_time = parse_dt(end_time_val)
+            duration_min = int((end_time - now).total_seconds() / 60)
+
+            display = end_time.strftime("%H:%M")
+            if end_time.date() == now.date():
+                display += " today"
+            elif end_time.date() == (now + timedelta(days=1)).date():
+                display += " tomorrow"
+            else:
+                display += end_time.strftime(" on %d/%m")
+
+            availability_info = {
+                "available": True,
+                "duration": format_hours(duration_min),
+                "end_time_display": display,
+            }
+        else:
+            availability_info = {
+                "available": False,
+                "duration": None,
+                "end_time_display": None,
+            }
+
+        crew_data.append({**crew_member, **availability_info})
+
+    return crew_data
+
+
 def get_crew_list() -> List[Dict]:
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM crew ORDER BY name").fetchall()
@@ -228,11 +282,7 @@ def health():
 def root():
     try:
         now = datetime.now()
-        crew = get_crew_list()
-        crew_data = []
-        for c in crew:
-            avail = get_availability(c["id"], "crew_availability", now)
-            crew_data.append({**c, **avail})
+        crew_data = get_dashboard_data(now)
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
         crew_data.sort(
