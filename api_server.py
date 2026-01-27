@@ -188,7 +188,11 @@ def check_rules(available_ids: List[int]) -> Dict:
 
         if "BA" in c_skills:
             skills["BA"] += 1
-            if "TTR" not in c_skills and "IC" not in c_skills and role not in ["FFC", "CC", "WC", "CM"]:
+            if (
+                "TTR" not in c_skills
+                and "IC" not in c_skills
+                and role not in ["FFC", "CC", "WC", "CM"]
+            ):
                 ba_non_ttr += 1
             if role in ["FFC", "CC", "WC", "CM"]:
                 ffc_ba = True
