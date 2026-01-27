@@ -76,7 +76,9 @@ def format_hours(minutes: Optional[int]) -> Optional[str]:
     return f"{minutes / 60.0:.2f}h"
 
 
-def _format_availability_data(end_time: Optional[datetime], now: datetime) -> Dict[str, Any]:
+def _format_availability_data(
+    end_time: Optional[datetime], now: datetime
+) -> Dict[str, Any]:
     """Formats availability data based on end time."""
     if end_time is None:
         return {"available": False, "duration": None, "end_time_display": None}
@@ -126,9 +128,7 @@ def get_dashboard_data(now: datetime) -> List[Dict[str, Any]]:
     crew_data = []
     for r in rows:
         d = dict(r)
-        d["display_name"] = (
-            d["contact"].split("|")[0] if d["contact"] else d["name"]
-        )
+        d["display_name"] = d["contact"].split("|")[0] if d["contact"] else d["name"]
         availability_info = _format_availability_data(d.get("end_time"), now)
         d.update(availability_info)
         crew_data.append(d)
