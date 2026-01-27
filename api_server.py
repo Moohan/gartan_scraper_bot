@@ -32,19 +32,21 @@ def get_db():
     return conn
 
 
-def parse_dt(val):
+def parse_dt(val: Any) -> Optional[datetime]:
+    """Parse a value into a timezone-aware datetime object."""
     if isinstance(val, datetime):
-        return val
+        return val if val.tzinfo else val.replace(tzinfo=timezone.utc)
     if isinstance(val, str):
-        return datetime.fromisoformat(val)
-    return val
+        dt = datetime.fromisoformat(val)
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return None
 
 
 # --- Data Helpers ---
 
 
 def get_week_boundaries() -> Tuple[datetime, datetime]:
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     monday = (now - timedelta(days=now.weekday())).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
@@ -74,7 +76,30 @@ def format_hours(minutes: Optional[int]) -> Optional[str]:
     return f"{minutes / 60.0:.2f}h"
 
 
-def get_dashboard_data(now: datetime) -> List[Dict]:
+def _format_availability_data(end_time: Optional[datetime], now: datetime) -> Dict[str, Any]:
+    """Formats availability data based on end time."""
+    if end_time is None:
+        return {"available": False, "duration": None, "end_time_display": None}
+
+    parsed_end_time = parse_dt(end_time)
+    duration_min = int((parsed_end_time - now).total_seconds() / 60)
+
+    display = parsed_end_time.strftime("%H:%M")
+    if parsed_end_time.date() == now.date():
+        display += " today"
+    elif parsed_end_time.date() == (now + timedelta(days=1)).date():
+        display += " tomorrow"
+    else:
+        display += parsed_end_time.strftime(" on %d/%m")
+
+    return {
+        "available": True,
+        "duration": format_hours(duration_min),
+        "end_time_display": display,
+    }
+
+
+def get_dashboard_data(now: datetime) -> List[Dict[str, Any]]:
     """
     Fetches all crew and their current availability in a single, optimized query.
     This avoids the N+1 problem by joining crew and crew_availability tables.
@@ -100,28 +125,11 @@ def get_dashboard_data(now: datetime) -> List[Dict]:
     crew_data = []
     for r in rows:
         d = dict(r)
-        d["display_name"] = d["contact"].split("|")[0] if d["contact"] else d["name"]
-
-        available = d["end_time"] is not None
-        d["available"] = available
-
-        if available:
-            end_time = parse_dt(d["end_time"])
-            duration_min = int((end_time - now).total_seconds() / 60)
-            d["duration"] = format_hours(duration_min)
-
-            display = end_time.strftime("%H:%M")
-            if end_time.date() == now.date():
-                display += " today"
-            elif end_time.date() == (now + timedelta(days=1)).date():
-                display += " tomorrow"
-            else:
-                display += end_time.strftime(" on %d/%m")
-            d["end_time_display"] = display
-        else:
-            d["duration"] = None
-            d["end_time_display"] = None
-
+        d["display_name"] = (
+            d["contact"].split("|")[0] if d["contact"] else d["name"]
+        )
+        availability_info = _format_availability_data(d.get("end_time"), now)
+        d.update(availability_info)
         crew_data.append(d)
 
     return crew_data
@@ -140,30 +148,13 @@ def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
             f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
             (entity_id, now, now),
         ).fetchone()
-        if not curr:
-            return {"available": False, "duration": None, "end_time_display": None}
-
-        end_time = parse_dt(curr["end_time"])
-        duration_min = int((end_time - now).total_seconds() / 60)
-
-        display = end_time.strftime("%H:%M")
-        if end_time.date() == now.date():
-            display += " today"
-        elif end_time.date() == (now + timedelta(days=1)).date():
-            display += " tomorrow"
-        else:
-            display += end_time.strftime(" on %d/%m")
-
-        return {
-            "available": True,
-            "duration": format_hours(duration_min),
-            "end_time_display": display,
-        }
+        end_time = curr["end_time"] if curr else None
+        return _format_availability_data(end_time, now)
 
 
 def get_weekly_stats(crew_id: int) -> Dict:
     start, end = get_week_boundaries()
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     with get_db() as conn:
         rows = conn.execute(
             "SELECT start_time, end_time FROM crew_availability WHERE crew_id = ? AND end_time > ? AND start_time < ?",
@@ -280,7 +271,7 @@ def health():
 @app.route("/")
 def root():
     try:
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         crew_data = get_dashboard_data(now)
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
@@ -332,7 +323,8 @@ def list_crew():
 @app.route("/crew/<int:id>/available")
 def crew_avail(id):
     try:
-        res = get_availability(id, "crew_availability", datetime.now())
+        now = datetime.now(timezone.utc)
+        res = get_availability(id, "crew_availability", now)
         with get_db() as conn:
             if not conn.execute("SELECT 1 FROM crew WHERE id = ?", (id,)).fetchone():
                 return jsonify({"error": "Not found"}), 404
@@ -344,7 +336,8 @@ def crew_avail(id):
 @app.route("/crew/<int:id>/duration")
 def crew_dur(id):
     try:
-        res = get_availability(id, "crew_availability", datetime.now())
+        now = datetime.now(timezone.utc)
+        res = get_availability(id, "crew_availability", now)
         with get_db() as conn:
             if not conn.execute("SELECT 1 FROM crew WHERE id = ?", (id,)).fetchone():
                 return jsonify({"error": "Not found"}), 404
@@ -417,7 +410,7 @@ def crew_hrs_rem(id):
 @app.route("/appliances/<name>/available")
 def app_avail(name):
     try:
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         with get_db() as conn:
             app = conn.execute(
                 "SELECT id FROM appliance WHERE name = ?", (name,)
@@ -444,7 +437,7 @@ def app_avail(name):
 @app.route("/appliances/<name>/duration")
 def app_dur(name):
     try:
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         with get_db() as conn:
             app = conn.execute(
                 "SELECT id FROM appliance WHERE name = ?", (name,)
@@ -475,12 +468,6 @@ def station_now():
         return jsonify(data) if data else (jsonify({"error": "Failed"}), 500)
     except:
         return jsonify({"error": "DB error"}), 500
-
-
-# --- Compatibility Helpers for Tests ---
-# This section is intentionally left blank.
-# The old helper functions were removed as part of the N+1 query optimization.
-# Tests now directly call API endpoints and validate their responses.
 
 
 @app.after_request
