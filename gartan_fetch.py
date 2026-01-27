@@ -236,7 +236,7 @@ BASE_URL = "https://scottishfrs-availability.gartantech.com/"
 LOGIN_URL = f"{BASE_URL}Account/Login.aspx"
 DATA_URL = f"{BASE_URL}Availability/Schedule/AvailabilityMain1.aspx?UseDefaultStation=1"
 SCHEDULE_URL = f"{BASE_URL}Availability/Schedule/AvailabilityMain1.aspx/GetSchedule"
-STATION_FEED_URL = f"{BASE_URL}ScheduleDisplay.aspx?BrigadeID=P22"
+STATION_FEED_URL = f"{BASE_URL}StationDisplay.aspx?id=P22"
 
 
 def fetch_station_feed_html(session) -> str | None:
