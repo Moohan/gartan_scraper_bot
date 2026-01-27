@@ -32,7 +32,6 @@ from utils import get_week_aligned_date_range
 logger = get_logger()
 
 
-
 def cleanup_old_cache_files(cache_dir: str, today: datetime) -> None:
     """Clean up cache files older than today."""
     if not os.path.exists(cache_dir):
