@@ -1,11 +1,11 @@
-
-import sys
 import os
+import sys
 
 # Add the current directory to the path so we can import api_server
 sys.path.append(os.getcwd())
 
 from api_server import check_rules
+
 
 def test_user_scenario():
     # Crew from user's report:
@@ -25,10 +25,11 @@ def test_user_scenario():
     print(f"Skill Counts: {result['skill_counts']}")
     print(f"BA Non-TTR: {result['ba_non_ttr']}")
 
-    if result['rules_pass']:
+    if result["rules_pass"]:
         print("\nSUCCESS: The reported crew now passes the availability rules!")
     else:
         print("\nFAILURE: The reported crew still fails the availability rules.")
+
 
 if __name__ == "__main__":
     test_user_scenario()

@@ -282,8 +282,9 @@ def _find_appliance_name(appliance_row: Optional[Tag]) -> str:
         return "P22P6"
 
     import re
+
     # Regular expression for typical Scottish FRS appliance patterns
-    appliance_pattern = re.compile(r'P\d{2}P[67]')
+    appliance_pattern = re.compile(r"P\d{2}P[67]")
     match = appliance_pattern.search(row_text)
     if match:
         return match.group(0)
@@ -519,7 +520,11 @@ def _find_appliance_rows(soup: BeautifulSoup) -> List[Tuple[Tag, Tag]]:
             if "P22P6" in text:
                 # If we found P22P6, use the nearest Appliances header if seen,
                 # otherwise fallback to the immediately preceding row.
-                header = potential_header if potential_header else (rows[i-1] if i > 0 else None)
+                header = (
+                    potential_header
+                    if potential_header
+                    else (rows[i - 1] if i > 0 else None)
+                )
                 if header:
                     appliance_rows.append((header, row))
 
