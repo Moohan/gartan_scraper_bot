@@ -175,13 +175,23 @@ def check_rules(available_ids: List[int]) -> Dict:
     ba_non_ttr, ffc_ba = 0, False
     for r in rows:
         c_skills = (r["skills"] or "").split()
-        for s in c_skills:
-            if s in skills:
-                skills[s] += 1
-        if "BA" in c_skills and "TTR" not in c_skills:
-            ba_non_ttr += 1
-        if r["role"] in ["FFC", "CC", "WC", "CM"] and "BA" in c_skills:
-            ffc_ba = True
+        role = r["role"]
+
+        # Enhanced skill mapping
+        # 1. LGV mapping include ERD
+        if "LGV" in c_skills or "ERD" in c_skills:
+            skills["LGV"] += 1
+
+        # 2. TTR mapping include IC or CC role
+        if "TTR" in c_skills or "IC" in c_skills or role in ["FFC", "CC", "WC", "CM"]:
+            skills["TTR"] += 1
+
+        if "BA" in c_skills:
+            skills["BA"] += 1
+            if "TTR" not in c_skills and "IC" not in c_skills and role not in ["FFC", "CC", "WC", "CM"]:
+                ba_non_ttr += 1
+            if role in ["FFC", "CC", "WC", "CM"]:
+                ffc_ba = True
 
     rules = {
         "total_crew_ok": len(rows) >= 4,
