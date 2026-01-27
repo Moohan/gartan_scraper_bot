@@ -77,14 +77,7 @@ def format_hours(minutes: Optional[int]) -> Optional[str]:
 def get_crew_list() -> List[Dict]:
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM crew ORDER BY name").fetchall()
-        crew = []
-        for r in rows:
-            d = dict(r)
-            d["display_name"] = (
-                d["contact"].split("|")[0] if d["contact"] else d["name"]
-            )
-            crew.append(d)
-        return crew
+        return [dict(r) for r in rows]
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
@@ -539,7 +532,7 @@ DASHBOARD_TEMPLATE = """
             <div class="grid">
                 {% for crew in crew_data %}
                 <div class="card {{ 'available' if crew.available else 'unavailable' }}">
-                    <div class="crew-name">{{ crew.display_name }}</div>
+                    <div class="crew-name">{{ crew.name }}</div>
                     <div class="crew-details">
                         <strong>Role:</strong> {{ crew.role }} | <strong>Skills:</strong> {{ crew.skills }}<br>
                         <strong>Status:</strong> {{ 'AVAILABLE' if crew.available else 'OFF' }}<br>

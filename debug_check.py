@@ -17,7 +17,7 @@ def check():
 
     for r in rows:
         print(
-            f"ID: {r['id']}, Name: {r['name']}, Role: {r['role']}, Skills: {r['skills']}, Contact: {r['contact']}"
+            f"ID: {r['id']}, Name: {r['name']}, Role: {r['role']}, Skills: {r['skills']}"
         )
 
     print("\n--- Current Crew Availability ---")
