@@ -32,7 +32,7 @@ class TestAPIEndpoints:
 
         # Create all required tables
         c.execute(
-            "CREATE TABLE crew (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, role TEXT, contact TEXT, skills TEXT, contract_hours TEXT)"
+            "CREATE TABLE crew (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, role TEXT, skills TEXT, contract_hours TEXT)"
         )
         c.execute(
             "CREATE TABLE crew_availability (id INTEGER PRIMARY KEY AUTOINCREMENT, crew_id INTEGER NOT NULL, start_time DATETIME NOT NULL, end_time DATETIME NOT NULL)"
@@ -58,14 +58,14 @@ class TestAPIEndpoints:
             pass
 
     def _insert_crew_member(
-        self, crew_id, name, role="FFC", skills="BA", contact="", available=True
+        self, crew_id, name, role="FFC", skills="BA", available=True
     ):
         """Helper to insert crew member with availability."""
         conn = sqlite3.connect(self.temp_path)
         c = conn.cursor()
         c.execute(
-            "INSERT INTO crew (id, name, role, skills, contact, contract_hours) VALUES (?, ?, ?, ?, ?, ?)",
-            (crew_id, name, role, skills, contact, "56"),
+            "INSERT INTO crew (id, name, role, skills, contract_hours) VALUES (?, ?, ?, ?, ?)",
+            (crew_id, name, role, skills, "56"),
         )
 
         if available:
@@ -139,9 +139,8 @@ class TestAPIEndpoints:
             "JONES, AB",
             "FFC",
             "BA LGV",
-            "Alice Jones|07123456789|alice@example.com|Firefighter",
         )
-        self._insert_crew_member(2, "SMITH, CD", "FFT", "TTR", "")
+        self._insert_crew_member(2, "SMITH, CD", "FFT", "TTR")
 
         response = self.client.get("/crew")
         assert response.status_code == 200
@@ -150,13 +149,12 @@ class TestAPIEndpoints:
         assert isinstance(data, list)
         assert len(data) == 2
 
-        # Check first crew member (with display name)
+        # Check first crew member
         crew1 = next(c for c in data if c["name"] == "JONES, AB")
         assert crew1["role"] == "FFC"
         assert crew1["skills"] == "BA LGV"
-        assert crew1["display_name"] == "Alice Jones"
 
-        # Check second crew member (without display name)
+        # Check second crew member
         crew2 = next(c for c in data if c["name"] == "SMITH, CD")
         assert crew2["role"] == "FFT"
         assert crew2["skills"] == "TTR"

@@ -32,23 +32,6 @@ from utils import get_week_aligned_date_range
 logger = get_logger()
 
 
-def read_crew_details_file() -> Dict[str, str]:
-    """Reads and parses the crew_details.local file."""
-    contact_map = {}
-    if os.path.exists("crew_details.local"):
-        with open("crew_details.local", "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                parts = line.split("|")
-                if len(parts) >= 3:
-                    crew_id, display_name, phone = parts[0], parts[1], parts[2]
-                    email = parts[3] if len(parts) > 3 else ""
-                    position = parts[4] if len(parts) > 4 else ""
-                    contact_map[crew_id] = f"{display_name}|{phone}|{email}|{position}"
-    return contact_map
-
 
 def cleanup_old_cache_files(cache_dir: str, today: datetime) -> None:
     """Clean up cache files older than today."""
@@ -170,9 +153,7 @@ def main():
         # All data is fetched and parsed, now process it
         crew_list_agg = aggregate_crew_availability(daily_crew_lists)
 
-        contact_map = read_crew_details_file()
-
-        insert_crew_details(crew_list_agg, contact_map, db_conn=db_conn)
+        insert_crew_details(crew_list_agg, db_conn=db_conn)
         insert_crew_availability(crew_list_agg, db_conn=db_conn)
         print(
             f"Saved crew availability for {len(crew_list_agg)} crew members to gartan_availability.db"
