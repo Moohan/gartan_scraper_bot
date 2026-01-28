@@ -108,6 +108,36 @@ def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
         }
 
 
+def get_all_crew_availability_data(now: datetime) -> Dict[int, Dict]:
+    """Fetches availability for all crew members in a single query."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT crew_id, end_time FROM crew_availability WHERE start_time <= ? AND end_time > ?",
+            (now, now),
+        ).fetchall()
+
+    availability_data = {}
+    for row in rows:
+        crew_id = row["crew_id"]
+        end_time = parse_dt(row["end_time"])
+        duration_min = int((end_time - now).total_seconds() / 60)
+
+        display = end_time.strftime("%H:%M")
+        if end_time.date() == now.date():
+            display += " today"
+        elif end_time.date() == (now + timedelta(days=1)).date():
+            display += " tomorrow"
+        else:
+            display += end_time.strftime(" on %d/%m")
+
+        availability_data[crew_id] = {
+            "available": True,
+            "duration": format_hours(duration_min),
+            "end_time_display": display,
+        }
+    return availability_data
+
+
 def get_weekly_stats(crew_id: int) -> Dict:
     start, end = get_week_boundaries()
     now = datetime.now()
@@ -229,9 +259,13 @@ def root():
     try:
         now = datetime.now()
         crew = get_crew_list()
+        availability_data = get_all_crew_availability_data(now)
         crew_data = []
         for c in crew:
-            avail = get_availability(c["id"], "crew_availability", now)
+            avail = availability_data.get(
+                c["id"],
+                {"available": False, "duration": None, "end_time_display": None},
+            )
             crew_data.append({**c, **avail})
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
