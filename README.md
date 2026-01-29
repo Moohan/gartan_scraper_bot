@@ -25,6 +25,25 @@ curl http://localhost:5000/health
 
 ## API Endpoints
 
+### Running the API Server
+
+**Production:**
+
+Use a production-grade WSGI server like `gunicorn`:
+
+```bash
+gunicorn --bind 0.0.0.0:5000 api_server:app
+```
+
+**Development:**
+
+For local development, use the Flask development server. You **must** set the `FLASK_ENV` environment variable to `development`.
+
+```bash
+export FLASK_ENV=development
+python api_server.py
+```
+
 **Crew:**
 
 ```bash
