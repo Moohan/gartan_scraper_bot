@@ -551,7 +551,9 @@ DASHBOARD_TEMPLATE = """
 if __name__ == "__main__":
     # 🛡️ Sentinel: Prevent running insecure dev server in production
     if os.environ.get("FLASK_ENV") != "development":
-        logger.error("FLASK_ENV is not 'development'. Refusing to start dev server in production mode.")
+        logger.error(
+            "FLASK_ENV is not 'development'. Refusing to start dev server in production mode."
+        )
         logger.error("Use a production WSGI server like gunicorn instead.")
         logger.error("Example: gunicorn --bind 0.0.0.0:5000 api_server:app")
     else:
