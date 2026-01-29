@@ -86,6 +86,10 @@ def main():
             "Running in cache-only mode: skipping authentication and network fetches."
         )
 
+    if session is None and args.cache_mode != "cache-only":
+        logger.error("🚫 No valid session and not in cache-only mode. Aborting scrape.")
+        return  # Exit gracefully
+
     # Calculate week-aligned date range for weekly availability tracking
     start_date, effective_max_days = get_week_aligned_date_range(args.max_days)
 

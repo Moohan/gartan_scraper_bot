@@ -667,6 +667,7 @@ def aggregate_crew_availability(
 
 def parse_grid_html(grid_html: str, date: Optional[str] = None) -> GridResult:
     """Parse grid HTML into structured crew/appliance availability data."""
+    # PERF: Parse HTML only once to avoid redundant expensive operations.
     soup = BeautifulSoup(grid_html, "lxml")
     table, header_row = _get_table_and_header(soup)
 
