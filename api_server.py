@@ -81,12 +81,15 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
+    if table == "crew_availability":
+        query = "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    elif table == "appliance_availability":
+        query = "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    else:
+        raise ValueError("Invalid table name")
+
     with get_db() as conn:
-        curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-            (entity_id, now, now),
-        ).fetchone()
+        curr = conn.execute(query, (entity_id, now, now)).fetchone()
         if not curr:
             return {"available": False, "duration": None, "end_time_display": None}
 
@@ -110,13 +113,22 @@ def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
 
 def get_all_availability(table: str, now: datetime) -> Dict[int, Dict]:
     """Efficiently fetch all current availabilities in a single query."""
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
     res = {}
     with get_db() as conn:
-        rows = conn.execute(
-            f"SELECT {col}, end_time FROM {table} WHERE start_time <= ? AND end_time > ?",
-            (now, now),
-        ).fetchall()
+        if table == "crew_availability":
+            rows = conn.execute(
+                "SELECT crew_id, end_time FROM crew_availability WHERE start_time <= ? AND end_time > ?",
+                (now, now),
+            ).fetchall()
+            col = "crew_id"
+        elif table == "appliance_availability":
+            rows = conn.execute(
+                "SELECT appliance_id, end_time FROM appliance_availability WHERE start_time <= ? AND end_time > ?",
+                (now, now),
+            ).fetchall()
+            col = "appliance_id"
+        else:
+            raise ValueError("Invalid table name")
 
         for r in rows:
             entity_id = r[col]
@@ -271,10 +283,7 @@ def root():
 
         crew_data = []
         for c in crew:
-            avail = availabilities.get(
-                c["id"],
-                {"available": False, "duration": None, "end_time_display": None},
-            )
+            avail = availabilities.get(c["id"], {"available": False, "duration": None, "end_time_display": None})
             crew_data.append({**c, **avail})
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
@@ -295,10 +304,7 @@ def root():
                 "SELECT id FROM appliance WHERE name = 'P22P6'"
             ).fetchone()
             if app_p22:
-                p22p6_base = appliance_avails.get(
-                    app_p22["id"],
-                    {"available": False, "duration": None, "end_time_display": None},
-                )
+                p22p6_base = appliance_avails.get(app_p22["id"], {"available": False, "duration": None, "end_time_display": None})
 
         p22p6_avail = p22p6_base["available"] and rules_res["rules_pass"]
 
@@ -436,8 +442,7 @@ def app_avail(name):
                     (now, now),
                 ).fetchall()
                 return jsonify(
-                    base["available"]
-                    and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]
+                    base["available"] and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]
                 )
             return jsonify(base["available"])
     except:
@@ -466,10 +471,7 @@ def app_dur(name):
                     """,
                     (now, now),
                 ).fetchall()
-                if not (
-                    base["available"]
-                    and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]
-                ):
+                if not (base["available"] and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]):
                     return jsonify(None)
             return jsonify(base["duration"])
     except:
@@ -520,8 +522,7 @@ def get_appliance_available_data(name):
                 (now, now),
             ).fetchall()
             return {
-                "available": base["available"]
-                and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]
+                "available": base["available"] and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]
             }
         return {"available": base["available"]}
 
