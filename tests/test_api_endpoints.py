@@ -432,6 +432,29 @@ class TestAPIEndpoints:
             503,
         ]  # Various error responses acceptable
 
+    def test_security_headers_present(self):
+        """Test that security headers are present and correctly configured."""
+        response = self.client.get("/health")
+        assert response.status_code == 200
+
+        # Check for standard security headers
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert "max-age=31536000" in response.headers["Strict-Transport-Security"]
+        assert "no-referrer-when-downgrade" in response.headers["Referrer-Policy"]
+
+        # Check CSP
+        csp = response.headers["Content-Security-Policy"]
+        assert "default-src 'self'" in csp
+        assert "frame-ancestors 'none'" in csp
+        assert "form-action 'self'" in csp
+        assert "img-src 'self' data:" in csp
+
+        # Check Permissions Policy
+        assert "camera=()" in response.headers["Permissions-Policy"]
+        assert "microphone=()" in response.headers["Permissions-Policy"]
+        assert "geolocation=()" in response.headers["Permissions-Policy"]
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
