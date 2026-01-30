@@ -283,10 +283,7 @@ def root():
 
         crew_data = []
         for c in crew:
-            avail = availabilities.get(
-                c["id"],
-                {"available": False, "duration": None, "end_time_display": None},
-            )
+            avail = availabilities.get(c["id"], {"available": False, "duration": None, "end_time_display": None})
             crew_data.append({**c, **avail})
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
@@ -307,10 +304,7 @@ def root():
                 "SELECT id FROM appliance WHERE name = 'P22P6'"
             ).fetchone()
             if app_p22:
-                p22p6_base = appliance_avails.get(
-                    app_p22["id"],
-                    {"available": False, "duration": None, "end_time_display": None},
-                )
+                p22p6_base = appliance_avails.get(app_p22["id"], {"available": False, "duration": None, "end_time_display": None})
 
         p22p6_avail = p22p6_base["available"] and rules_res["rules_pass"]
 
@@ -448,8 +442,7 @@ def app_avail(name):
                     (now, now),
                 ).fetchall()
                 return jsonify(
-                    base["available"]
-                    and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]
+                    base["available"] and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]
                 )
             return jsonify(base["available"])
     except:
@@ -478,10 +471,7 @@ def app_dur(name):
                     """,
                     (now, now),
                 ).fetchall()
-                if not (
-                    base["available"]
-                    and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]
-                ):
+                if not (base["available"] and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]):
                     return jsonify(None)
             return jsonify(base["duration"])
     except:
@@ -532,8 +522,7 @@ def get_appliance_available_data(name):
                 (now, now),
             ).fetchall()
             return {
-                "available": base["available"]
-                and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]
+                "available": base["available"] and _calculate_rules_logic([dict(r) for r in rows])["rules_pass"]
             }
         return {"available": base["available"]}
 
