@@ -639,6 +639,13 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
         "}"
     )
 
+    if session is None:
+        log_debug(
+            "error",
+            "No authenticated session provided for AJAX schedule request.",
+        )
+        return None
+
     schedule_resp = session.post(schedule_url, headers=headers, data=raw_payload)
     if schedule_resp.status_code != 200:
         log_debug(
