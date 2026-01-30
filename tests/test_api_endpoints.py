@@ -441,7 +441,7 @@ class TestAPIEndpoints:
         assert response.headers["X-Content-Type-Options"] == "nosniff"
         assert response.headers["X-Frame-Options"] == "DENY"
         assert "max-age=31536000" in response.headers["Strict-Transport-Security"]
-        assert "no-referrer-when-downgrade" in response.headers["Referrer-Policy"]
+        assert "strict-origin-when-cross-origin" in response.headers["Referrer-Policy"]
 
         # Check CSP
         csp = response.headers["Content-Security-Policy"]
