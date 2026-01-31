@@ -154,9 +154,7 @@ def main():
 
         insert_crew_details(crew_list_agg, db_conn=db_conn)
         insert_crew_availability(crew_list_agg, db_conn=db_conn)
-        print(
-            f"Saved crew availability for {len(crew_list_agg)} crew members to gartan_availability.db"
-        )
+        print(f"Saved crew details for {len(crew_list_agg)} crew members")
 
         appliance_agg = aggregate_appliance_availability(daily_appliance_lists)
         appliance_agg_dict = {
