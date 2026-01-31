@@ -72,7 +72,20 @@ def run_api_server():
         logger.info("Starting API server process with Gunicorn")
         p = "".join(c for c in os.environ.get("PORT", "5000") if c.isdigit()) or "5000"
         # Use shlex.quote and a static-looking list to satisfy linters
-        subprocess.run(["gunicorn", "--bind", shlex.quote(f"0.0.0.0:{p}"), "--workers", "2", "--timeout", "120", "api_server:app"], check=True, env={**os.environ, "FLASK_DEBUG": "false"})
+        subprocess.run(
+            [
+                "gunicorn",
+                "--bind",
+                shlex.quote(f"0.0.0.0:{p}"),
+                "--workers",
+                "2",
+                "--timeout",
+                "120",
+                "api_server:app",
+            ],
+            check=True,
+            env={**os.environ, "FLASK_DEBUG": "false"},
+        )
     except Exception as e:
         logger.error(f"API server process failed: {e}")
         raise

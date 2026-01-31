@@ -74,7 +74,12 @@ def run_scraper(max_days: int = 3) -> bool:
         logger.info(f"Starting scraper run for {max_days} days")
         d = shlex.quote(str(int(max_days)))
         # Use a list with static command name to satisfy linters
-        result = subprocess.run([sys.executable, "run_bot.py", "--max-days", d], capture_output=True, text=True, timeout=300)
+        result = subprocess.run(
+            [sys.executable, "run_bot.py", "--max-days", d],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
 
         if result.returncode == 0:
             logger.info("Scraper run completed successfully")
