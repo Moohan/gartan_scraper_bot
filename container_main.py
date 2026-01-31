@@ -70,10 +70,24 @@ def run_api_server():
     try:
         logger.info("Starting API server process with Gunicorn")
         port = os.environ.get("PORT", "5000")
-        cmd = ["gunicorn", "--bind", f"0.0.0.0:{port}", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "api_server:app"]
+        cmd = [
+            "gunicorn",
+            "--bind",
+            f"0.0.0.0:{port}",
+            "--workers",
+            "2",
+            "--timeout",
+            "120",
+            "--access-logfile",
+            "-",
+            "--error-logfile",
+            "-",
+            "api_server:app",
+        ]
         subprocess.run(cmd, check=True, env={**os.environ, "FLASK_DEBUG": "false"})
     except Exception as e:
-        logger.error(f"API server process failed: {e}"); raise
+        logger.error(f"API server process failed: {e}")
+        raise
 
 
 def wait_for_database():
