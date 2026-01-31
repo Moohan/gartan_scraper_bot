@@ -481,7 +481,9 @@ def app_dur(name):
                     (now, now),
                 ).fetchall()
                 available_crew = [dict(r) for r in crew_rows]
-                if not (base["available"] and check_rules(available_crew)["rules_pass"]):
+                if not (
+                    base["available"] and check_rules(available_crew)["rules_pass"]
+                ):
                     return jsonify(None)
             return jsonify(base["duration"])
     except:
@@ -532,7 +534,8 @@ def get_appliance_available_data(name):
             ).fetchall()
             available_crew = [dict(r) for r in crew_rows]
             return {
-                "available": base["available"] and check_rules(available_crew)["rules_pass"]
+                "available": base["available"]
+                and check_rules(available_crew)["rules_pass"]
             }
         return {"available": base["available"]}
 
