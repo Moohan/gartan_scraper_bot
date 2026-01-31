@@ -245,10 +245,8 @@ def check_rules(available_data: List[Any]) -> Dict:
     else:
         with get_db() as conn:
             placeholders = ",".join("?" * len(available_data))
-            rows = conn.execute(
-                f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
-                available_data,
-            ).fetchall()
+            query = "SELECT role, skills FROM crew WHERE id IN (" + placeholders + ")"
+            rows = conn.execute(query, available_data).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
