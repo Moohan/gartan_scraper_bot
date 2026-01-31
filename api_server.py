@@ -225,11 +225,10 @@ def get_weekly_stats(crew_id: int) -> Dict:
         }
 
 
-def check_rules(available_data: List[Any]) -> Dict:
+def check_rules(available_data: List[Dict]) -> Dict:
     """Check business rules for available crew.
 
-    Accepts either a list of crew IDs (backward compatibility) or a list of
-    crew dictionaries (optimized path).
+    Expects a list of crew dictionaries containing 'role' and 'skills'.
     """
     if not available_data:
         return {
@@ -239,15 +238,7 @@ def check_rules(available_data: List[Any]) -> Dict:
             "ba_non_ttr": 0,
         }
 
-    # Optimization: If we already have the crew data, use it. Otherwise, fetch it.
-    if isinstance(available_data[0], dict):
-        rows = available_data
-    else:
-        with get_db() as conn:
-            placeholders = ",".join("?" * len(available_data))
-            query = "SELECT role, skills FROM crew WHERE id IN (" + placeholders + ")"
-            rows = conn.execute(query, available_data).fetchall()
-
+    rows = available_data
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
     for r in rows:
@@ -443,22 +434,25 @@ def app_avail(name):
     try:
         now = datetime.now()
         with get_db() as conn:
-            app = conn.execute(
+            app_row = conn.execute(
                 "SELECT id FROM appliance WHERE name = ?", (name,)
             ).fetchone()
-            if not app:
+            if not app_row:
                 return jsonify({"error": "Not found"}), 404
-            base = get_availability(app["id"], "appliance_availability", now)
+            base = get_availability(app_row["id"], "appliance_availability", now)
             if name == "P22P6":
-                avail_ids = [
-                    r[0]
-                    for r in conn.execute(
-                        "SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?",
-                        (now, now),
-                    ).fetchall()
-                ]
+                crew_rows = conn.execute(
+                    """
+                    SELECT c.role, c.skills
+                    FROM crew c
+                    JOIN crew_availability ca ON c.id = ca.crew_id
+                    WHERE ca.start_time <= ? AND ca.end_time > ?
+                    """,
+                    (now, now),
+                ).fetchall()
+                available_crew = [dict(r) for r in crew_rows]
                 return jsonify(
-                    base["available"] and check_rules(avail_ids)["rules_pass"]
+                    base["available"] and check_rules(available_crew)["rules_pass"]
                 )
             return jsonify(base["available"])
     except:
@@ -470,21 +464,24 @@ def app_dur(name):
     try:
         now = datetime.now()
         with get_db() as conn:
-            app = conn.execute(
+            app_row = conn.execute(
                 "SELECT id FROM appliance WHERE name = ?", (name,)
             ).fetchone()
-            if not app:
+            if not app_row:
                 return jsonify({"error": "Not found"}), 404
-            base = get_availability(app["id"], "appliance_availability", now)
+            base = get_availability(app_row["id"], "appliance_availability", now)
             if name == "P22P6":
-                avail_ids = [
-                    r[0]
-                    for r in conn.execute(
-                        "SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?",
-                        (now, now),
-                    ).fetchall()
-                ]
-                if not (base["available"] and check_rules(avail_ids)["rules_pass"]):
+                crew_rows = conn.execute(
+                    """
+                    SELECT c.role, c.skills
+                    FROM crew c
+                    JOIN crew_availability ca ON c.id = ca.crew_id
+                    WHERE ca.start_time <= ? AND ca.end_time > ?
+                    """,
+                    (now, now),
+                ).fetchall()
+                available_crew = [dict(r) for r in crew_rows]
+                if not (base["available"] and check_rules(available_crew)["rules_pass"]):
                     return jsonify(None)
             return jsonify(base["duration"])
     except:
@@ -517,22 +514,25 @@ def get_crew_duration_data(id):
 def get_appliance_available_data(name):
     now = datetime.now()
     with get_db() as conn:
-        app = conn.execute(
+        app_row = conn.execute(
             "SELECT id FROM appliance WHERE name = ?", (name,)
         ).fetchone()
-        if not app:
+        if not app_row:
             return {"error": "Not found"}
-        base = get_availability(app["id"], "appliance_availability", now)
+        base = get_availability(app_row["id"], "appliance_availability", now)
         if name == "P22P6":
-            avail_ids = [
-                r[0]
-                for r in conn.execute(
-                    "SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?",
-                    (now, now),
-                ).fetchall()
-            ]
+            crew_rows = conn.execute(
+                """
+                SELECT c.role, c.skills
+                FROM crew c
+                JOIN crew_availability ca ON c.id = ca.crew_id
+                WHERE ca.start_time <= ? AND ca.end_time > ?
+                """,
+                (now, now),
+            ).fetchall()
+            available_crew = [dict(r) for r in crew_rows]
             return {
-                "available": base["available"] and check_rules(avail_ids)["rules_pass"]
+                "available": base["available"] and check_rules(available_crew)["rules_pass"]
             }
         return {"available": base["available"]}
 
