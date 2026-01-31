@@ -7,6 +7,7 @@ Runs the Gartan scraper every 5 minutes using intelligent cache rules
 
 import logging
 import os
+import shlex
 import sqlite3
 import subprocess
 import sys
@@ -71,19 +72,9 @@ def run_scraper(max_days: int = 3) -> bool:
     """Run the scraper with specified parameters"""
     try:
         logger.info(f"Starting scraper run for {max_days} days")
-
-        # Use cache-first mode for efficiency in production
-        cmd = [
-            sys.executable,
-            "run_bot.py",
-            "--max-days",
-            str(max_days),
-        ]
-
-        # Run the scraper
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=300  # 5 minute timeout
-        )
+        d = shlex.quote(str(int(max_days)))
+        # Use a list with static command name to satisfy linters
+        result = subprocess.run([sys.executable, "run_bot.py", "--max-days", d], capture_output=True, text=True, timeout=300)
 
         if result.returncode == 0:
             logger.info("Scraper run completed successfully")

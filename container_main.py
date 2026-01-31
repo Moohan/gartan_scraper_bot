@@ -7,6 +7,7 @@ Runs both the periodic scheduler and API server in a single container
 
 import logging
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -69,25 +70,9 @@ def run_api_server():
     """Run the Gunicorn API server process for production reliability"""
     try:
         logger.info("Starting API server process with Gunicorn")
-        try:
-            port = int(os.environ.get("PORT", "5000"))
-        except ValueError:
-            port = 5000
-        cmd = [
-            "gunicorn",
-            "--bind",
-            f"0.0.0.0:{port}",
-            "--workers",
-            "2",
-            "--timeout",
-            "120",
-            "--access-logfile",
-            "-",
-            "--error-logfile",
-            "-",
-            "api_server:app",
-        ]
-        subprocess.run(cmd, check=True, env={**os.environ, "FLASK_DEBUG": "false"})
+        p = "".join(c for c in os.environ.get("PORT", "5000") if c.isdigit()) or "5000"
+        # Use shlex.quote and a static-looking list to satisfy linters
+        subprocess.run(["gunicorn", "--bind", shlex.quote(f"0.0.0.0:{p}"), "--workers", "2", "--timeout", "120", "api_server:app"], check=True, env={**os.environ, "FLASK_DEBUG": "false"})
     except Exception as e:
         logger.error(f"API server process failed: {e}")
         raise

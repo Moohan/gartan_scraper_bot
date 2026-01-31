@@ -435,26 +435,12 @@ class TestAPIEndpoints:
     def test_security_headers(self):
         """Test that security headers are present and correctly configured."""
         h = self.client.get("/health").headers
-        assert (
-            h["X-Content-Type-Options"] == "nosniff" and h["X-Frame-Options"] == "DENY"
-        )
+        assert h["X-Content-Type-Options"] == "nosniff" and h["X-Frame-Options"] == "DENY"
         assert h["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
         assert h["Referrer-Policy"] == "strict-origin-when-cross-origin"
-        assert all(
-            x in h["Permissions-Policy"]
-            for x in ["camera=()", "microphone=()", "geolocation=()"]
-        )
+        assert all(x in h["Permissions-Policy"] for x in ["camera=()", "microphone=()", "geolocation=()"])
         csp = h["Content-Security-Policy"]
-        assert all(
-            x in csp
-            for x in [
-                "default-src 'self'",
-                "object-src 'none'",
-                "frame-ancestors 'none'",
-                "form-action 'self'",
-                "img-src 'self' data:",
-            ]
-        )
+        assert all(x in csp for x in ["default-src 'self'", "object-src 'none'", "frame-ancestors 'none'", "form-action 'self'", "img-src 'self' data:"])
 
 
 if __name__ == "__main__":
