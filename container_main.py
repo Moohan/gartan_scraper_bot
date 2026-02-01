@@ -66,19 +66,28 @@ def run_scheduler():
 
 
 def run_api_server():
-    """Run the Flask API server process"""
+    """Run the Flask API server process using Gunicorn in production"""
     try:
         logger.info("Starting API server process")
+        port = os.environ.get("PORT", "5000")
 
-        # Set environment variables for production
-        os.environ["FLASK_DEBUG"] = "false"
-        os.environ["PORT"] = os.environ.get("PORT", "5000")
-
-        # Import and run the API server
-        from api_server import app
-
-        port = int(os.environ.get("PORT", 5000))
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+        if os.environ.get("FLASK_ENV") == "production":
+            logger.info("Using Gunicorn for production server")
+            cmd = [
+                "gunicorn",
+                "--bind", f"0.0.0.0:{port}",
+                "--workers", "4",
+                "--access-logfile", "-",
+                "--error-logfile", "-",
+                "api_server:app"
+            ]
+            subprocess.run(cmd, check=True)
+        else:
+            # Set environment variables for development mode
+            os.environ["FLASK_DEBUG"] = "false"
+            # Import and run the API server development server
+            from api_server import app
+            app.run(host="0.0.0.0", port=int(port), debug=False, use_reloader=False)
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")
