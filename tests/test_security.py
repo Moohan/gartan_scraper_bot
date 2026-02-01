@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Tests for security headers in API server."""
 
-import pytest
-import sys
 import os
+import sys
+
+import pytest
 
 sys.path.insert(0, ".")
 from api_server import app
+
 
 def test_security_headers():
     """Test that all security headers are correctly set in the responses."""
@@ -16,7 +18,10 @@ def test_security_headers():
     # Check for expected security headers
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
-    assert "max-age=31536000; includeSubDomains" in response.headers["Strict-Transport-Security"]
+    assert (
+        "max-age=31536000; includeSubDomains"
+        in response.headers["Strict-Transport-Security"]
+    )
     assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
 
     csp = response.headers["Content-Security-Policy"]
@@ -31,6 +36,7 @@ def test_security_headers():
     assert "microphone=()" in response.headers["Permissions-Policy"]
     assert "geolocation=()" in response.headers["Permissions-Policy"]
 
+
 def test_production_safeguard():
     """Test that the development server cannot run when FLASK_ENV=production."""
     # We can't easily test app.run() directly without mocking,
@@ -38,6 +44,7 @@ def test_production_safeguard():
     # Since it's in the if __name__ == "__main__" block, we'll rely on visual inspection
     # or a separate testable function if we refactored it.
     pass
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

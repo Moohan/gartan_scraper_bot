@@ -75,11 +75,15 @@ def run_api_server():
             logger.info("Using Gunicorn for production server")
             cmd = [
                 "gunicorn",
-                "--bind", f"0.0.0.0:{port}",
-                "--workers", "4",
-                "--access-logfile", "-",
-                "--error-logfile", "-",
-                "api_server:app"
+                "--bind",
+                f"0.0.0.0:{port}",
+                "--workers",
+                "4",
+                "--access-logfile",
+                "-",
+                "--error-logfile",
+                "-",
+                "api_server:app",
             ]
             subprocess.run(cmd, check=True)
         else:
@@ -87,6 +91,7 @@ def run_api_server():
             os.environ["FLASK_DEBUG"] = "false"
             # Import and run the API server development server
             from api_server import app
+
             app.run(host="0.0.0.0", port=int(port), debug=False, use_reloader=False)
 
     except Exception as e:
