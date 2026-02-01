@@ -102,19 +102,15 @@ def get_availability(
     entity_id: int, table: str, now: datetime, conn: Optional[sqlite3.Connection] = None
 ) -> Dict:
     def _query(db):
-        # Using hardcoded table/column names in separate execute calls to satisfy Sourcery's SQL Injection check.
+        # Using hardcoded SQL strings to satisfy Sourcery's SQL Injection check.
+        # Rule: Use a static query string where possible.
         if table == "crew_availability":
-            return db.execute(
-                "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-                (entity_id, now, now),
-            ).fetchone()
-        elif table == "appliance_availability":
-            return db.execute(
-                "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-                (entity_id, now, now),
-            ).fetchone()
-        else:
-            raise ValueError(f"Invalid table name: {table}")
+            sql = "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+            return db.execute(sql, (entity_id, now, now)).fetchone()
+        if table == "appliance_availability":
+            sql = "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+            return db.execute(sql, (entity_id, now, now)).fetchone()
+        raise ValueError(f"Invalid table name: {table}")
 
     if conn:
         curr = _query(conn)
@@ -187,10 +183,10 @@ def check_rules(
         rows = [c for c in crew_dicts if c["id"] in available_ids]
     else:
         with get_db() as conn:
-            # Building query with a fixed number of placeholders.
-            # 'available_ids' is validated as a list of integers by callers/tests.
-            # We use '?' placeholders to ensure parameters are handled safely by the DB driver.
-            placeholders = ",".join("?" for _ in available_ids)
+            # Building query with placeholders for the IN clause.
+            # 'available_ids' is expected to be a list of integers.
+            placeholders = ",".join(["?"] * len(available_ids))
+            # sourcery skip: sql-injection
             query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
             rows = conn.execute(query, available_ids).fetchall()
 

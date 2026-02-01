@@ -19,4 +19,4 @@ pylint==3.2.5
 gunicorn==23.0.0
 
 # Logging and monitoring
-Werkzeug==3.1.4
+Werkzeug==3.1.5
