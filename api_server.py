@@ -101,18 +101,20 @@ def get_crew_list() -> List[Dict]:
 def get_availability(
     entity_id: int, table: str, now: datetime, conn: Optional[sqlite3.Connection] = None
 ) -> Dict:
-    # Validate table and column names to prevent SQL injection
-    if table == "crew_availability":
-        col = "crew_id"
-    elif table == "appliance_availability":
-        col = "appliance_id"
-    else:
-        raise ValueError(f"Invalid table name: {table}")
-
     def _query(db):
-        # We've validated 'table' and 'col' are from a strict whitelist above
-        query = f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1"
-        return db.execute(query, (entity_id, now, now)).fetchone()
+        # Using hardcoded table/column names in separate execute calls to satisfy Sourcery's SQL Injection check.
+        if table == "crew_availability":
+            return db.execute(
+                "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+                (entity_id, now, now),
+            ).fetchone()
+        elif table == "appliance_availability":
+            return db.execute(
+                "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+                (entity_id, now, now),
+            ).fetchone()
+        else:
+            raise ValueError(f"Invalid table name: {table}")
 
     if conn:
         curr = _query(conn)
@@ -174,7 +176,7 @@ def check_rules(
 ) -> Dict:
     if not available_ids:
         return {
-            "rules_pass": False,
+            "rules_pass": False,  # nosec B105
             "rules": {},
             "skill_counts": {"TTR": 0, "LGV": 0, "BA": 0},
             "ba_non_ttr": 0,
@@ -185,8 +187,11 @@ def check_rules(
         rows = [c for c in crew_dicts if c["id"] in available_ids]
     else:
         with get_db() as conn:
+            # Building query with a fixed number of placeholders.
+            # 'available_ids' is validated as a list of integers by callers/tests.
+            # We use '?' placeholders to ensure parameters are handled safely by the DB driver.
             placeholders = ",".join("?" for _ in available_ids)
-            query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"
+            query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
             rows = conn.execute(query, available_ids).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -223,7 +228,7 @@ def check_rules(
         "ffc_with_ba": ffc_ba,
     }
     return {
-        "rules_pass": all(rules.values()),
+        "rules_pass": all(rules.values()),  # nosec B105
         "rules": rules,
         "skill_counts": skills,
         "ba_non_ttr": ba_non_ttr,
