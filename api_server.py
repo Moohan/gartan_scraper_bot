@@ -101,13 +101,18 @@ def get_crew_list() -> List[Dict]:
 def get_availability(
     entity_id: int, table: str, now: datetime, conn: Optional[sqlite3.Connection] = None
 ) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
+    # Validate table and column names to prevent SQL injection
+    if table == "crew_availability":
+        col = "crew_id"
+    elif table == "appliance_availability":
+        col = "appliance_id"
+    else:
+        raise ValueError(f"Invalid table name: {table}")
 
     def _query(db):
-        return db.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-            (entity_id, now, now),
-        ).fetchone()
+        # We've validated 'table' and 'col' are from a strict whitelist above
+        query = f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+        return db.execute(query, (entity_id, now, now)).fetchone()
 
     if conn:
         curr = _query(conn)
@@ -180,11 +185,9 @@ def check_rules(
         rows = [c for c in crew_dicts if c["id"] in available_ids]
     else:
         with get_db() as conn:
-            placeholders = ",".join("?" * len(available_ids))
-            rows = conn.execute(
-                f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
-                available_ids,
-            ).fetchall()
+            placeholders = ",".join("?" for _ in available_ids)
+            query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"
+            rows = conn.execute(query, available_ids).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
