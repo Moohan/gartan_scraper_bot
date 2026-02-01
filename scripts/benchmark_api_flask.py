@@ -1,8 +1,10 @@
-import time
-from api_server import app, get_db
 import sqlite3
+import time
 from datetime import datetime, timedelta
+
+from api_server import app, get_db
 from db_store import init_db
+
 
 def setup_dummy_data():
     init_db()
@@ -18,7 +20,7 @@ def setup_dummy_data():
                 for i in range(50 - count):
                     conn.execute(
                         "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-                        (f"Crew {i+count}", "FFD", "BA LGV", "42 hours")
+                        (f"Crew {i+count}", "FFD", "BA LGV", "42 hours"),
                     )
                 conn.commit()
 
@@ -28,19 +30,20 @@ def setup_dummy_data():
             for cid in crew_ids:
                 conn.execute(
                     "INSERT OR IGNORE INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-                    (cid, now - timedelta(hours=1), now + timedelta(hours=1))
+                    (cid, now - timedelta(hours=1), now + timedelta(hours=1)),
                 )
             conn.commit()
+
 
 def benchmark_root(iterations=20):
     client = app.test_client()
     latencies = []
     # Warm up
-    client.get('/')
+    client.get("/")
 
     for _ in range(iterations):
         start = time.perf_counter()
-        client.get('/')
+        client.get("/")
         latencies.append(time.perf_counter() - start)
 
     avg = sum(latencies) / len(latencies)
@@ -48,6 +51,7 @@ def benchmark_root(iterations=20):
     print(f"Average latency: {avg:.4f}s")
     print(f"Min latency: {min(latencies):.4f}s")
     print(f"Max latency: {max(latencies):.4f}s")
+
 
 if __name__ == "__main__":
     setup_dummy_data()
