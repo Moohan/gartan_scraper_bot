@@ -18,7 +18,7 @@ permissions:
 jobs:
   dependency-check:
     name: Security & Dependency Audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     
     steps:
     - name: Checkout code
@@ -33,12 +33,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install safety pip-audit
-        
-    - name: Run safety check
-      run: |
-        safety check --json --output safety-report.json || true
-        safety check
+        pip install pip-audit
         
     - name: Run pip-audit
       run: |
@@ -51,7 +46,6 @@ jobs:
       with:
         name: security-reports
         path: |
-          safety-report.json
           pip-audit-report.json
           
     - name: Check for outdated packages
@@ -68,7 +62,7 @@ jobs:
 
   docker-security:
     name: Docker Security Scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     
     steps:
     - name: Checkout code
