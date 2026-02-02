@@ -18,14 +18,14 @@ permissions:
 jobs:
   dependency-check:
     name: Security & Dependency Audit
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
       
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v5
       with:
         python-version: "3.13"
         
@@ -41,7 +41,7 @@ jobs:
         pip-audit
         
     - name: Upload security reports
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: security-reports
@@ -55,18 +55,18 @@ jobs:
         pip list --outdated
         
     - name: Upload outdated packages report
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v4
       with:
         name: outdated-packages
         path: outdated-packages.json
 
   docker-security:
     name: Docker Security Scan
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
       
     - name: Build Docker image
       run: |
@@ -80,7 +80,7 @@ jobs:
         output: 'trivy-results.sarif'
         
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v4
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
