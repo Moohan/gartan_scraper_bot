@@ -1,12 +1,13 @@
 import os
 import sqlite3
+import sys
 import time
 from datetime import datetime, timedelta
-import sys
 
 # Add current directory to path so we can import api_server
 sys.path.insert(0, ".")
 import api_server
+
 
 def setup_benchmark_db(db_path, num_crew=50):
     if os.path.exists(db_path):
@@ -14,10 +15,16 @@ def setup_benchmark_db(db_path, num_crew=50):
 
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute("CREATE TABLE crew (id INTEGER PRIMARY KEY, name TEXT, role TEXT, skills TEXT, contract_hours TEXT)")
-    c.execute("CREATE TABLE crew_availability (id INTEGER PRIMARY KEY, crew_id INTEGER, start_time DATETIME, end_time DATETIME)")
+    c.execute(
+        "CREATE TABLE crew (id INTEGER PRIMARY KEY, name TEXT, role TEXT, skills TEXT, contract_hours TEXT)"
+    )
+    c.execute(
+        "CREATE TABLE crew_availability (id INTEGER PRIMARY KEY, crew_id INTEGER, start_time DATETIME, end_time DATETIME)"
+    )
     c.execute("CREATE TABLE appliance (id INTEGER PRIMARY KEY, name TEXT)")
-    c.execute("CREATE TABLE appliance_availability (id INTEGER PRIMARY KEY, appliance_id INTEGER, start_time DATETIME, end_time DATETIME)")
+    c.execute(
+        "CREATE TABLE appliance_availability (id INTEGER PRIMARY KEY, appliance_id INTEGER, start_time DATETIME, end_time DATETIME)"
+    )
 
     now = datetime.now()
     future = now + timedelta(hours=8)
@@ -34,17 +41,21 @@ def setup_benchmark_db(db_path, num_crew=50):
     c.executemany("INSERT INTO crew_availability VALUES (?, ?, ?, ?)", avail_data)
 
     c.execute("INSERT INTO appliance VALUES (1, 'P22P6')")
-    c.execute("INSERT INTO appliance_availability VALUES (1, 1, ?, ?)", (now.isoformat(), future.isoformat()))
+    c.execute(
+        "INSERT INTO appliance_availability VALUES (1, 1, ?, ?)",
+        (now.isoformat(), future.isoformat()),
+    )
 
     conn.commit()
     conn.close()
+
 
 def run_benchmark(num_runs=20):
     api_server.DB_PATH = "benchmark.db"
     setup_benchmark_db(api_server.DB_PATH)
 
     app = api_server.app
-    app.config['TESTING'] = True
+    app.config["TESTING"] = True
     client = app.test_client()
 
     # Warm up
@@ -60,6 +71,7 @@ def run_benchmark(num_runs=20):
 
     if os.path.exists("benchmark.db"):
         os.remove("benchmark.db")
+
 
 if __name__ == "__main__":
     run_benchmark()
