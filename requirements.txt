@@ -3,6 +3,7 @@ requests==2.32.5
 beautifulsoup4==4.12.3
 python-dotenv==1.0.1
 flask==3.0.3
+lxml==5.1.0
 
 # Scheduling
 schedule==1.2.2
@@ -11,11 +12,8 @@ schedule==1.2.2
 pytest==7.4.4
 pytest-xdist==3.6.1
 
-# Remove pylint as it might have issues too, but let's keep it for now if it installs
-pylint==3.2.5
-
 # Production server
-gunicorn==22.0.0
+gunicorn==23.0.0
 
 # Logging and monitoring
-Werkzeug==3.1.4
+Werkzeug==3.1.5

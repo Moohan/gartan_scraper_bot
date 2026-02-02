@@ -74,11 +74,20 @@ def run_api_server():
         os.environ["FLASK_DEBUG"] = "false"
         os.environ["PORT"] = os.environ.get("PORT", "5000")
 
-        # Import and run the API server
-        from api_server import app
-
-        port = int(os.environ.get("PORT", 5000))
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+        port = os.environ.get("PORT", "5000")
+        subprocess.run(
+            [
+                "gunicorn",
+                "--bind",
+                f"0.0.0.0:{port}",
+                "--workers",
+                "4",
+                "--access-logfile",
+                "-",
+                "api_server:app",
+            ],
+            check=True,
+        )
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")
