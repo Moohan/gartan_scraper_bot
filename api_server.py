@@ -150,7 +150,9 @@ def get_weekly_stats(crew_id: int) -> Dict:
         }
 
 
-def check_rules(available_ids: List[int]) -> Dict:
+def check_rules(
+    available_ids: List[int], crew_dicts: Optional[List[Dict]] = None
+) -> Dict:
     if not available_ids:
         return {
             "rules_pass": False,
@@ -158,11 +160,17 @@ def check_rules(available_ids: List[int]) -> Dict:
             "skill_counts": {"TTR": 0, "LGV": 0, "BA": 0},
             "ba_non_ttr": 0,
         }
-    with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
-        rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids
-        ).fetchall()
+
+    if crew_dicts:
+        # Optimization: Use pre-fetched crew data if available
+        rows = [c for c in crew_dicts if c["id"] in available_ids]
+    else:
+        with get_db() as conn:
+            placeholders = ",".join("?" * len(available_ids))
+            rows = conn.execute(
+                f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
+                available_ids,
+            ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
@@ -205,6 +213,100 @@ def check_rules(available_ids: List[int]) -> Dict:
     }
 
 
+# --- Data Helpers ---
+
+
+def get_dashboard_data(now: datetime) -> Dict:
+    with get_db() as conn:
+        # Optimized query: Fetch all crew and their current availability in a single JOIN
+        # Using a subquery for availability to ensure we only get one (the latest) block per crew
+        query = """
+            SELECT
+                c.id, c.name, c.role, c.skills, c.contract_hours,
+                ca.end_time
+            FROM crew c
+            LEFT JOIN (
+                SELECT crew_id, MAX(end_time) as end_time
+                FROM crew_availability
+                WHERE start_time <= ? AND end_time > ?
+                GROUP BY crew_id
+            ) ca ON c.id = ca.crew_id
+            ORDER BY c.name
+        """
+        rows = conn.execute(query, (now, now)).fetchall()
+
+        crew_data = []
+        avail_ids = []
+        for r in rows:
+            c = {
+                "id": r["id"],
+                "name": r["name"],
+                "role": r["role"],
+                "skills": r["skills"],
+                "contract_hours": r["contract_hours"],
+            }
+
+            end_time_raw = r["end_time"]
+            if end_time_raw:
+                end_time = parse_dt(end_time_raw)
+                duration_min = int((end_time - now).total_seconds() / 60)
+
+                display = end_time.strftime("%H:%M")
+                if end_time.date() == now.date():
+                    display += " today"
+                elif end_time.date() == (now + timedelta(days=1)).date():
+                    display += " tomorrow"
+                else:
+                    display += end_time.strftime(" on %d/%m")
+
+                c.update(
+                    {
+                        "available": True,
+                        "duration": format_hours(duration_min),
+                        "end_time_display": display,
+                    }
+                )
+                avail_ids.append(c["id"])
+            else:
+                c.update(
+                    {"available": False, "duration": None, "end_time_display": None}
+                )
+            crew_data.append(c)
+
+        # 2. Optimized rules check using pre-fetched data
+        rules_res = check_rules(avail_ids, crew_dicts=crew_data)
+
+        # 3. Appliance status (separate query for simplicity, as it's a different table)
+        p22p6_base = {"available": False, "duration": None}
+        app_p22 = conn.execute(
+            "SELECT id FROM appliance WHERE name = 'P22P6'"
+        ).fetchone()
+        if app_p22:
+            curr = conn.execute(
+                "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+                (app_p22["id"], now, now),
+            ).fetchone()
+
+            if curr:
+                app_end_time = parse_dt(curr["end_time"])
+                app_duration_min = int((app_end_time - now).total_seconds() / 60)
+                p22p6_base = {
+                    "available": True,
+                    "duration": format_hours(app_duration_min),
+                }
+
+        p22p6_avail = p22p6_base["available"] and rules_res["rules_pass"]
+
+        return {
+            "crew_data": crew_data,
+            "total_available": len(avail_ids),
+            "p22p6_avail": p22p6_avail,
+            "p22p6_duration": p22p6_base["duration"] if p22p6_avail else None,
+            "rules": rules_res["rules"],
+            "skill_counts": rules_res["skill_counts"],
+        }
+
+
 # --- Routes ---
 
 
@@ -228,41 +330,23 @@ def health():
 def root():
     try:
         now = datetime.now()
-        crew = get_crew_list()
-        crew_data = []
-        for c in crew:
-            avail = get_availability(c["id"], "crew_availability", now)
-            crew_data.append({**c, **avail})
+        data = get_dashboard_data(now)
+        crew_data = data["crew_data"]
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
         crew_data.sort(
             key=lambda x: (not x["available"], ranks.get(x["role"], 99), x["name"])
         )
 
-        avail_ids = [c["id"] for c in crew_data if c["available"]]
-        rules_res = check_rules(avail_ids)
-
-        p22p6_base = {"available": False, "duration": None}
-        with get_db() as conn:
-            app_p22 = conn.execute(
-                "SELECT id FROM appliance WHERE name = 'P22P6'"
-            ).fetchone()
-            if app_p22:
-                p22p6_base = get_availability(
-                    app_p22["id"], "appliance_availability", now
-                )
-
-        p22p6_avail = p22p6_base["available"] and rules_res["rules_pass"]
-
         return render_template_string(
             DASHBOARD_TEMPLATE,
             crew_data=crew_data,
             now=now,
-            total_available=len(avail_ids),
-            p22p6_avail=p22p6_avail,
-            p22p6_duration=p22p6_base["duration"] if p22p6_avail else None,
-            rules=rules_res["rules"],
-            skill_counts=rules_res["skill_counts"],
+            total_available=data["total_available"],
+            p22p6_avail=data["p22p6_avail"],
+            p22p6_duration=data["p22p6_duration"],
+            rules=data["rules"],
+            skill_counts=data["skill_counts"],
         )
     except Exception as e:
         logger.error(f"Root error: {e}")
