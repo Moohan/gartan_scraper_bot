@@ -161,14 +161,18 @@ def check_rules(
             "ba_non_ttr": 0,
         }
 
+    # Use a set for O(1) lookups
+    avail_set = set(available_ids)
+
     if crew_dicts:
         # Optimization: Use pre-fetched crew data if available
-        rows = [c for c in crew_dicts if c["id"] in available_ids]
+        rows = [c for c in crew_dicts if c["id"] in avail_set]
     else:
-        with get_db() as conn:
-            placeholders = ",".join("?" for _ in available_ids)
-            query = "SELECT role, skills FROM crew WHERE id IN (" + placeholders + ")"
-            rows = conn.execute(query, available_ids).fetchall()
+        # Fallback: fetch all crew and filter in Python
+        # This avoids dynamic SQL composition which triggers security warnings,
+        # and is efficient for the expected scale (dozens of crew members).
+        all_crew = get_crew_list()
+        rows = [c for c in all_crew if c["id"] in avail_set]
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
