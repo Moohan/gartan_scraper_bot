@@ -615,7 +615,9 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     Perform the AJAX request to fetch the schedule grid HTML for a given date.
     """
     if not session:
-        log_debug("error", f"Cannot POST schedule request for {booking_date}: No session")
+        log_debug(
+            "error", f"Cannot POST schedule request for {booking_date}: No session"
+        )
         return None
 
     import json
