@@ -276,7 +276,11 @@ def root():
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
         crew_data.sort(
-            key=lambda x: (not x.get("available"), ranks.get(x.get("role"), 99), x.get("name"))
+            key=lambda x: (
+                not x.get("available"),
+                ranks.get(x.get("role"), 99),
+                x.get("name"),
+            )
         )
 
         rules_res = check_rules(crew_data)
