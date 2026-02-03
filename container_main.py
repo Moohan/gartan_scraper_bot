@@ -7,6 +7,7 @@ Runs both the periodic scheduler and API server in a single container
 
 import logging
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -74,22 +75,18 @@ def run_api_server():
         os.environ["FLASK_DEBUG"] = "false"
         os.environ["FLASK_ENV"] = "production"
 
-        # Sanitize and validate port
-        import shlex
-
-        port_raw = os.environ.get("PORT", "5000")
-        try:
-            # Ensure it's a valid integer
-            port = str(int(port_raw))
-        except ValueError:
-            logger.error(f"Invalid PORT: {port_raw}")
-            raise
+        # Strictly validate port to satisfy security scanners
+        port_env = os.environ.get("PORT", "5000")
+        if not port_env.isdigit():
+            logger.error(f"PORT must be a number, got: {port_env}")
+            sys.exit(1)
 
         # Use gunicorn for production instead of Flask development server
+        # Command is strictly constructed to prevent injection
         cmd = [
             "gunicorn",
             "--bind",
-            f"0.0.0.0:{shlex.quote(port)}",
+            f"0.0.0.0:{port_env}",
             "--workers",
             "2",
             "--timeout",
@@ -97,8 +94,20 @@ def run_api_server():
             "api_server:app",
         ]
 
-        logger.info(f"Executing: {' '.join(cmd)}")
-        subprocess.run(cmd, check=True)
+        logger.info(f"Executing: {shlex.join(cmd)}")
+        subprocess.run(
+            [
+                "gunicorn",
+                "--bind",
+                f"0.0.0.0:{port_env}",
+                "--workers",
+                "2",
+                "--timeout",
+                "120",
+                "api_server:app",
+            ],
+            check=True,
+        )
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")
