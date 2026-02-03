@@ -73,13 +73,23 @@ def run_api_server():
         # Set environment variables for production
         os.environ["FLASK_DEBUG"] = "false"
         os.environ["FLASK_ENV"] = "production"
-        port = os.environ.get("PORT", "5000")
+
+        # Sanitize and validate port
+        import shlex
+
+        port_raw = os.environ.get("PORT", "5000")
+        try:
+            # Ensure it's a valid integer
+            port = str(int(port_raw))
+        except ValueError:
+            logger.error(f"Invalid PORT: {port_raw}")
+            raise
 
         # Use gunicorn for production instead of Flask development server
         cmd = [
             "gunicorn",
             "--bind",
-            f"0.0.0.0:{port}",
+            f"0.0.0.0:{shlex.quote(port)}",
             "--workers",
             "2",
             "--timeout",

@@ -560,7 +560,6 @@ if __name__ == "__main__":
     # Safeguard: prevent running the development server in production
     if os.environ.get("FLASK_ENV") == "production":
         import sys
-
         print("Error: Do not run the development server in production.")
         print("Use a production WSGI server like gunicorn instead.")
         sys.exit(1)
