@@ -14,7 +14,7 @@ import requests
 from bs4 import BeautifulSoup  # type: ignore
 from dotenv import load_dotenv  # type: ignore
 
-from utils import log_debug
+from utils import get_soup, log_debug
 
 
 def fetch_and_cache_grid_html(
@@ -370,15 +370,8 @@ def _get_login_form(session):
         cookies_dict = {}
     log_debug("session", f"Initial cookies: {cookies_dict}")
 
-    # Try lxml parser first for speed/consistency, but fall back to built-in parser when lxml is not available
-    try:
-        soup = BeautifulSoup(resp.content, "lxml")
-    except Exception:
-        log_debug(
-            "warn",
-            "lxml parser not available for login form parsing, falling back to html.parser",
-        )
-        soup = BeautifulSoup(resp.content, "html.parser")
+    # preferring lxml for speed/consistency, falling back to built-in parser
+    soup = get_soup(resp.content)
 
     form = soup.find("form")
     if not form:
@@ -622,9 +615,7 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     Perform the AJAX request to fetch the schedule grid HTML for a given date.
     """
     if not session:
-        log_debug(
-            "error", f"Cannot POST schedule request for {booking_date}: No session"
-        )
+        log_debug("error", f"Cannot POST schedule request for {booking_date}: No session")
         return None
 
     import json

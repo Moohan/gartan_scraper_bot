@@ -5,9 +5,23 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, Union
 
+from bs4 import BeautifulSoup
 from logging_config import get_logger
 
 logger = get_logger()
+
+
+def get_soup(html_content: str) -> BeautifulSoup:
+    """
+    Creates a BeautifulSoup object, preferring lxml for performance.
+    Falls back to html.parser if lxml is not available.
+    """
+    try:
+        return BeautifulSoup(html_content, "lxml")
+    except Exception:
+        # lxml may not be available in all environments
+        log_debug("warn", "lxml parser not available, falling back to html.parser")
+        return BeautifulSoup(html_content, "html.parser")
 
 
 def get_week_aligned_date_range(max_days: int) -> Tuple[datetime, int]:

@@ -97,11 +97,12 @@ def get_dashboard_data(now: datetime) -> List[Dict]:
         query = """
             SELECT
                 c.id, c.name, c.role, c.skills, c.contract_hours,
-                ca.end_time
+                MAX(ca.end_time) as end_time
             FROM crew c
             LEFT JOIN crew_availability ca ON c.id = ca.crew_id
                 AND ca.start_time <= ?
                 AND ca.end_time > ?
+            GROUP BY c.id
             ORDER BY c.name
         """
         rows = conn.execute(query, (now, now)).fetchall()
@@ -276,11 +277,7 @@ def root():
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
         crew_data.sort(
-            key=lambda x: (
-                not x.get("available"),
-                ranks.get(x.get("role"), 99),
-                x.get("name"),
-            )
+            key=lambda x: (not x.get("available"), ranks.get(x.get("role"), 99), x.get("name"))
         )
 
         rules_res = check_rules(crew_data)
