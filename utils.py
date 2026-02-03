@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple, Union
 
 from bs4 import BeautifulSoup
-
 from logging_config import get_logger
 
 logger = get_logger()
