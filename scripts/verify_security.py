@@ -25,8 +25,13 @@ class TestSecurityHardening(unittest.TestCase):
         # Check standard security headers
         self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
         self.assertEqual(headers.get("X-Frame-Options"), "DENY")
-        self.assertEqual(headers.get("Strict-Transport-Security"), "max-age=31536000; includeSubDomains")
-        self.assertEqual(headers.get("Referrer-Policy"), "strict-origin-when-cross-origin")
+        self.assertEqual(
+            headers.get("Strict-Transport-Security"),
+            "max-age=31536000; includeSubDomains",
+        )
+        self.assertEqual(
+            headers.get("Referrer-Policy"), "strict-origin-when-cross-origin"
+        )
 
         # Check Content-Security-Policy
         csp = headers.get("Content-Security-Policy")
@@ -54,9 +59,15 @@ class TestSecurityHardening(unittest.TestCase):
             # But we can verify the logic is present in the file
             with open("api_server.py", "r") as f:
                 content = f.read()
-                self.assertIn('if os.environ.get("FLASK_ENV") == "production":', content)
-                self.assertIn('print("Error: Do not run the development server in production.")', content)
-                self.assertIn('exit(1)', content)
+                self.assertIn(
+                    'if os.environ.get("FLASK_ENV") == "production":', content
+                )
+                self.assertIn(
+                    'print("Error: Do not run the development server in production.")',
+                    content,
+                )
+                self.assertIn("exit(1)", content)
+
 
 if __name__ == "__main__":
     unittest.main()
