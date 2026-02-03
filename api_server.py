@@ -284,7 +284,11 @@ def root():
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
         crew_data.sort(
-            key=lambda x: (not x.get("available"), ranks.get(x.get("role"), 99), x.get("name"))
+            key=lambda x: (
+                not x.get("available"),
+                ranks.get(x.get("role"), 99),
+                x.get("name"),
+            )
         )
 
         avail_ids = [c["id"] for c in crew_data if c.get("available")]
