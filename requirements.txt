@@ -21,4 +21,4 @@ gunicorn==23.0.0
 Werkzeug==3.1.5
 
 # Parsers
-lxml==5.1.0
+lxml==5.3.0

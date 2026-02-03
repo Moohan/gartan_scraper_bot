@@ -83,23 +83,15 @@ def run_api_server():
 
         # Use gunicorn for production instead of Flask development server
         # Command is strictly constructed to prevent injection
-        cmd = [
-            "gunicorn",
-            "--bind",
-            f"0.0.0.0:{port_env}",
-            "--workers",
-            "2",
-            "--timeout",
-            "120",
-            "api_server:app",
-        ]
+        port_safe = shlex.quote(port_env)
+        bind_address = f"0.0.0.0:{port_safe}"
 
-        logger.info(f"Executing: {shlex.join(cmd)}")
+        logger.info(f"Starting Gunicorn on {bind_address}")
         subprocess.run(
             [
                 "gunicorn",
                 "--bind",
-                f"0.0.0.0:{port_env}",
+                bind_address,
                 "--workers",
                 "2",
                 "--timeout",
