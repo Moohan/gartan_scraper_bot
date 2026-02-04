@@ -2,13 +2,16 @@
 """Security tests for the API server."""
 
 import pytest
+
 from api_server import app
+
 
 @pytest.fixture
 def client():
     app.config["TESTING"] = True
     with app.test_client() as client:
         yield client
+
 
 def test_security_headers_present(client):
     """Verify that essential security headers are present in the response."""
@@ -27,6 +30,7 @@ def test_security_headers_present(client):
     assert "frame-ancestors 'none'" in csp
     assert "form-action 'self'" in csp
     assert "img-src 'self' data:" in csp
+
 
 def test_permissions_policy_present(client):
     """Verify that the Permissions-Policy header is present."""

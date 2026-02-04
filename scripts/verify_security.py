@@ -6,9 +6,11 @@ Checks for HSTS, CSP, Referrer-Policy, and the production environment safeguard.
 
 import os
 import subprocess
-import time
-import requests
 import sys
+import time
+
+import requests
+
 
 def test_security_headers():
     print("Checking security headers...")
@@ -17,14 +19,14 @@ def test_security_headers():
     port = "5005"
     env = os.environ.copy()
     env["PORT"] = port
-    env["FLASK_ENV"] = "development" # Allow dev server for this test
+    env["FLASK_ENV"] = "development"  # Allow dev server for this test
 
     # Use python3 directly to satisfy static analysis check for non-dynamic commands
     proc = subprocess.Popen(
         ["python3", "api_server.py"],
         env=env,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.PIPE,
     )
 
     # Wait for server to start
@@ -57,7 +59,7 @@ def test_security_headers():
             "object-src 'none'",
             "frame-ancestors 'none'",
             "form-action 'self'",
-            "img-src 'self' data:"
+            "img-src 'self' data:",
         ]
 
         for check in csp_checks:
@@ -71,6 +73,7 @@ def test_security_headers():
     finally:
         proc.terminate()
         proc.wait()
+
 
 def test_production_safeguard():
     print("\nChecking production safeguard...")
@@ -87,18 +90,24 @@ def test_production_safeguard():
             capture_output=True,
             text=True,
             timeout=5,
-            check=False
+            check=False,
         )
-        if result.returncode == 1 and "Do not run the development server in production" in result.stdout:
+        if (
+            result.returncode == 1
+            and "Do not run the development server in production" in result.stdout
+        ):
             print("  [PASS] Production safeguard triggered correctly.")
             return True
         else:
-            print(f"  [FAIL] Production safeguard failed. Return code: {result.returncode}")
+            print(
+                f"  [FAIL] Production safeguard failed. Return code: {result.returncode}"
+            )
             print(f"  STDOUT: {result.stdout}")
             return False
     except subprocess.TimeoutExpired:
         print("  [FAIL] Production safeguard failed - server kept running.")
         return False
+
 
 if __name__ == "__main__":
     headers_ok = test_security_headers()
