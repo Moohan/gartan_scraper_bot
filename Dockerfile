@@ -1,11 +1,13 @@
 # Multi-stage Docker build for Gartan Scraper Bot
-FROM python:3.14-alpine AS builder
+FROM python:3.13-alpine AS builder
 
 # Install build dependencies for Alpine
 RUN apk add --no-cache --virtual .build-deps \
     gcc \
     musl-dev \
     linux-headers \
+    libxml2-dev \
+    libxslt-dev \
     && apk add --no-cache git
 
 # Set working directory
@@ -21,13 +23,15 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 RUN apk del .build-deps
 
 # Production stage - Use same Alpine base for consistency
-FROM python:3.14-alpine AS production
+FROM python:3.13-alpine AS production
 
 # Install runtime dependencies for Alpine
 RUN apk add --no-cache \
     sqlite \
     curl \
-    ca-certificates
+    ca-certificates \
+    libxml2 \
+    libxslt
 
 # Create non-root user (Alpine style)
 RUN addgroup -g 1000 -S gartan && \
