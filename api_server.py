@@ -257,18 +257,22 @@ def root():
                     else:
                         display += end_time.strftime(" on %d/%m")
 
-                    c.update({
-                        "available": True,
-                        "duration": format_hours(duration_min),
-                        "end_time_display": display,
-                    })
+                    c.update(
+                        {
+                            "available": True,
+                            "duration": format_hours(duration_min),
+                            "end_time_display": display,
+                        }
+                    )
                     available_crew_for_rules.append(c)
                 else:
-                    c.update({
-                        "available": False,
-                        "duration": None,
-                        "end_time_display": None,
-                    })
+                    c.update(
+                        {
+                            "available": False,
+                            "duration": None,
+                            "end_time_display": None,
+                        }
+                    )
                 crew_data.append(c)
 
             ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
@@ -291,7 +295,10 @@ def root():
                 if curr_app:
                     app_end = parse_dt(curr_app["end_time"])
                     app_dur_min = int((app_end - now).total_seconds() / 60)
-                    p22p6_base = {"available": True, "duration": format_hours(app_dur_min)}
+                    p22p6_base = {
+                        "available": True,
+                        "duration": format_hours(app_dur_min),
+                    }
 
             p22p6_avail = p22p6_base["available"] and rules_res["rules_pass"]
 
