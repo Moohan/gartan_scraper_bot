@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from bs4 import BeautifulSoup, Tag
 
-from utils import log_debug
+from utils import get_soup, log_debug
 
 
 def parse_station_display_html(html_content: str) -> Optional[Dict[str, Any]]:
@@ -21,12 +21,7 @@ def parse_station_display_html(html_content: str) -> Optional[Dict[str, Any]]:
         A dictionary containing the parsed information, or None if parsing fails.
     """
     try:
-        try:
-            soup = BeautifulSoup(html_content, "lxml")
-        except Exception:
-            # lxml may not be available in some environments (tests/CI), fallback to built-in parser
-            log_debug("warn", "lxml parser not available, falling back to html.parser")
-            soup = BeautifulSoup(html_content, "html.parser")
+        soup = get_soup(html_content)
 
         # Extract basic info
         time = soup.find("span", id="lblTime").text.strip()
