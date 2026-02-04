@@ -2,13 +2,16 @@
 """Security tests for the API server."""
 
 import pytest
+
 from api_server import app
+
 
 @pytest.fixture
 def client():
     app.config["TESTING"] = True
     with app.test_client() as client:
         yield client
+
 
 def test_security_headers_present(client):
     """Verify that essential security headers are present in the response."""
@@ -28,6 +31,7 @@ def test_security_headers_present(client):
     assert "form-action 'self'" in csp
     assert "img-src 'self' data:" in csp
 
+
 def test_permissions_policy_present(client):
     """Verify that the Permissions-Policy header is present."""
     response = client.get("/health")
@@ -36,11 +40,12 @@ def test_permissions_policy_present(client):
     assert "microphone=()" in policy
     assert "geolocation=()" in policy
 
+
 def test_production_safeguard():
     """Verify that the Flask development server does not run in production."""
+    import os
     import subprocess
     import sys
-    import os
 
     env = os.environ.copy()
     env["FLASK_ENV"] = "production"
@@ -56,7 +61,7 @@ def test_production_safeguard():
             capture_output=True,
             text=True,
             timeout=5,
-            shell=False
+            shell=False,
         )
         assert result.returncode == 1
         assert "Do not run the development server in production" in result.stdout
