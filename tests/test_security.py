@@ -2,16 +2,13 @@
 """Security tests for the API server."""
 
 import pytest
-
 from api_server import app
-
 
 @pytest.fixture
 def client():
     app.config["TESTING"] = True
     with app.test_client() as client:
         yield client
-
 
 def test_security_headers_present(client):
     """Verify that essential security headers are present in the response."""
@@ -31,7 +28,6 @@ def test_security_headers_present(client):
     assert "form-action 'self'" in csp
     assert "img-src 'self' data:" in csp
 
-
 def test_permissions_policy_present(client):
     """Verify that the Permissions-Policy header is present."""
     response = client.get("/health")
@@ -39,3 +35,30 @@ def test_permissions_policy_present(client):
     assert "camera=()" in policy
     assert "microphone=()" in policy
     assert "geolocation=()" in policy
+
+def test_production_safeguard():
+    """Verify that the Flask development server does not run in production."""
+    import subprocess
+    import sys
+    import os
+
+    env = os.environ.copy()
+    env["FLASK_ENV"] = "production"
+
+    try:
+        # Run api_server.py as a separate process
+        # It should exit immediately with code 1 if safeguard works
+        # Use a list of static strings to satisfy security scanners
+        # sourcery skip: subprocess-run-pre-check
+        result = subprocess.run(
+            ["python3", "api_server.py"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            shell=False
+        )
+        assert result.returncode == 1
+        assert "Do not run the development server in production" in result.stdout
+    except subprocess.TimeoutExpired:
+        pytest.fail("Production safeguard failed - server kept running.")
