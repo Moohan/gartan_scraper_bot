@@ -37,8 +37,8 @@ jobs:
         
     - name: Run safety check
       run: |
-        safety check --output json > safety-report.json || true
-        safety check
+        safety scan --output json > safety-report.json || true
+        safety scan
         
     - name: Run pip-audit
       run: |
