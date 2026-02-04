@@ -1,13 +1,11 @@
+import time
 import os
 import sqlite3
-import time
 from datetime import datetime, timedelta
-
 from api_server import app
 from db_store import init_db
 
 DB_PATH = "benchmark.db"
-
 
 def setup_benchmark_data():
     if os.path.exists(DB_PATH):
@@ -27,7 +25,7 @@ def setup_benchmark_data():
 
     c.executemany(
         "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-        crew_data,
+        crew_data
     )
 
     # Get all crew IDs
@@ -45,7 +43,7 @@ def setup_benchmark_data():
 
     c.executemany(
         "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-        availability_data,
+        availability_data
     )
 
     # Insert P22P6 appliance
@@ -53,34 +51,31 @@ def setup_benchmark_data():
     appliance_id = c.lastrowid
     c.execute(
         "INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (?, ?, ?)",
-        (appliance_id, start_time, end_time),
+        (appliance_id, start_time, end_time)
     )
 
     conn.commit()
     conn.close()
 
-
 def benchmark():
-    app.config["TESTING"] = True
+    app.config['TESTING'] = True
     # Point api_server to our benchmark DB
     import api_server
-
     api_server.DB_PATH = DB_PATH
 
     client = app.test_client()
 
     # Warm up
-    client.get("/")
+    client.get('/')
 
     start = time.time()
     iterations = 10
     for _ in range(iterations):
-        client.get("/")
+        client.get('/')
     end = time.time()
 
     avg_time = (end - start) / iterations
     print(f"Average response time for dashboard (50 crew members): {avg_time:.4f}s")
-
 
 if __name__ == "__main__":
     setup_benchmark_data()

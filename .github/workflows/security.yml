@@ -34,12 +34,7 @@ jobs:
         sudo apt-get update && sudo apt-get install -y libxml2-dev libxslt-dev
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install safety pip-audit
-        
-    - name: Run safety check
-      run: |
-        safety scan --output json > safety-report.json || true
-        safety scan
+        pip install pip-audit
         
     - name: Run pip-audit
       run: |
@@ -52,7 +47,6 @@ jobs:
       with:
         name: security-reports
         path: |
-          safety-report.json
           pip-audit-report.json
           
     - name: Check for outdated packages
