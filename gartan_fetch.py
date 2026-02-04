@@ -176,6 +176,9 @@ def _is_cache_valid(cache_file: str, cache_minutes: int) -> bool:
 
 def _fetch_and_write_cache(session, booking_date, cache_file):
     """Fetch grid HTML and write it to the cache file."""
+    if not session:
+        log_debug("fetch", f"No session available to fetch data for {booking_date}")
+        return None
     grid_html = fetch_grid_html_for_date(session, booking_date)
     if grid_html:
         import os
@@ -618,6 +621,9 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     """
     Perform the AJAX request to fetch the schedule grid HTML for a given date.
     """
+    if not session:
+        log_debug("error", f"No session available for schedule request for {booking_date}")
+        return None
     import json
 
     # Manually construct the payload string to match Gartan's frontend JS exactly (unquoted keys, single-quoted values)
