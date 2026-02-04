@@ -15,7 +15,10 @@ pytest-xdist==3.6.1
 pylint==3.2.5
 
 # Production server
-gunicorn==22.0.0
+gunicorn==23.0.0
 
 # Logging and monitoring
-Werkzeug==3.1.4
+Werkzeug==3.1.5
+
+# Parsers
+lxml==5.3.0

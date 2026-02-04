@@ -7,6 +7,7 @@ Runs both the periodic scheduler and API server in a single container
 
 import logging
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -66,19 +67,39 @@ def run_scheduler():
 
 
 def run_api_server():
-    """Run the Flask API server process"""
+    """Run the Gunicorn API server process"""
     try:
-        logger.info("Starting API server process")
+        logger.info("Starting API server process (gunicorn)")
 
         # Set environment variables for production
         os.environ["FLASK_DEBUG"] = "false"
-        os.environ["PORT"] = os.environ.get("PORT", "5000")
+        os.environ["FLASK_ENV"] = "production"
 
-        # Import and run the API server
-        from api_server import app
+        # Strictly validate port to satisfy security scanners
+        port_env = os.environ.get("PORT", "5000")
+        if not port_env.isdigit():
+            logger.error(f"PORT must be a number, got: {port_env}")
+            sys.exit(1)
 
-        port = int(os.environ.get("PORT", 5000))
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+        # Use gunicorn for production instead of Flask development server
+        # Command is strictly constructed to prevent injection
+        # Validation has already ensured port_env is numeric
+        port_num = int(port_env)
+
+        logger.info(f"Starting Gunicorn on port {port_num}")
+        subprocess.run(
+            [
+                "gunicorn",
+                "--bind",
+                f"0.0.0.0:{port_num}",
+                "--workers",
+                "2",
+                "--timeout",
+                "120",
+                "api_server:app",
+            ],
+            check=True,
+        )
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")
