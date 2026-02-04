@@ -485,10 +485,24 @@ def get_crew_hours_planned_week_data(id):
 
 @app.after_request
 def add_security_headers(response):
+    """Add security headers to all responses."""
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
+        "object-src 'none'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "img-src 'self' data:; "
+        "connect-src 'self'"
+    )
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=(), usb=()"
     )
     return response
 
@@ -549,4 +563,13 @@ DASHBOARD_TEMPLATE = """
 """
 
 if __name__ == "__main__":
+    # Safeguard: Do not run development server in production
+    if os.environ.get("FLASK_ENV") == "production":
+        print(
+            "Error: Do not run the development server in production. "
+            "Use a production-grade WSGI server like gunicorn."
+        )
+        import sys
+
+        sys.exit(1)
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
