@@ -30,9 +30,7 @@ def get_db():
     """Get a database connection. Reuses connection within the same request context."""
     db = getattr(g, "_database", None)
     if db is None:
-        db = g._database = sqlite3.connect(
-            DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES
-        )
+        db = g._database = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
         db.row_factory = sqlite3.Row
     return db
 
@@ -467,9 +465,7 @@ def app_dur(name):
             base = get_availability(app["id"], "appliance_availability", now)
             if name == "P22P6":
                 available_crew = get_currently_available_crew(now)
-                if not (
-                    base["available"] and check_rules(available_crew)["rules_pass"]
-                ):
+                if not (base["available"] and check_rules(available_crew)["rules_pass"]):
                     return jsonify(None)
             return jsonify(base["duration"])
     except:
@@ -511,8 +507,7 @@ def get_appliance_available_data(name):
         if name == "P22P6":
             available_crew = get_currently_available_crew(now)
             return {
-                "available": base["available"]
-                and check_rules(available_crew)["rules_pass"]
+                "available": base["available"] and check_rules(available_crew)["rules_pass"]
             }
         return {"available": base["available"]}
 
