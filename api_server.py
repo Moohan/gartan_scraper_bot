@@ -174,7 +174,9 @@ def check_rules(available_ids: List[int]) -> Dict:
     with get_db() as conn:
         # Use placeholders for variable IN clause; f-string is safe here as it only contains '?'
         placeholders = ",".join("?" for _ in available_ids)
-        query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
+        query = (
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
+        )
         rows = conn.execute(query, available_ids).fetchall()  # nosec B608
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
