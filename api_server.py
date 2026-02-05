@@ -176,7 +176,10 @@ def check_rules(available_ids: List[int]) -> Dict:
         rows = []
         cursor = conn.cursor()
         for crew_id in available_ids:
-            cursor.execute("SELECT role, skills FROM crew WHERE id = ?", (crew_id,))
+            cursor.execute(
+                "SELECT role, skills FROM crew WHERE id = ?",
+                (crew_id,)
+            )
             row = cursor.fetchone()
             if row:
                 rows.append(row)
@@ -574,4 +577,7 @@ DASHBOARD_TEMPLATE = """
 """
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))  # nosec B104
+    app.run(
+        host="0.0.0.0",  # nosec B104
+        port=int(os.environ.get("PORT", 5000))
+    )
