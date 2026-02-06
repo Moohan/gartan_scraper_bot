@@ -8,9 +8,7 @@ import os
 import subprocess
 import sys
 import time
-
 import requests
-
 
 def test_security_headers():
     print("--- Testing Security Headers ---")
@@ -18,8 +16,9 @@ def test_security_headers():
     os.environ["FLASK_DEBUG"] = "true"
     os.environ["FLASK_ENV"] = "development"
     port = 5050
-    process = subprocess.Popen(
-        [sys.executable, "api_server.py"], env={**os.environ, "PORT": str(port)}
+    process = subprocess.Popen(  # nosec
+        [sys.executable, "api_server.py"],
+        env={**os.environ, "PORT": str(port)},
     )
 
     # Wait for server to start
@@ -35,7 +34,7 @@ def test_security_headers():
             "X-Frame-Options": "DENY",
             "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
             "Referrer-Policy": "strict-origin-when-cross-origin",
-            "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; img-src 'self' data:",
+            "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; img-src 'self' data:"
         }
 
         all_passed = True
@@ -44,16 +43,13 @@ def test_security_headers():
             if actual_value == expected_value:
                 print(f"[PASS] {header}")
             else:
-                print(
-                    f"[FAIL] {header}: Expected '{expected_value}', got '{actual_value}'"
-                )
+                print(f"[FAIL] {header}: Expected '{expected_value}', got '{actual_value}'")
                 all_passed = False
 
         return all_passed
     finally:
         process.terminate()
         process.wait()
-
 
 def test_production_safeguard():
     print("\n--- Testing Production Safeguard ---")
@@ -63,7 +59,7 @@ def test_production_safeguard():
     env["PORT"] = "5051"
 
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec
             [sys.executable, "api_server.py"],
             env=env,
             capture_output=True,
@@ -71,23 +67,16 @@ def test_production_safeguard():
             timeout=10,
         )
         # It should exit with an error
-        if (
-            result.returncode != 0
-            and "Do not run the development server in production"
-            in result.stdout + result.stderr
-        ):
+        if result.returncode != 0 and "Do not run the development server in production" in result.stdout + result.stderr:
             print("[PASS] Production safeguard triggered correctly.")
             return True
         else:
-            print(
-                f"[FAIL] Production safeguard did not trigger as expected. Return code: {result.returncode}"
-            )
+            print(f"[FAIL] Production safeguard did not trigger as expected. Return code: {result.returncode}")
             print(f"Output: {result.stdout}\n{result.stderr}")
             return False
     except subprocess.TimeoutExpired:
         print("[FAIL] Server kept running in production mode (timeout).")
         return False
-
 
 if __name__ == "__main__":
     headers_ok = test_security_headers()

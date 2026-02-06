@@ -33,12 +33,11 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install safety pip-audit
+        pip install pip-audit
         
-    - name: Run safety check
+    - name: Run safety check (removed)
       run: |
-        safety scan --output json > safety-report.json || true
-        safety scan
+        echo "Safety 3.x requires an account/login which fails in non-interactive CI. Using pip-audit instead."
         
     - name: Run pip-audit
       run: |
@@ -51,7 +50,6 @@ jobs:
       with:
         name: security-reports
         path: |
-          safety-report.json
           pip-audit-report.json
           
     - name: Check for outdated packages
