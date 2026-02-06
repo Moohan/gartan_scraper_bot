@@ -123,9 +123,7 @@ def get_all_crew_availability(now: datetime) -> List[Dict]:
                 }
             )
         else:
-            d.update(
-                {"available": False, "duration": None, "end_time_display": None}
-            )
+            d.update({"available": False, "duration": None, "end_time_display": None})
         crew_data.append(d)
     return crew_data
 
