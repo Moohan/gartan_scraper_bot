@@ -4,6 +4,7 @@
 import os
 import sys
 import unittest
+
 from api_server import app
 
 
@@ -52,8 +53,8 @@ class TestSecurityHardening(unittest.TestCase):
             content = f.read()
 
         self.assertIn('"gunicorn"', content)
-        self.assertIn('port_str.isdigit()', content)
-        self.assertIn('subprocess.run', content)
+        self.assertIn("port_str.isdigit()", content)
+        self.assertIn("subprocess.run", content)
 
 
 if __name__ == "__main__":
