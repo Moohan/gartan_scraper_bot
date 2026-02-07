@@ -72,6 +72,7 @@ def run_api_server():
 
         # Set environment variables for production
         os.environ["FLASK_DEBUG"] = "false"
+        os.environ["FLASK_ENV"] = "production"
         port_str = os.environ.get("PORT", "5000")
 
         # Hardened validation of PORT to prevent command injection
