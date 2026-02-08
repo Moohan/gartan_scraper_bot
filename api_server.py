@@ -448,7 +448,9 @@ def app_dur(name):
                         (now, now),
                     ).fetchall()
                 ]
-                if not (base["available"] and check_rules(available_crew)["rules_pass"]):
+                if not (
+                    base["available"] and check_rules(available_crew)["rules_pass"]
+                ):
                     return jsonify(None)
             return jsonify(base["duration"])
     except:
