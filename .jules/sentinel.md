@@ -12,3 +12,8 @@
 **Vulnerability:** The `gartan_login_and_get_session` function could return `None` on authentication failure, but callers were not checking for `None` before using it, leading to an `AttributeError` and application crash (DoS).
 **Learning:** Robustness and security are linked; a failure in a security component (auth) shouldn't cause the entire application to crash due to poor error handling.
 **Prevention:** Always check if a session object is valid before attempting to use it, especially when it originates from a function that can fail due to external factors like authentication or network issues.
+
+## 2026-02-08 - [CI Dependency and Environment Mismatch]
+**Vulnerability:** The addition of `lxml` as a dependency caused CI failures because the Docker Alpine environment lacked the necessary C libraries for building it, and the `safety` security tool failed due to mandatory registration.
+**Learning:** Security enhancements (like adding `lxml` for safer parsing) must be accompanied by environment updates (Docker system packages). Also, CI tools must be compatible with non-interactive environments.
+**Prevention:** When adding new dependencies that require compilation, ensure the build environment (Dockerfile, CI runners) has the necessary system headers. Prefer well-supported, CI-friendly security auditing tools like `pip-audit` over those requiring user interaction or accounts.
