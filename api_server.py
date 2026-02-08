@@ -4,6 +4,7 @@
 import logging
 import os
 import sqlite3
+import sys
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -488,7 +489,14 @@ def add_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
+        "object-src 'none'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "img-src 'self' data:"
     )
     return response
 
@@ -549,4 +557,12 @@ DASHBOARD_TEMPLATE = """
 """
 
 if __name__ == "__main__":
+    # Production safeguard: do not run the development server in production
+    if os.environ.get("FLASK_ENV") == "production":
+        logger.error(
+            "CRITICAL: Attempted to start Flask development server in production."
+        )
+        logger.error("Use a production WSGI server like Gunicorn instead.")
+        sys.exit(1)
+
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
