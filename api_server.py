@@ -398,6 +398,7 @@ def app_avail(name):
                     SELECT c.role, c.skills FROM crew c
                     JOIN crew_availability ca ON c.id = ca.crew_id
                     WHERE ca.start_time <= ? AND ca.end_time > ?
+                    GROUP BY c.id
                     """,
                     (now, now),
                 ).fetchall()
@@ -427,6 +428,7 @@ def app_dur(name):
                     SELECT c.role, c.skills FROM crew c
                     JOIN crew_availability ca ON c.id = ca.crew_id
                     WHERE ca.start_time <= ? AND ca.end_time > ?
+                    GROUP BY c.id
                     """,
                     (now, now),
                 ).fetchall()
@@ -478,6 +480,7 @@ def get_appliance_available_data(name):
                 SELECT c.role, c.skills FROM crew c
                 JOIN crew_availability ca ON c.id = ca.crew_id
                 WHERE ca.start_time <= ? AND ca.end_time > ?
+                GROUP BY c.id
                 """,
                 (now, now),
             ).fetchall()
