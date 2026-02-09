@@ -14,10 +14,16 @@ def test_user_scenario():
     # ID: 4540, Name: HAYES, JA, Role: FFD, Skills: BA
     # ID: 7, Name: SABA, JA, Role: FF, Skills: BA ERD
 
-    available_ids = [3, 2, 4540, 7]
-    print(f"Checking rules for crew IDs: {available_ids}")
+    # Crew members with their roles and skills
+    crew_members = [
+        {"name": "GIBB, OL", "role": "CC", "skills": "BA ERD IC"},
+        {"name": "CASELY, CH", "role": "FF", "skills": "BA ERD"},
+        {"name": "HAYES, JA", "role": "FFD", "skills": "BA"},
+        {"name": "SABA, JA", "role": "FF", "skills": "BA ERD"},
+    ]
+    print(f"Checking rules for crew: {[c['name'] for c in crew_members]}")
 
-    result = check_rules(available_ids)
+    result = check_rules(crew_members)
 
     print("\n--- Results ---")
     print(f"Rules Pass: {result['rules_pass']}")
