@@ -72,13 +72,24 @@ def run_api_server():
 
         # Set environment variables for production
         os.environ["FLASK_DEBUG"] = "false"
-        os.environ["PORT"] = os.environ.get("PORT", "5000")
+        os.environ["FLASK_ENV"] = "production"
 
-        # Import and run the API server
-        from api_server import app
+        port = os.environ.get("PORT", "5000")
+        if not port.isdigit():
+            port = "5000"
 
-        port = int(os.environ.get("PORT", 5000))
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+        # Hardened gunicorn launch
+        cmd = [
+            "gunicorn",
+            "--bind",
+            f"0.0.0.0:{port}",
+            "--workers",
+            "2",
+            "--timeout",
+            "120",
+            "api_server:app",
+        ]
+        subprocess.run(cmd, check=True)
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")

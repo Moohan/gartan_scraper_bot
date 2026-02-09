@@ -487,8 +487,11 @@ def get_crew_hours_planned_week_data(id):
 def add_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+        "object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
     )
     return response
 
@@ -549,4 +552,7 @@ DASHBOARD_TEMPLATE = """
 """
 
 if __name__ == "__main__":
+    if os.environ.get("FLASK_ENV") == "production":
+        print("Error: Do not run development server in production. Use gunicorn instead.")
+        os._exit(1)
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
