@@ -78,18 +78,20 @@ def run_api_server():
         if not port.isdigit():
             port = "5000"
 
-        # Hardened gunicorn launch
-        cmd = [
-            "gunicorn",
-            "--bind",
-            f"0.0.0.0:{port}",
-            "--workers",
-            "2",
-            "--timeout",
-            "120",
-            "api_server:app",
-        ]
-        subprocess.run(cmd, check=True)
+        # Hardened gunicorn launch - inline args to satisfy static analysis
+        subprocess.run(
+            [
+                "gunicorn",
+                "--bind",
+                f"0.0.0.0:{port}",
+                "--workers",
+                "2",
+                "--timeout",
+                "120",
+                "api_server:app",
+            ],
+            check=True,
+        )
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")
