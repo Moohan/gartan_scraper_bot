@@ -558,6 +558,8 @@ DASHBOARD_TEMPLATE = """
 if __name__ == "__main__":
     # Safeguard: prevent development server in production
     if os.environ.get("FLASK_ENV") == "production":
-        print("Error: Do not run development server in production. Use gunicorn instead.")
+        print(
+            "Error: Do not run development server in production. Use gunicorn instead."
+        )
         sys.exit(1)
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
