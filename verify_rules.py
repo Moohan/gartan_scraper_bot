@@ -18,14 +18,13 @@ def test_user_scenario():
     print(f"Checking rules for crew IDs: {available_ids}")
 
     with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
-        crew_members = [
-            dict(r)
-            for r in conn.execute(
-                f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
-                available_ids,
-            ).fetchall()
-        ]
+        crew_members = []
+        for crew_id in available_ids:
+            row = conn.execute(
+                "SELECT role, skills FROM crew WHERE id = ?", (crew_id,)
+            ).fetchone()
+            if row:
+                crew_members.append(dict(row))
 
     result = check_rules(crew_members)
 
