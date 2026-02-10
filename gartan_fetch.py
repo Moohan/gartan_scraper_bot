@@ -293,10 +293,7 @@ def gartan_login_and_get_session():
 
     username, password = _get_credentials()
     # Safe logging that only indicates session presence
-    log_debug(
-        "session",
-        f"gartan_login called (cached_session={'yes' if _authenticated_session is not None else 'no'})",
-    )
+    log_debug("session", f"gartan_login called (cached_session={'yes' if _authenticated_session is not None else 'no'})")
     if not username or not password:
         log_debug("error", "Missing Gartan credentials in environment")
         # Clear any cached session to avoid cross-test pollution
@@ -531,6 +528,12 @@ def fetch_grid_html_for_date(session, booking_date):
     Given an authenticated session and a booking_date (str, dd/mm/yyyy), fetch the grid HTML for that date.
     Returns grid_html or None.
     """
+    if not session:
+        log_debug(
+            "warn",
+            f"No session available for grid fetch on {booking_date} (skipping fetch)",
+        )
+        return None
     schedule_url = SCHEDULE_URL
     payload = _build_schedule_payload(booking_date)
     headers = _get_schedule_headers()

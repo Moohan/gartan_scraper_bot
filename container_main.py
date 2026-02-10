@@ -81,16 +81,13 @@ def run_api_server():
         # Launch production server with hardened settings
         cmd = [
             "gunicorn",
-            "--bind",
-            f"0.0.0.0:{port_str}",
-            "--workers",
-            "2",
-            "--timeout",
-            "120",
-            "api_server:app",
+            "--bind", f"0.0.0.0:{port_str}",
+            "--workers", "2",
+            "--timeout", "120",
+            "api_server:app"
         ]
 
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True)  # nosec B603
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")
