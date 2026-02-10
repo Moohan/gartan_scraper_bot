@@ -4,7 +4,7 @@ import sys
 # Add the current directory to the path so we can import api_server
 sys.path.append(os.getcwd())
 
-from api_server import check_rules
+from api_server import check_rules, get_db
 
 
 def test_user_scenario():
@@ -17,7 +17,17 @@ def test_user_scenario():
     available_ids = [3, 2, 4540, 7]
     print(f"Checking rules for crew IDs: {available_ids}")
 
-    result = check_rules(available_ids)
+    with get_db() as conn:
+        placeholders = ",".join("?" * len(available_ids))
+        crew_members = [
+            dict(r)
+            for r in conn.execute(
+                f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
+                available_ids,
+            ).fetchall()
+        ]
+
+    result = check_rules(crew_members)
 
     print("\n--- Results ---")
     print(f"Rules Pass: {result['rules_pass']}")
