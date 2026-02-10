@@ -6,6 +6,8 @@ RUN apk add --no-cache --virtual .build-deps \
     gcc \
     musl-dev \
     linux-headers \
+    libxml2-dev \
+    libxslt-dev \
     && apk add --no-cache git
 
 # Set working directory
