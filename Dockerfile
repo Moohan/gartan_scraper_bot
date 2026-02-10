@@ -6,7 +6,9 @@ RUN apk add --no-cache --virtual .build-deps \
     gcc \
     musl-dev \
     linux-headers \
-    && apk add --no-cache git
+    libxml2-dev \
+    libxslt-dev \
+    && apk add --no-cache git libxml2 libxslt
 
 # Set working directory
 WORKDIR /app
@@ -27,7 +29,9 @@ FROM python:3.14-alpine AS production
 RUN apk add --no-cache \
     sqlite \
     curl \
-    ca-certificates
+    ca-certificates \
+    libxml2 \
+    libxslt
 
 # Create non-root user (Alpine style)
 RUN addgroup -g 1000 -S gartan && \
