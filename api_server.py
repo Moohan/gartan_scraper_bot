@@ -267,7 +267,11 @@ def root():
                 if r["end_time"]:
                     avail = format_availability_data(parse_dt(r["end_time"]), now)
                 else:
-                    avail = {"available": False, "duration": None, "end_time_display": None}
+                    avail = {
+                        "available": False,
+                        "duration": None,
+                        "end_time_display": None,
+                    }
                 crew_data.append({**c, **avail})
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
@@ -435,7 +439,9 @@ def app_dur(name):
             base = get_availability(app["id"], "appliance_availability", now)
             if name == "P22P6":
                 available_crew = _get_available_crew_details(conn, now)
-                if not (base["available"] and check_rules(available_crew)["rules_pass"]):
+                if not (
+                    base["available"] and check_rules(available_crew)["rules_pass"]
+                ):
                     return jsonify(None)
             return jsonify(base["duration"])
     except:
@@ -477,7 +483,8 @@ def get_appliance_available_data(name):
         if name == "P22P6":
             available_crew = _get_available_crew_details(conn, now)
             return {
-                "available": base["available"] and check_rules(available_crew)["rules_pass"]
+                "available": base["available"]
+                and check_rules(available_crew)["rules_pass"]
             }
         return {"available": base["available"]}
 
