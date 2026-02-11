@@ -168,7 +168,9 @@ def _get_soup(html_content: str) -> BeautifulSoup:
     try:
         return BeautifulSoup(html_content, "lxml")
     except Exception:
-        log_debug("warn", "lxml parser not available, falling back to html.parser")
+        log_debug(
+            "warn", "lxml parser not available, falling back to html.parser"
+        )
         return BeautifulSoup(html_content, "html.parser")
 
 
