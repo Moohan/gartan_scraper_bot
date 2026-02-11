@@ -10,10 +10,9 @@ def check():
 
     print("--- Crew Information ---")
     crew_names = ["GIBB, OL", "CASELY, CH", "SABA, JA", "HAYES, JA"]
-    placeholders = ",".join("?" * len(crew_names))
-    rows = conn.execute(
-        f"SELECT * FROM crew WHERE name IN ({placeholders})", crew_names
-    ).fetchall()
+    placeholders = ",".join("?" for _ in crew_names)
+    query = f"SELECT * FROM crew WHERE name IN ({placeholders})"  # nosec B608
+    rows = conn.execute(query, crew_names).fetchall()
 
     for r in rows:
         print(

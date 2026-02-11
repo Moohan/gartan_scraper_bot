@@ -81,13 +81,16 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
+    # Use explicit constants to satisfy static analysis
+    if table == "crew_availability":
+        query = "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    elif table == "appliance_availability":
+        query = "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    else:
+        raise ValueError(f"Invalid table: {table}")
+
     with get_db() as conn:
-        # Table and column names are internal constants, safe from injection
-        curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",  # nosec B608
-            (entity_id, now, now),
-        ).fetchone()
+        curr = conn.execute(query, (entity_id, now, now)).fetchone()
         if not curr:
             return {"available": False, "duration": None, "end_time_display": None}
 
@@ -160,12 +163,10 @@ def check_rules(available_ids: List[int]) -> Dict:
             "ba_non_ttr": 0,
         }
     with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
-        # Parameterized query with dynamic number of placeholders
-        rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
-            available_ids,  # nosec B608
-        ).fetchall()
+        # Construct placeholders string safely
+        placeholders = ",".join("?" for _ in available_ids)
+        query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
+        rows = conn.execute(query, available_ids).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
@@ -490,9 +491,7 @@ def get_crew_hours_planned_week_data(id):
 def add_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Strict-Transport-Security"] = (
-        "max-age=31536000; includeSubDomains"
-    )
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
