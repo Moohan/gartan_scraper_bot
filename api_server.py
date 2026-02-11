@@ -165,10 +165,8 @@ def check_rules(available_ids: List[int]) -> Dict:
     with get_db() as conn:
         # Construct placeholders string safely
         placeholders = ",".join("?" for _ in available_ids)
-        query = (
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
-        )
-        rows = conn.execute(query, available_ids).fetchall()
+        query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
+        rows = conn.execute(query, available_ids).fetchall()  # sourcery skip: sql-injection
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
@@ -493,9 +491,7 @@ def get_crew_hours_planned_week_data(id):
 def add_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Strict-Transport-Security"] = (
-        "max-age=31536000; includeSubDomains"
-    )
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "

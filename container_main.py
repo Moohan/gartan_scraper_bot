@@ -71,31 +71,25 @@ def run_api_server():
         logger.info("Starting API server process via gunicorn")
 
         # Strictly validate PORT to prevent command injection
-        import shlex
-
         port_str = os.environ.get("PORT", "5000")
         if not port_str.isdigit():
             logger.error(f"Invalid PORT value: {port_str}")
             sys.exit(1)
 
         # Run gunicorn as a subprocess
-        cmd = [
+        # Port is strictly validated as digits above
+        cmd = [  # sourcery skip: command-injection
             "gunicorn",
-            "--bind",
-            f"0.0.0.0:{shlex.quote(port_str)}",
-            "--workers",
-            "2",
-            "--timeout",
-            "120",
-            "--access-logfile",
-            "-",
-            "--error-logfile",
-            "-",
-            "api_server:app",
+            "--bind", f"0.0.0.0:{port_str}",
+            "--workers", "2",
+            "--timeout", "120",
+            "--access-logfile", "-",
+            "--error-logfile", "-",
+            "api_server:app"
         ]
 
         logger.info(f"Executing: {' '.join(cmd)}")
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True)  # sourcery skip: command-injection, subprocess-run-without-static-string
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")

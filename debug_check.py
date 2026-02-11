@@ -12,7 +12,7 @@ def check():
     crew_names = ["GIBB, OL", "CASELY, CH", "SABA, JA", "HAYES, JA"]
     placeholders = ",".join("?" for _ in crew_names)
     query = f"SELECT * FROM crew WHERE name IN ({placeholders})"  # nosec B608
-    rows = conn.execute(query, crew_names).fetchall()
+    rows = conn.execute(query, crew_names).fetchall()  # sourcery skip: sql-injection
 
     for r in rows:
         print(
