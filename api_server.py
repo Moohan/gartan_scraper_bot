@@ -163,7 +163,8 @@ def check_rules(available_ids: List[int]) -> Dict:
         placeholders = ",".join("?" * len(available_ids))
         # Parameterized query with dynamic number of placeholders
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids  # nosec B608
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
+            available_ids,  # nosec B608
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -489,7 +490,9 @@ def get_crew_hours_planned_week_data(id):
 def add_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
+    )
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "

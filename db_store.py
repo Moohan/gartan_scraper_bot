@@ -446,7 +446,9 @@ def defrag_availability(db_conn=None):
 
                     # Delete current block
                     # Table name is an internal constant, safe from injection
-                    c.execute(f"DELETE FROM {table} WHERE id = ?", (curr_row_id,))  # nosec B608
+                    c.execute(
+                        f"DELETE FROM {table} WHERE id = ?", (curr_row_id,)
+                    )  # nosec B608
                     merged_count += 1
                 else:
                     # Move to next block

@@ -79,12 +79,17 @@ def run_api_server():
         # Run gunicorn as a subprocess
         cmd = [
             "gunicorn",
-            "--bind", f"0.0.0.0:{port_str}",
-            "--workers", "2",
-            "--timeout", "120",
-            "--access-logfile", "-",
-            "--error-logfile", "-",
-            "api_server:app"
+            "--bind",
+            f"0.0.0.0:{port_str}",
+            "--workers",
+            "2",
+            "--timeout",
+            "120",
+            "--access-logfile",
+            "-",
+            "--error-logfile",
+            "-",
+            "api_server:app",
         ]
 
         logger.info(f"Executing: {' '.join(cmd)}")
