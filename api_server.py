@@ -83,8 +83,9 @@ def get_crew_list() -> List[Dict]:
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
     col = "crew_id" if table == "crew_availability" else "appliance_id"
     with get_db() as conn:
+        # Table and column names are internal constants, safe from injection
         curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",  # nosec B608
             (entity_id, now, now),
         ).fetchone()
         if not curr:
@@ -160,8 +161,9 @@ def check_rules(available_ids: List[int]) -> Dict:
         }
     with get_db() as conn:
         placeholders = ",".join("?" * len(available_ids))
+        # Parameterized query with dynamic number of placeholders
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids  # nosec B608
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -487,8 +489,17 @@ def get_crew_hours_planned_week_data(id):
 def add_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
+        "img-src 'self' data:; "
+        "object-src 'none'; "
+        "form-action 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'"
     )
     return response
 
@@ -549,4 +560,9 @@ DASHBOARD_TEMPLATE = """
 """
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    # Prevent running development server in production
+    if os.environ.get("FLASK_ENV") == "production":
+        print("Error: app.run() is disabled in production. Use gunicorn instead.")
+        os._exit(1)
+    # Binding to 0.0.0.0 is intended for containerized deployment
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))  # nosec B104
