@@ -1,0 +1,4 @@
+## 2026-02-11 - [Production Server and Credential Logging Regression]
+**Vulnerability:** The application was using the Flask development server in production (`app.run()`) and logging sensitive credentials (`GARTAN_USERNAME`) in `gartan_fetch.py`, despite previous memory entries indicating these had been fixed.
+**Learning:** Security fixes can regress if they are not enforced at multiple levels (e.g., both code-level safeguards and deployment-level configuration). Relying solely on memory for the state of the codebase is insufficient; direct verification is always required.
+**Prevention:** 1. Implement code-level safeguards (like the `FLASK_ENV` check in `api_server.py`) to prevent insecure configurations from running. 2. Use hardened production commands (like `gunicorn`) in the main orchestrator. 3. Consolidate credential handling and logging into audited, safe utility functions.
