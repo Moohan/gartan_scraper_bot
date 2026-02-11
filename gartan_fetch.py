@@ -530,6 +530,10 @@ def fetch_grid_html_for_date(session, booking_date):
     Given an authenticated session and a booking_date (str, dd/mm/yyyy), fetch the grid HTML for that date.
     Returns grid_html or None.
     """
+    if not session:
+        log_debug("warn", f"No session available to fetch grid HTML for {booking_date}")
+        return None
+
     schedule_url = SCHEDULE_URL
     payload = _build_schedule_payload(booking_date)
     headers = _get_schedule_headers()

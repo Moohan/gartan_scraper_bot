@@ -7,3 +7,7 @@
 ## 2026-02-11 - [Dashboard N+1 Query Optimization]
 **Learning:** The dashboard route was suffering from an N+1 query problem, making a separate database call for each crew member's availability. This scaled poorly with the number of crew members.
 **Action:** Use a single SQL query with a `LEFT JOIN` and `GROUP BY` to fetch crew members and their most recent availability status in one batch. Additionally, cache the SQLite connection in Flask's `g` object to avoid connection overhead within a single request.
+
+## 2026-02-11 - [Environment-Resilient Performance Fixes]
+**Learning:** Performance optimizations (like adding `lxml` for faster parsing) can fail in CI if dependencies aren't explicitly pinned or if environmental assumptions (like authenticated sessions) aren't met.
+**Action:** Always pin performance-critical dependencies (e.g., `lxml`) in `requirements.txt` and implement robust fallbacks (e.g., `_get_soup` helper) to ensure the application remains functional even if optimized paths fail.
