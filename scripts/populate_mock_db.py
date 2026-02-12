@@ -1,10 +1,10 @@
-import os
-import sqlite3
-from datetime import datetime, timedelta
 
-from config import config
+import sqlite3
+import os
+from datetime import datetime, timedelta
 from db_store import init_db
 
+from config import config
 
 def populate():
     db_path = config.db_path
@@ -25,7 +25,7 @@ def populate():
     # Appliance availability
     c.execute(
         "INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (?, ?, ?)",
-        (appliance_id, now - timedelta(hours=1), now + timedelta(hours=10)),
+        (appliance_id, now - timedelta(hours=1), now + timedelta(hours=10))
     )
 
     # Add 50 crew members
@@ -41,7 +41,7 @@ def populate():
 
         c.execute(
             "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-            (name, role, skills, contract_hours),
+            (name, role, skills, contract_hours)
         )
         crew_id = c.lastrowid
 
@@ -49,19 +49,18 @@ def populate():
         if i % 2 == 0:
             c.execute(
                 "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-                (crew_id, now - timedelta(hours=1), now + timedelta(hours=5)),
+                (crew_id, now - timedelta(hours=1), now + timedelta(hours=5))
             )
 
         # Some random other availability blocks
         c.execute(
             "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-            (crew_id, now + timedelta(days=1), now + timedelta(days=1, hours=8)),
+            (crew_id, now + timedelta(days=1), now + timedelta(days=1, hours=8))
         )
 
     conn.commit()
     conn.close()
     print("Database populated with 50 crew members.")
-
 
 if __name__ == "__main__":
     populate()

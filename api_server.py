@@ -121,9 +121,7 @@ def get_crew_with_availability(now: datetime) -> List[Dict]:
                 end_time = parse_dt(c["availability_end_time"])
                 c.update(format_availability_data(now, end_time))
             else:
-                c.update(
-                    {"available": False, "duration": None, "end_time_display": None}
-                )
+                c.update({"available": False, "duration": None, "end_time_display": None})
             crew_data.append(c)
         return crew_data
 
@@ -406,8 +404,9 @@ def app_avail(name):
             base = get_availability(app["id"], "appliance_availability", now)
             if name == "P22P6":
                 # ⚡ Bolt: Fetch available crew details in one JOIN query for check_rules.
+                # Use GROUP BY c.id to ensure each crew member is only counted once.
                 rows = conn.execute(
-                    "SELECT c.role, c.skills FROM crew c JOIN crew_availability ca ON c.id = ca.crew_id WHERE ca.start_time <= ? AND ca.end_time > ?",
+                    "SELECT c.role, c.skills FROM crew c JOIN crew_availability ca ON c.id = ca.crew_id WHERE ca.start_time <= ? AND ca.end_time > ? GROUP BY c.id",
                     (now, now),
                 ).fetchall()
                 avail_crew = [dict(r) for r in rows]
@@ -432,8 +431,9 @@ def app_dur(name):
             base = get_availability(app["id"], "appliance_availability", now)
             if name == "P22P6":
                 # ⚡ Bolt: Fetch available crew details in one JOIN query for check_rules.
+                # Use GROUP BY c.id to ensure each crew member is only counted once.
                 rows = conn.execute(
-                    "SELECT c.role, c.skills FROM crew c JOIN crew_availability ca ON c.id = ca.crew_id WHERE ca.start_time <= ? AND ca.end_time > ?",
+                    "SELECT c.role, c.skills FROM crew c JOIN crew_availability ca ON c.id = ca.crew_id WHERE ca.start_time <= ? AND ca.end_time > ? GROUP BY c.id",
                     (now, now),
                 ).fetchall()
                 avail_crew = [dict(r) for r in rows]
@@ -478,8 +478,9 @@ def get_appliance_available_data(name):
         base = get_availability(app["id"], "appliance_availability", now)
         if name == "P22P6":
             # ⚡ Bolt: Fetch available crew details in one JOIN query for check_rules.
+            # Use GROUP BY c.id to ensure each crew member is only counted once.
             rows = conn.execute(
-                "SELECT c.role, c.skills FROM crew c JOIN crew_availability ca ON c.id = ca.crew_id WHERE ca.start_time <= ? AND ca.end_time > ?",
+                "SELECT c.role, c.skills FROM crew c JOIN crew_availability ca ON c.id = ca.crew_id WHERE ca.start_time <= ? AND ca.end_time > ? GROUP BY c.id",
                 (now, now),
             ).fetchall()
             avail_crew = [dict(r) for r in rows]

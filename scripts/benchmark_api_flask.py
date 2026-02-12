@@ -1,8 +1,7 @@
-import statistics
+
 import time
-
+import statistics
 from api_server import app
-
 
 def benchmark_root(n=50):
     client = app.test_client()
@@ -26,7 +25,6 @@ def benchmark_root(n=50):
     print(f"  Min:     {min(latencies):.2f} ms")
     print(f"  Max:     {max(latencies):.2f} ms")
     print(f"  StdDev:  {statistics.stdev(latencies):.2f} ms")
-
 
 if __name__ == "__main__":
     benchmark_root()
