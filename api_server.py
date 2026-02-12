@@ -162,13 +162,12 @@ def check_rules(available_ids: List[int]) -> Dict:
             "skill_counts": {"TTR": 0, "LGV": 0, "BA": 0},
             "ba_non_ttr": 0,
         }
+    rows = []
     with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
-        # Building the placeholders string is safe here as it only contains '?' characters.
-        query = (
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
-        )
-        rows = conn.execute(query, available_ids).fetchall()
+        for crew_id in available_ids:
+            row = conn.execute("SELECT role, skills FROM crew WHERE id = ?", (crew_id,)).fetchone()
+            if row:
+                rows.append(row)
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
