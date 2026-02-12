@@ -121,7 +121,9 @@ def get_crew_with_availability(now: datetime) -> List[Dict]:
                 end_time = parse_dt(c["availability_end_time"])
                 c.update(format_availability_data(now, end_time))
             else:
-                c.update({"available": False, "duration": None, "end_time_display": None})
+                c.update(
+                    {"available": False, "duration": None, "end_time_display": None}
+                )
             crew_data.append(c)
         return crew_data
 
