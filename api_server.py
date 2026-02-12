@@ -165,7 +165,9 @@ def check_rules(available_ids: List[int]) -> Dict:
     rows = []
     with get_db() as conn:
         for crew_id in available_ids:
-            row = conn.execute("SELECT role, skills FROM crew WHERE id = ?", (crew_id,)).fetchone()
+            row = conn.execute(
+                "SELECT role, skills FROM crew WHERE id = ?", (crew_id,)
+            ).fetchone()
             if row:
                 rows.append(row)
 
