@@ -620,6 +620,13 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     """
     import json
 
+    if not session:
+        log_debug(
+            "warn",
+            f"No session available for schedule fetch for {booking_date} (running in cache-only or no-auth mode)",
+        )
+        return None
+
     # Manually construct the payload string to match Gartan's frontend JS exactly (unquoted keys, single-quoted values)
     # See js_fsi3.js line 275
     raw_payload = (
