@@ -416,7 +416,9 @@ def defrag_availability(db_conn=None):
             elif table == "appliance_availability":
                 id_col = "appliance_id"
                 select_sql = "SELECT id, appliance_id, start_time, end_time FROM appliance_availability ORDER BY appliance_id, start_time"
-                update_sql = "UPDATE appliance_availability SET end_time = ? WHERE id = ?"
+                update_sql = (
+                    "UPDATE appliance_availability SET end_time = ? WHERE id = ?"
+                )
                 delete_sql = "DELETE FROM appliance_availability WHERE id = ?"
             else:
                 continue
