@@ -292,9 +292,9 @@ def gartan_login_and_get_session():
     import time
 
     username, password = _get_credentials()
-    # Temporary debug: log credentials and cached session presence for bisecting test-order flakiness
+    # Temporary debug: log cached session presence (sensitive credentials removed)
     print(
-        f"[DEBUG] gartan_login called: username={username!r}, password_set={'yes' if password else 'no'}, cached_session={'yes' if _authenticated_session is not None else 'no'}"
+        f"[DEBUG] gartan_login called: cached_session={'yes' if _authenticated_session is not None else 'no'}"
     )
     if not username or not password:
         log_debug("error", "Missing Gartan credentials in environment")
