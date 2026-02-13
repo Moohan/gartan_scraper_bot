@@ -164,13 +164,10 @@ def check_rules(available_ids: List[int]) -> Dict:
             "ba_non_ttr": 0,
         }
     with get_db() as conn:
-        # Use a list of placeholders to safely construct the IN clause (Bandit B608)
-        # Performance is maintained by using a single query.
-        placeholders = ",".join(["?"] * len(available_ids))
-        query = (
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
-        )
-        rows = conn.execute(query, available_ids).fetchall()
+        # Fetch all crew and filter in Python to avoid dynamic SQL construction
+        # and satisfy strict security scanners (Bandit, Sourcery) while maintaining performance.
+        all_crew = conn.execute("SELECT id, role, skills FROM crew").fetchall()
+        rows = [r for r in all_crew if r["id"] in available_ids]
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False

@@ -10,10 +10,10 @@ def check():
 
     print("--- Crew Information ---")
     crew_names = ["GIBB, OL", "CASELY, CH", "SABA, JA", "HAYES, JA"]
-    placeholders = ",".join("?" * len(crew_names))
-    rows = conn.execute(
-        f"SELECT * FROM crew WHERE name IN ({placeholders})", crew_names
-    ).fetchall()
+    # Safely fetch all crew and filter in Python to avoid dynamic SQL construction
+    # and satisfy strict security scanners.
+    all_crew = conn.execute("SELECT * FROM crew").fetchall()
+    rows = [r for r in all_crew if r["name"] in crew_names]
 
     for r in rows:
         print(
