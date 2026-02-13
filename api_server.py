@@ -167,7 +167,9 @@ def check_rules(available_ids: List[int]) -> Dict:
         # Use a list of placeholders to safely construct the IN clause (Bandit B608)
         # Performance is maintained by using a single query.
         placeholders = ",".join(["?"] * len(available_ids))
-        query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
+        query = (
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
+        )
         rows = conn.execute(query, available_ids).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
