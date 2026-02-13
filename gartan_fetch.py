@@ -292,9 +292,9 @@ def gartan_login_and_get_session():
     import time
 
     username, password = _get_credentials()
-    # Temporary debug: log credentials and cached session presence for bisecting test-order flakiness
+    # Temporary debug: log cached session presence (sensitive credentials removed)
     print(
-        f"[DEBUG] gartan_login called: username={username!r}, password_set={'yes' if password else 'no'}, cached_session={'yes' if _authenticated_session is not None else 'no'}"
+        f"[DEBUG] gartan_login called: cached_session={'yes' if _authenticated_session is not None else 'no'}"
     )
     if not username or not password:
         log_debug("error", "Missing Gartan credentials in environment")
@@ -618,6 +618,12 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     """
     Perform the AJAX request to fetch the schedule grid HTML for a given date.
     """
+    if session is None:
+        log_debug(
+            "error", f"Cannot fetch schedule for {booking_date}: No active session."
+        )
+        return None
+
     import json
 
     # Manually construct the payload string to match Gartan's frontend JS exactly (unquoted keys, single-quoted values)

@@ -2,10 +2,13 @@
 FROM python:3.14-alpine AS builder
 
 # Install build dependencies for Alpine
+# lxml requires libxml2-dev and libxslt-dev to build from source
 RUN apk add --no-cache --virtual .build-deps \
     gcc \
     musl-dev \
     linux-headers \
+    libxml2-dev \
+    libxslt-dev \
     && apk add --no-cache git
 
 # Set working directory
@@ -24,10 +27,13 @@ RUN apk del .build-deps
 FROM python:3.14-alpine AS production
 
 # Install runtime dependencies for Alpine
+# lxml requires libxml2 and libxslt at runtime
 RUN apk add --no-cache \
     sqlite \
     curl \
-    ca-certificates
+    ca-certificates \
+    libxml2 \
+    libxslt
 
 # Create non-root user (Alpine style)
 RUN addgroup -g 1000 -S gartan && \
