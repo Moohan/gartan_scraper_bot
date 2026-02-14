@@ -463,9 +463,7 @@ def app_dur(name):
             base = get_availability(app_row["id"], "appliance_availability", now)
             if name == "P22P6":
                 available_crew = get_available_crew_details(now)
-                if not (
-                    base["available"] and check_rules(available_crew)["rules_pass"]
-                ):
+                if not (base["available"] and check_rules(available_crew)["rules_pass"]):
                     return jsonify(None)
             return jsonify(base["duration"])
     except:
@@ -507,8 +505,7 @@ def get_appliance_available_data(name):
         if name == "P22P6":
             available_crew = get_available_crew_details(now)
             return {
-                "available": base["available"]
-                and check_rules(available_crew)["rules_pass"]
+                "available": base["available"] and check_rules(available_crew)["rules_pass"]
             }
         return {"available": base["available"]}
 
