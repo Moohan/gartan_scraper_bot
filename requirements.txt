@@ -19,3 +19,4 @@ gunicorn==23.0.0
 
 # Logging and monitoring
 Werkzeug==3.1.5
+lxml==5.3.0
