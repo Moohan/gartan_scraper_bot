@@ -618,6 +618,13 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     """
     Perform the AJAX request to fetch the schedule grid HTML for a given date.
     """
+    if not session:
+        log_debug(
+            "error",
+            f"No session provided for schedule request on {booking_date} (session is None)",
+        )
+        return None
+
     import json
 
     # Manually construct the payload string to match Gartan's frontend JS exactly (unquoted keys, single-quoted values)
