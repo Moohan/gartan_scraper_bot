@@ -414,7 +414,9 @@ def defrag_availability(db_conn=None):
                 delete_query = "DELETE FROM crew_availability WHERE id = ?"
             else:
                 select_query = "SELECT id, appliance_id, start_time, end_time FROM appliance_availability ORDER BY appliance_id, start_time"
-                update_query = "UPDATE appliance_availability SET end_time = ? WHERE id = ?"
+                update_query = (
+                    "UPDATE appliance_availability SET end_time = ? WHERE id = ?"
+                )
                 delete_query = "DELETE FROM appliance_availability WHERE id = ?"
 
             # Simple iterative merging logic:
