@@ -162,13 +162,15 @@ def check_rules(available_ids: List[int]) -> Dict:
             "skill_counts": {"TTR": 0, "LGV": 0, "BA": 0},
             "ba_non_ttr": 0,
         }
+    rows = []
     with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
-        # Construction of placeholders from list length is safe; used to support dynamic IN clause
-        rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
-            available_ids,  # nosec B608
-        ).fetchall()
+        # Using a loop instead of 'IN' clause with f-string to satisfy strict static analysis (Sourcery B608)
+        for crew_id in available_ids:
+            row = conn.execute(
+                "SELECT role, skills FROM crew WHERE id = ?", (crew_id,)
+            ).fetchone()
+            if row:
+                rows.append(row)
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False

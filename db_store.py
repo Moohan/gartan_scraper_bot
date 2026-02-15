@@ -407,13 +407,19 @@ def defrag_availability(db_conn=None):
 
     try:
         for table in ["crew_availability", "appliance_availability"]:
-            id_col = "crew_id" if table == "crew_availability" else "appliance_id"
+            # Use explicit static queries to satisfy strict security scanners (Sourcery/Bandit)
+            if table == "crew_availability":
+                select_query = "SELECT id, crew_id, start_time, end_time FROM crew_availability ORDER BY crew_id, start_time"
+                update_query = "UPDATE crew_availability SET end_time = ? WHERE id = ?"
+                delete_query = "DELETE FROM crew_availability WHERE id = ?"
+            else:
+                select_query = "SELECT id, appliance_id, start_time, end_time FROM appliance_availability ORDER BY appliance_id, start_time"
+                update_query = "UPDATE appliance_availability SET end_time = ? WHERE id = ?"
+                delete_query = "DELETE FROM appliance_availability WHERE id = ?"
 
             # Simple iterative merging logic:
             # 1. Select all blocks sorted by id and start_time
-            c.execute(
-                f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time"  # nosec B608
-            )
+            c.execute(select_query)
             rows = c.fetchall()
 
             if not rows:
@@ -436,16 +442,11 @@ def defrag_availability(db_conn=None):
                     new_end = max(prev_end, curr_end)
                     if new_end != prev_end:
                         # Update prev block
-                        c.execute(
-                            f"UPDATE {table} SET end_time = ? WHERE id = ?",  # nosec B608
-                            (new_end, prev_row_id),
-                        )
+                        c.execute(update_query, (new_end, prev_row_id))
                         prev_end = new_end
 
                     # Delete current block
-                    c.execute(
-                        f"DELETE FROM {table} WHERE id = ?", (curr_row_id,)
-                    )  # nosec B608
+                    c.execute(delete_query, (curr_row_id,))
                     merged_count += 1
                 else:
                     # Move to next block

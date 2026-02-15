@@ -10,10 +10,12 @@ def check():
 
     print("--- Crew Information ---")
     crew_names = ["GIBB, OL", "CASELY, CH", "SABA, JA", "HAYES, JA"]
-    placeholders = ",".join("?" * len(crew_names))
-    rows = conn.execute(
-        f"SELECT * FROM crew WHERE name IN ({placeholders})", crew_names  # nosec B608
-    ).fetchall()
+    rows = []
+    # Using a loop instead of 'IN' clause with f-string to satisfy strict static analysis (Sourcery B608)
+    for name in crew_names:
+        row = conn.execute("SELECT * FROM crew WHERE name = ?", (name,)).fetchone()
+        if row:
+            rows.append(row)
 
     for r in rows:
         print(
