@@ -166,7 +166,8 @@ def check_rules(available_ids: List[int]) -> Dict:
         placeholders = ",".join("?" * len(available_ids))
         # Construction of placeholders from list length is safe; used to support dynamic IN clause
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids  # nosec B608
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
+            available_ids,  # nosec B608
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}

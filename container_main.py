@@ -79,7 +79,9 @@ def run_api_server():
 
         port = int(os.environ.get("PORT", 5000))
         # Binding to all interfaces is required for containerized deployment
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)  # nosec B104
+        app.run(
+            host="0.0.0.0", port=port, debug=False, use_reloader=False
+        )  # nosec B104
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")
