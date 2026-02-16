@@ -293,7 +293,10 @@ def gartan_login_and_get_session():
 
     username, password = _get_credentials()
     # Log session presence but avoid leaking sensitive credentials in stdout
-    log_debug("session", f"gartan_login called (cached_session={'yes' if _authenticated_session is not None else 'no'})")
+    log_debug(
+        "session",
+        f"gartan_login called (cached_session={'yes' if _authenticated_session is not None else 'no'})",
+    )
     if not username or not password:
         log_debug("error", "Missing Gartan credentials in environment")
         # Clear any cached session to avoid cross-test pollution
