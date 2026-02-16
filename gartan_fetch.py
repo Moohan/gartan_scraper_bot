@@ -292,10 +292,8 @@ def gartan_login_and_get_session():
     import time
 
     username, password = _get_credentials()
-    # Temporary debug: log credentials and cached session presence for bisecting test-order flakiness
-    print(
-        f"[DEBUG] gartan_login called: username={username!r}, password_set={'yes' if password else 'no'}, cached_session={'yes' if _authenticated_session is not None else 'no'}"
-    )
+    # Log session presence but avoid leaking sensitive credentials in stdout
+    log_debug("session", f"gartan_login called (cached_session={'yes' if _authenticated_session is not None else 'no'})")
     if not username or not password:
         log_debug("error", "Missing Gartan credentials in environment")
         # Clear any cached session to avoid cross-test pollution
@@ -488,7 +486,8 @@ def _post_login(session, post_url, payload, headers):
     log_debug("session", f"Cookies after login POST: {after_cookies}")
     if login_resp.status_code != 200:
         log_debug("error", f"Login POST failed with status: {login_resp.status_code}")
-        log_debug("error", f"Response content: {login_resp.text}")
+        # Redacted to avoid leaking potential sensitive info reflected in response
+        log_debug("error", "Login response content redacted for security")
         raise AuthenticationError("Login request failed - incorrect credentials")
 
     # Check for login failure indicators in response
