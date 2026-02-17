@@ -621,6 +621,10 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     """
     import json
 
+    if session is None:
+        log_debug("error", f"No session provided for schedule fetch for {booking_date}")
+        return None
+
     # Manually construct the payload string to match Gartan's frontend JS exactly (unquoted keys, single-quoted values)
     # See js_fsi3.js line 275
     raw_payload = (
