@@ -19,3 +19,6 @@ gunicorn==23.0.0
 
 # Logging and monitoring
 Werkzeug==3.1.5
+
+# HTML Parsing
+lxml==5.3.0

@@ -155,25 +155,32 @@ def get_weekly_stats(crew_id: int) -> Dict:
         }
 
 
-def check_rules(available_ids: List[int]) -> Dict:
-    if not available_ids:
+def get_currently_available_crew(conn, now: datetime) -> List[sqlite3.Row]:
+    """Fetch roles and skills for all crew members currently available."""
+    return conn.execute(
+        """
+        SELECT c.id, c.role, c.skills
+        FROM crew c
+        JOIN crew_availability ca ON c.id = ca.crew_id
+        WHERE ca.start_time <= ? AND ca.end_time > ?
+        GROUP BY c.id
+    """,
+        (now, now),
+    ).fetchall()
+
+
+def check_rules(crew_list: List[Dict]) -> Dict:
+    if not crew_list:
         return {
             "rules_pass": False,
             "rules": {},
             "skill_counts": {"TTR": 0, "LGV": 0, "BA": 0},
             "ba_non_ttr": 0,
         }
-    with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
-        # Use placeholders for values; the f-string is only for the correct number of placeholders.
-        rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
-            available_ids,  # nosec B608
-        ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
-    for r in rows:
+    for r in crew_list:
         c_skills = (r["skills"] or "").split()
         role = r["role"]
 
@@ -198,7 +205,7 @@ def check_rules(available_ids: List[int]) -> Dict:
                 ffc_ba = True
 
     rules = {
-        "total_crew_ok": len(rows) >= 4,
+        "total_crew_ok": len(crew_list) >= 4,
         "ttr_present": skills["TTR"] > 0,
         "lgv_present": skills["LGV"] > 0,
         "ba_non_ttr_ok": ba_non_ttr >= 2,
@@ -246,8 +253,8 @@ def root():
             key=lambda x: (not x["available"], ranks.get(x["role"], 99), x["name"])
         )
 
-        avail_ids = [c["id"] for c in crew_data if c["available"]]
-        rules_res = check_rules(avail_ids)
+        available_crew = [c for c in crew_data if c["available"]]
+        rules_res = check_rules(available_crew)
 
         p22p6_base = {"available": False, "duration": None}
         with get_db() as conn:
@@ -265,7 +272,7 @@ def root():
             DASHBOARD_TEMPLATE,
             crew_data=crew_data,
             now=now,
-            total_available=len(avail_ids),
+            total_available=len(available_crew),
             p22p6_avail=p22p6_avail,
             p22p6_duration=p22p6_base["duration"] if p22p6_avail else None,
             rules=rules_res["rules"],
@@ -384,15 +391,9 @@ def app_avail(name):
                 return jsonify({"error": "Not found"}), 404
             base = get_availability(app["id"], "appliance_availability", now)
             if name == "P22P6":
-                avail_ids = [
-                    r[0]
-                    for r in conn.execute(
-                        "SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?",
-                        (now, now),
-                    ).fetchall()
-                ]
+                available_crew = get_currently_available_crew(conn, now)
                 return jsonify(
-                    base["available"] and check_rules(avail_ids)["rules_pass"]
+                    base["available"] and check_rules(available_crew)["rules_pass"]
                 )
             return jsonify(base["available"])
     except:
@@ -411,14 +412,10 @@ def app_dur(name):
                 return jsonify({"error": "Not found"}), 404
             base = get_availability(app["id"], "appliance_availability", now)
             if name == "P22P6":
-                avail_ids = [
-                    r[0]
-                    for r in conn.execute(
-                        "SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?",
-                        (now, now),
-                    ).fetchall()
-                ]
-                if not (base["available"] and check_rules(avail_ids)["rules_pass"]):
+                available_crew = get_currently_available_crew(conn, now)
+                if not (
+                    base["available"] and check_rules(available_crew)["rules_pass"]
+                ):
                     return jsonify(None)
             return jsonify(base["duration"])
     except:
@@ -458,15 +455,10 @@ def get_appliance_available_data(name):
             return {"error": "Not found"}
         base = get_availability(app["id"], "appliance_availability", now)
         if name == "P22P6":
-            avail_ids = [
-                r[0]
-                for r in conn.execute(
-                    "SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?",
-                    (now, now),
-                ).fetchall()
-            ]
+            available_crew = get_currently_available_crew(conn, now)
             return {
-                "available": base["available"] and check_rules(avail_ids)["rules_pass"]
+                "available": base["available"]
+                and check_rules(available_crew)["rules_pass"]
             }
         return {"available": base["available"]}
 
