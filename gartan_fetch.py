@@ -488,7 +488,8 @@ def _post_login(session, post_url, payload, headers):
     log_debug("session", f"Cookies after login POST: {after_cookies}")
     if login_resp.status_code != 200:
         log_debug("error", f"Login POST failed with status: {login_resp.status_code}")
-        log_debug("error", f"Response content: {login_resp.text}")
+        # Redact response content to prevent credential reflection or PII leakage in logs (Sentinel 🛡️)
+        log_debug("error", "Response content suppressed for security")
         raise AuthenticationError("Login request failed - incorrect credentials")
 
     # Check for login failure indicators in response
@@ -645,7 +646,8 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
             "error",
             f"Schedule AJAX failed for {booking_date}: {schedule_resp.status_code}",
         )
-        log_debug("error", f"Response body: {schedule_resp.text}")
+        # Redact response content for security
+        log_debug("error", "Response body suppressed for security")
     try:
         grid_html = schedule_resp.json().get("d", "")
         return grid_html
