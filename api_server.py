@@ -167,7 +167,8 @@ def check_rules(available_ids: List[int]) -> Dict:
         placeholders = ",".join("?" * len(available_ids))
         # Use placeholders for values; the f-string is only for the correct number of placeholders.
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids  # nosec B608
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
+            available_ids,  # nosec B608
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
