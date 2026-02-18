@@ -66,19 +66,33 @@ def run_scheduler():
 
 
 def run_api_server():
-    """Run the Flask API server process"""
+    """Run the Flask API server process using Gunicorn for production (Sentinel 🛡️)"""
     try:
-        logger.info("Starting API server process")
+        logger.info("Starting API server process with Gunicorn")
 
         # Set environment variables for production
         os.environ["FLASK_DEBUG"] = "false"
-        os.environ["PORT"] = os.environ.get("PORT", "5000")
+        port_str = os.environ.get("PORT", "5000")
 
-        # Import and run the API server
-        from api_server import app
+        # Strict validation of PORT to prevent invalid port numbers or injection
+        if not port_str.isdigit():
+            logger.error(f"Invalid PORT value: {port_str}. Must be a digit.")
+            return
 
-        port = int(os.environ.get("PORT", 5000))
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+        # Use Gunicorn as production server with 2 workers and 120s timeout
+        cmd = [
+            "gunicorn",
+            "--bind",
+            f"0.0.0.0:{port_str}",  # nosec B104
+            "--workers",
+            "2",
+            "--timeout",
+            "120",
+            "api_server:app",
+        ]
+
+        logger.info(f"Launching gunicorn on port {port_str}")
+        subprocess.run(cmd, check=True)  # nosec B603
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")
