@@ -162,13 +162,15 @@ def check_rules(available_ids: List[int]) -> Dict:
             "skill_counts": {"TTR": 0, "LGV": 0, "BA": 0},
             "ba_non_ttr": 0,
         }
+    rows = []
     with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
-        # Use IN clause with placeholders; Bandit B608 suppressed as this is preferred for performance
-        rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",  # nosec B608
-            available_ids,
-        ).fetchall()
+        # Refactored to individual queries in a loop to satisfy Sourcery and avoid any string concatenation
+        for aid in available_ids:
+            row = conn.execute(
+                "SELECT role, skills FROM crew WHERE id = ?", (aid,)
+            ).fetchone()
+            if row:
+                rows.append(row)
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
