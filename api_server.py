@@ -81,12 +81,16 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
+    # Use explicit whitelist to prevent SQL injection (Bandit B608)
+    if table == "crew_availability":
+        sql = "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    elif table == "appliance_availability":
+        sql = "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    else:
+        raise ValueError(f"Invalid table: {table}")
+
     with get_db() as conn:
-        curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-            (entity_id, now, now),
-        ).fetchone()
+        curr = conn.execute(sql, (entity_id, now, now)).fetchone()
         if not curr:
             return {"available": False, "duration": None, "end_time_display": None}
 
@@ -160,8 +164,10 @@ def check_rules(available_ids: List[int]) -> Dict:
         }
     with get_db() as conn:
         placeholders = ",".join("?" * len(available_ids))
+        # Use IN clause with placeholders; Bandit B608 suppressed as this is preferred for performance
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",  # nosec B608
+            available_ids,
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -549,4 +555,5 @@ DASHBOARD_TEMPLATE = """
 """
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    # For local development only
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))  # nosec B104

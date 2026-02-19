@@ -66,19 +66,34 @@ def run_scheduler():
 
 
 def run_api_server():
-    """Run the Flask API server process"""
+    """Run the Flask API server process using gunicorn for production."""
     try:
         logger.info("Starting API server process")
 
         # Set environment variables for production
         os.environ["FLASK_DEBUG"] = "false"
-        os.environ["PORT"] = os.environ.get("PORT", "5000")
+        port_str = os.environ.get("PORT", "5000")
 
-        # Import and run the API server
-        from api_server import app
+        # Harden against command injection by validating PORT is a digit
+        if not port_str.isdigit():
+            logger.error(f"Invalid PORT environment variable: {port_str}")
+            sys.exit(1)
 
-        port = int(os.environ.get("PORT", 5000))
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+        # Launch using gunicorn for production as recommended in memory
+        cmd = [
+            "gunicorn",
+            "--bind",
+            f"0.0.0.0:{port_str}",  # nosec B104
+            "--workers",
+            "2",
+            "--timeout",
+            "120",
+            "api_server:app",
+        ]
+
+        logger.info(f"Launching gunicorn: {' '.join(cmd)}")
+        # Use subprocess.run with list to prevent shell injection (Bandit B603)
+        subprocess.run(cmd, check=True)  # nosec B603
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")
