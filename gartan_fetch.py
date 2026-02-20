@@ -488,7 +488,8 @@ def _post_login(session, post_url, payload, headers):
     log_debug("session", f"Cookies after login POST: {after_cookies}")
     if login_resp.status_code != 200:
         log_debug("error", f"Login POST failed with status: {login_resp.status_code}")
-        log_debug("error", f"Response content: {login_resp.text}")
+        # Redacted to prevent credential/PII leakage in logs
+        log_debug("error", f"Response content length: {len(login_resp.text)}")
         raise AuthenticationError("Login request failed - incorrect credentials")
 
     # Check for login failure indicators in response
