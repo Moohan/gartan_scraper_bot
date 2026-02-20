@@ -9,6 +9,7 @@ Core responsibilities:
 
 import os
 from datetime import datetime as dt
+from typing import Union
 
 import requests
 from bs4 import BeautifulSoup  # type: ignore
@@ -357,6 +358,18 @@ def gartan_login_and_get_session():
         raise AuthenticationError(f"Login failed due to unexpected error: {str(e)}")
 
 
+def get_soup(content: Union[str, bytes]) -> BeautifulSoup:
+    """Get BeautifulSoup object with lxml parser and html.parser fallback."""
+    try:
+        return BeautifulSoup(content, "lxml")
+    except Exception:
+        log_debug(
+            "warn",
+            "lxml parser not available, falling back to html.parser",
+        )
+        return BeautifulSoup(content, "html.parser")
+
+
 def _get_login_form(session):
     """
     Retrieve the login form from the login page.
@@ -370,15 +383,7 @@ def _get_login_form(session):
         cookies_dict = {}
     log_debug("session", f"Initial cookies: {cookies_dict}")
 
-    # Try lxml parser first for speed/consistency, but fall back to built-in parser when lxml is not available
-    try:
-        soup = BeautifulSoup(resp.content, "lxml")
-    except Exception:
-        log_debug(
-            "warn",
-            "lxml parser not available for login form parsing, falling back to html.parser",
-        )
-        soup = BeautifulSoup(resp.content, "html.parser")
+    soup = get_soup(resp.content)
 
     form = soup.find("form")
     if not form:
@@ -619,6 +624,10 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     Perform the AJAX request to fetch the schedule grid HTML for a given date.
     """
     import json
+
+    if session is None:
+        log_debug("error", f"No session available for schedule request for {booking_date}")
+        return None
 
     # Manually construct the payload string to match Gartan's frontend JS exactly (unquoted keys, single-quoted values)
     # See js_fsi3.js line 275
