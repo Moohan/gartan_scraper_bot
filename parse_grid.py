@@ -23,7 +23,6 @@ def get_soup(html_content: str) -> BeautifulSoup:
         # Fallback to standard library parser if lxml is not installed/available
         return BeautifulSoup(html_content, "html.parser")
 
-
 # Type aliases for clarity
 GridElement = Union[Tag, NavigableString]
 GridTable = Tag

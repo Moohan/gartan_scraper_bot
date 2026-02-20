@@ -454,14 +454,9 @@ def defrag_availability(db_conn=None):
 
                     # Delete current block
                     if table == "crew_availability":
-                        c.execute(
-                            "DELETE FROM crew_availability WHERE id = ?", (curr_row_id,)
-                        )
+                        c.execute("DELETE FROM crew_availability WHERE id = ?", (curr_row_id,))
                     else:
-                        c.execute(
-                            "DELETE FROM appliance_availability WHERE id = ?",
-                            (curr_row_id,),
-                        )
+                        c.execute("DELETE FROM appliance_availability WHERE id = ?", (curr_row_id,))
                     merged_count += 1
                 else:
                     # Move to next block
