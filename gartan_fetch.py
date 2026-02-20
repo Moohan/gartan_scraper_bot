@@ -488,7 +488,8 @@ def _post_login(session, post_url, payload, headers):
     log_debug("session", f"Cookies after login POST: {after_cookies}")
     if login_resp.status_code != 200:
         log_debug("error", f"Login POST failed with status: {login_resp.status_code}")
-        log_debug("error", f"Response content: {login_resp.text}")
+        # Redacted to prevent credential/PII leakage in logs
+        log_debug("error", f"Response content length: {len(login_resp.text)}")
         raise AuthenticationError("Login request failed - incorrect credentials")
 
     # Check for login failure indicators in response
@@ -618,6 +619,13 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     """
     Perform the AJAX request to fetch the schedule grid HTML for a given date.
     """
+    if not session:
+        log_debug(
+            "warn",
+            f"No session available for schedule request for {booking_date} (running in cache-only or no-auth mode)",
+        )
+        return None
+
     import json
 
     # Manually construct the payload string to match Gartan's frontend JS exactly (unquoted keys, single-quoted values)
