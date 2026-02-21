@@ -140,16 +140,25 @@ def get_currently_available_crew(conn: sqlite3.Connection, now: datetime) -> Lis
     return [dict(r) for r in rows]
 
 
-def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
+def get_availability(
+    entity_id: int,
+    table: str,
+    now: datetime,
+    db_conn: Optional[sqlite3.Connection] = None,
+) -> Dict:
+    """Check availability for a crew member or appliance."""
     col = "crew_id" if table == "crew_availability" else "appliance_id"
-    with get_db() as conn:
-        curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-            (entity_id, now, now),
-        ).fetchone()
-        if not curr:
-            return {"available": False, "duration": None, "end_time_display": None}
-        return format_availability_data(curr, now)
+    conn = db_conn or get_db()
+
+    curr = conn.execute(
+        f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+        (entity_id, now, now),
+    ).fetchone()
+
+    if not curr:
+        return {"available": False, "duration": None, "end_time_display": None}
+
+    return format_availability_data(curr, now)
 
 
 def get_weekly_stats(crew_id: int) -> Dict:
@@ -302,15 +311,15 @@ def root():
 
         p22p6_base = {"available": False, "duration": None}
         with get_db() as conn:
-            app_p22 = conn.execute(
+            app_p22_row = conn.execute(
                 "SELECT id FROM appliance WHERE name = 'P22P6'"
             ).fetchone()
-            if app_p22:
+            if app_p22_row:
                 p22p6_base = get_availability(
-                    app_p22["id"], "appliance_availability", now
+                    app_p22_row["id"], "appliance_availability", now, db_conn=conn
                 )
 
-        p22p6_avail = p22p6_base["available"] and rules_res["rules_pass"]
+        p22p6_avail = p22p6_base.get("available", False) and rules_res["rules_pass"]
 
         return render_template_string(
             DASHBOARD_TEMPLATE,
@@ -341,24 +350,26 @@ def list_crew():
 @app.route("/crew/<int:id>/available")
 def crew_avail(id):
     try:
-        res = get_availability(id, "crew_availability", datetime.now())
+        now = datetime.now()
         with get_db() as conn:
             if not conn.execute("SELECT 1 FROM crew WHERE id = ?", (id,)).fetchone():
                 return jsonify({"error": "Not found"}), 404
+            res = get_availability(id, "crew_availability", now, db_conn=conn)
         return jsonify(res["available"])
-    except:
+    except Exception:
         return jsonify({"error": "DB error"}), 500
 
 
 @app.route("/crew/<int:id>/duration")
 def crew_dur(id):
     try:
-        res = get_availability(id, "crew_availability", datetime.now())
+        now = datetime.now()
         with get_db() as conn:
             if not conn.execute("SELECT 1 FROM crew WHERE id = ?", (id,)).fetchone():
                 return jsonify({"error": "Not found"}), 404
+            res = get_availability(id, "crew_availability", now, db_conn=conn)
         return jsonify(res["duration"])
-    except:
+    except Exception:
         return jsonify({"error": "DB error"}), 500
 
 
@@ -433,14 +444,16 @@ def app_avail(name):
             ).fetchone()
             if not app_row:
                 return jsonify({"error": "Not found"}), 404
-            base = get_availability(app_row["id"], "appliance_availability", now)
+            base = get_availability(
+                app_row["id"], "appliance_availability", now, db_conn=conn
+            )
             if name == "P22P6":
                 available_crew = get_currently_available_crew(conn, now)
                 return jsonify(
                     base["available"] and check_rules(available_crew)["rules_pass"]
                 )
             return jsonify(base["available"])
-    except:
+    except Exception:
         return jsonify({"error": "DB error"}), 500
 
 
@@ -454,15 +467,15 @@ def app_dur(name):
             ).fetchone()
             if not app_row:
                 return jsonify({"error": "Not found"}), 404
-            base = get_availability(app_row["id"], "appliance_availability", now)
+            base = get_availability(
+                app_row["id"], "appliance_availability", now, db_conn=conn
+            )
             if name == "P22P6":
                 available_crew = get_currently_available_crew(conn, now)
-                if not (
-                    base["available"] and check_rules(available_crew)["rules_pass"]
-                ):
+                if not (base["available"] and check_rules(available_crew)["rules_pass"]):
                     return jsonify(None)
             return jsonify(base["duration"])
-    except:
+    except Exception:
         return jsonify({"error": "DB error"}), 500
 
 
@@ -497,25 +510,31 @@ def get_appliance_available_data(name):
         ).fetchone()
         if not app_row:
             return {"error": "Not found"}
-        base = get_availability(app_row["id"], "appliance_availability", now)
+        base = get_availability(
+            app_row["id"], "appliance_availability", now, db_conn=conn
+        )
         if name == "P22P6":
             available_crew = get_currently_available_crew(conn, now)
             return {
                 "available": base["available"]
-                and check_rules(available_crew)["rules_pass"]
+                and check_rules(available_crew)["rules_pass"],
+                "duration": base.get("duration"),
+                "end_time_display": base.get("end_time_display"),
             }
-        return {"available": base["available"]}
+        return base
 
 
 def get_appliance_duration_data(name):
     now = datetime.now()
     with get_db() as conn:
-        app = conn.execute(
+        app_row = conn.execute(
             "SELECT id FROM appliance WHERE name = ?", (name,)
         ).fetchone()
-        if not app:
+        if not app_row:
             return {"error": "Not found"}
-        return get_availability(app["id"], "appliance_availability", now)
+        return get_availability(
+            app_row["id"], "appliance_availability", now, db_conn=conn
+        )
 
 
 def get_crew_hours_this_week_data(id):
