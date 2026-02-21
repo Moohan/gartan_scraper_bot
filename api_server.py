@@ -81,12 +81,20 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
+    # Use explicit queries for each whitelisted table to satisfy static analysis (Sourcery)
     with get_db() as conn:
-        curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-            (entity_id, now, now),
-        ).fetchone()
+        if table == "crew_availability":
+            curr = conn.execute(
+                "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+                (entity_id, now, now),
+            ).fetchone()
+        elif table == "appliance_availability":
+            curr = conn.execute(
+                "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+                (entity_id, now, now),
+            ).fetchone()
+        else:
+            raise ValueError(f"Invalid table: {table}")
         if not curr:
             return {"available": False, "duration": None, "end_time_display": None}
 
@@ -489,6 +497,10 @@ def add_security_headers(response):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
+    )
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
     )
     return response
 
