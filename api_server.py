@@ -81,10 +81,15 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
+    # Explicitly whitelist allowed tables to prevent SQL injection
+    if table not in ["crew_availability", "appliance_availability"]:
+        raise ValueError(f"Invalid table: {table}")
+
     col = "crew_id" if table == "crew_availability" else "appliance_id"
     with get_db() as conn:
+        # Table and column names are whitelisted above, making this safe (B608)
         curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",  # nosec B608
             (entity_id, now, now),
         ).fetchone()
         if not curr:
@@ -490,6 +495,8 @@ def add_security_headers(response):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
     )
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 
