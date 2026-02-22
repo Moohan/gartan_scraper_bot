@@ -11,8 +11,9 @@ def check():
     print("--- Crew Information ---")
     crew_names = ["GIBB, OL", "CASELY, CH", "SABA, JA", "HAYES, JA"]
     placeholders = ",".join("?" * len(crew_names))
+    # Placeholders are safely constructed from ? characters (Bandit B608)
     rows = conn.execute(
-        f"SELECT * FROM crew WHERE name IN ({placeholders})", crew_names
+        f"SELECT * FROM crew WHERE name IN ({placeholders})", crew_names  # nosec B608
     ).fetchall()
 
     for r in rows:

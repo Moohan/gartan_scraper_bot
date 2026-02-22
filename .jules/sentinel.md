@@ -1,0 +1,4 @@
+## 2026-02-22 - SQL Injection and Log Leakage Hardening
+**Vulnerability:** String interpolation of table names in SQL queries and logging of sensitive response bodies (including credentials/session info) in error logs.
+**Learning:** Even when parameters are not directly user-controlled in the current routes, string-based SQL construction triggers static analysis warnings (Bandit B608) and represents a maintenance risk. Logging full response bodies on failure can inadvertently leak credentials if the upstream server reflects them or contains other PII.
+**Prevention:** Use whitelisted static queries for dynamic table/column selection. Redact sensitive fields and use content length instead of full response text in error logs for authentication-related requests. Always include standard security headers (HSTS, Referrer-Policy) to protect end-user sessions.
