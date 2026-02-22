@@ -167,7 +167,8 @@ def check_rules(available_ids: List[int]) -> Dict:
         placeholders = ",".join("?" * len(available_ids))
         # Use # nosec B608 as placeholders are safely constructed from ? characters
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids  # nosec B608
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
+            available_ids,  # nosec B608
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -497,7 +498,9 @@ def add_security_headers(response):
         "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
     )
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
+    )
     return response
 
 
