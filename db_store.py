@@ -406,14 +406,28 @@ def defrag_availability(db_conn=None):
     c = conn.cursor()
 
     try:
-        for table in ["crew_availability", "appliance_availability"]:
-            id_col = "crew_id" if table == "crew_availability" else "appliance_id"
+        # Use explicit, static SQL queries for whitelisted tables to satisfy security scanners (Sourcery/Bandit)
+        configs = [
+            {
+                "table": "crew_availability",
+                "id_col": "crew_id",
+                "select": "SELECT id, crew_id, start_time, end_time FROM crew_availability ORDER BY crew_id, start_time",
+                "update": "UPDATE crew_availability SET end_time = ? WHERE id = ?",
+                "delete": "DELETE FROM crew_availability WHERE id = ?",
+            },
+            {
+                "table": "appliance_availability",
+                "id_col": "appliance_id",
+                "select": "SELECT id, appliance_id, start_time, end_time FROM appliance_availability ORDER BY appliance_id, start_time",
+                "update": "UPDATE appliance_availability SET end_time = ? WHERE id = ?",
+                "delete": "DELETE FROM appliance_availability WHERE id = ?",
+            },
+        ]
 
+        for cfg in configs:
             # Simple iterative merging logic:
             # 1. Select all blocks sorted by id and start_time
-            c.execute(
-                f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time"
-            )
+            c.execute(cfg["select"])
             rows = c.fetchall()
 
             if not rows:
@@ -436,14 +450,11 @@ def defrag_availability(db_conn=None):
                     new_end = max(prev_end, curr_end)
                     if new_end != prev_end:
                         # Update prev block
-                        c.execute(
-                            f"UPDATE {table} SET end_time = ? WHERE id = ?",
-                            (new_end, prev_row_id),
-                        )
+                        c.execute(cfg["update"], (new_end, prev_row_id))
                         prev_end = new_end
 
                     # Delete current block
-                    c.execute(f"DELETE FROM {table} WHERE id = ?", (curr_row_id,))
+                    c.execute(cfg["delete"], (curr_row_id,))
                     merged_count += 1
                 else:
                     # Move to next block
@@ -455,7 +466,7 @@ def defrag_availability(db_conn=None):
                     )
 
             if merged_count > 0:
-                logger.info(f"Merged {merged_count} blocks in {table}")
+                logger.info(f"Merged {merged_count} blocks in {cfg['table']}")
 
         conn.commit()
     finally:
