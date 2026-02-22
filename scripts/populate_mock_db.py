@@ -1,11 +1,9 @@
-import random
 import sqlite3
 from datetime import datetime, timedelta
-
+import random
 from config import config
 
 DB_PATH = config.db_path
-
 
 def populate_mock_data():
     conn = sqlite3.connect(DB_PATH)
@@ -64,10 +62,7 @@ def populate_mock_data():
         contract = f"{random.randint(10, 40)} hours"
         crew_data.append((name, role, skills, contract))
 
-    c.executemany(
-        "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-        crew_data,
-    )
+    c.executemany("INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)", crew_data)
 
     # Add appliance
     c.execute("INSERT INTO appliance (name) VALUES ('P22P6')")
@@ -75,9 +70,7 @@ def populate_mock_data():
 
     # Add availability
     now = datetime.now()
-    start_of_week = (now - timedelta(days=now.weekday())).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    start_of_week = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Each crew member is available for most of the week
     avail_data = []
@@ -87,25 +80,17 @@ def populate_mock_data():
         # Other blocks in the week
         for d in range(7):
             day = start_of_week + timedelta(days=d)
-            avail_data.append(
-                (crew_id, day + timedelta(hours=8), day + timedelta(hours=18))
-            )
+            avail_data.append((crew_id, day + timedelta(hours=8), day + timedelta(hours=18)))
 
-    c.executemany(
-        "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-        avail_data,
-    )
+    c.executemany("INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)", avail_data)
 
     # Appliance availability
-    c.execute(
-        "INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (?, ?, ?)",
-        (appliance_id, now - timedelta(hours=24), now + timedelta(hours=24)),
-    )
+    c.execute("INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (?, ?, ?)",
+              (appliance_id, now - timedelta(hours=24), now + timedelta(hours=24)))
 
     conn.commit()
     conn.close()
     print("Populated 50 crew members and their availability.")
-
 
 if __name__ == "__main__":
     populate_mock_data()
