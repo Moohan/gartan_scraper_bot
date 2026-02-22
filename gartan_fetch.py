@@ -640,7 +640,9 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     )
 
     if session is None:
-        log_debug("error", f"Cannot fetch schedule for {booking_date}: No active session")
+        log_debug(
+            "error", f"Cannot fetch schedule for {booking_date}: No active session"
+        )
         return ""
 
     schedule_resp = session.post(schedule_url, headers=headers, data=raw_payload)
