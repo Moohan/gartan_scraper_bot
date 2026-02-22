@@ -1,10 +1,10 @@
 import pandas as pd
 
-file_path = 'ScottishfrsScottishfrsEmployeeAvailabilityReport.xlsx'
-file_path = 'ScottishfrsEmployeeAvailabilityReport.xlsx'
+file_path = "ScottishfrsScottishfrsEmployeeAvailabilityReport.xlsx"
+file_path = "ScottishfrsEmployeeAvailabilityReport.xlsx"
 
 try:
-    with open('explore_out.txt', 'w', encoding='utf-8') as f:
+    with open("explore_out.txt", "w", encoding="utf-8") as f:
         xl = pd.ExcelFile(file_path)
         f.write(f"Sheets: {xl.sheet_names}\n")
         for sheet in xl.sheet_names:
