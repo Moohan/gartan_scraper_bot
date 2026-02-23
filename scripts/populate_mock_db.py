@@ -1,10 +1,11 @@
-
+import os
 import sqlite3
 from datetime import datetime, timedelta
-import os
+
 from config import config
 
 DB_PATH = config.db_path
+
 
 def populate():
     # Ensure directory exists
@@ -59,16 +60,20 @@ def populate():
         name = f"Crew Member {i:02d}"
         role = roles[i % len(roles)]
         skills = "BA TTR LGV" if i % 4 == 0 else "BA TTR"
-        c.execute("INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-                  (name, role, skills, "42 hours"))
+        c.execute(
+            "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
+            (name, role, skills, "42 hours"),
+        )
 
         crew_id = c.lastrowid
         # Available now until tomorrow
         now = datetime.now()
         start = now - timedelta(hours=2)
         end = now + timedelta(hours=6)
-        c.execute("INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-                  (crew_id, start.isoformat(), end.isoformat()))
+        c.execute(
+            "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
+            (crew_id, start.isoformat(), end.isoformat()),
+        )
 
     # Add appliance
     c.execute("INSERT INTO appliance (name) VALUES ('P22P6')")
@@ -76,12 +81,15 @@ def populate():
     now = datetime.now()
     start = now - timedelta(hours=2)
     end = now + timedelta(hours=6)
-    c.execute("INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (?, ?, ?)",
-              (app_id, start.isoformat(), end.isoformat()))
+    c.execute(
+        "INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (?, ?, ?)",
+        (app_id, start.isoformat(), end.isoformat()),
+    )
 
     conn.commit()
     conn.close()
     print(f"Mock DB populated at {DB_PATH}")
+
 
 if __name__ == "__main__":
     populate()

@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from flask import Flask, jsonify, render_template_string, g, has_app_context
+from flask import Flask, g, has_app_context, jsonify, render_template_string
 
 from config import config
 from gartan_fetch import fetch_station_feed_html
