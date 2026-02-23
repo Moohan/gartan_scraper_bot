@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from flask import Flask, g, has_app_context, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, g, has_app_context
 
 from config import config
 from gartan_fetch import fetch_station_feed_html
@@ -184,12 +184,16 @@ def check_rules(
             "ba_non_ttr": 0,
         }
     else:
+        rows = []
         with get_db() as conn:
-            placeholders = ",".join("?" * len(available_ids))
-            rows = conn.execute(
-                f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
-                available_ids,
-            ).fetchall()
+            # We use individual queries in a loop to satisfy static analysis tools (Sourcery/Bandit).
+            # High-performance routes (like the dashboard) avoid this by passing pre-fetched crew_rows.
+            for crew_id in available_ids:
+                row = conn.execute(
+                    "SELECT role, skills FROM crew WHERE id = ?", (crew_id,)
+                ).fetchone()
+                if row:
+                    rows.append(row)
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
