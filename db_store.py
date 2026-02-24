@@ -67,11 +67,48 @@ def init_db(db_path: str = DB_PATH, reset: bool = False):
         c.execute("DROP TABLE IF EXISTS appliance_availability")
         c.execute("DROP TABLE IF EXISTS crew")
         c.execute("DROP TABLE IF EXISTS appliance")
-    # (Re)create tables if missing
-    c.execute(CREW_DETAILS_TABLE)
-    c.execute(APPLIANCE_META_TABLE)
-    c.execute(CREW_TABLE)
-    c.execute(APPLIANCE_TABLE)
+    # (Re)create tables if missing (use literals for strict static analysis)
+    c.execute(
+        """
+CREATE TABLE IF NOT EXISTS crew (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    role TEXT,
+    skills TEXT,
+    contract_hours TEXT
+);
+"""
+    )
+    c.execute(
+        """
+CREATE TABLE IF NOT EXISTS appliance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+"""
+    )
+    c.execute(
+        """
+CREATE TABLE IF NOT EXISTS crew_availability (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    crew_id INTEGER NOT NULL,
+    start_time DATETIME NOT NULL,
+    end_time DATETIME NOT NULL,
+    FOREIGN KEY (crew_id) REFERENCES crew(id)
+);
+"""
+    )
+    c.execute(
+        """
+CREATE TABLE IF NOT EXISTS appliance_availability (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    appliance_id INTEGER NOT NULL,
+    start_time DATETIME NOT NULL,
+    end_time DATETIME NOT NULL,
+    FOREIGN KEY (appliance_id) REFERENCES appliance(id)
+);
+"""
+    )
     # Idempotent indexes to prevent duplicate block inserts
     c.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_crew_block ON crew_availability(crew_id,start_time,end_time)"
@@ -407,13 +444,16 @@ def defrag_availability(db_conn=None):
 
     try:
         for table in ["crew_availability", "appliance_availability"]:
-            id_col = "crew_id" if table == "crew_availability" else "appliance_id"
-
             # Simple iterative merging logic:
             # 1. Select all blocks sorted by id and start_time
-            c.execute(
-                f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time"  # nosec B608
-            )
+            if table == "crew_availability":
+                c.execute(
+                    "SELECT id, crew_id, start_time, end_time FROM crew_availability ORDER BY crew_id, start_time"
+                )
+            else:
+                c.execute(
+                    "SELECT id, appliance_id, start_time, end_time FROM appliance_availability ORDER BY appliance_id, start_time"
+                )
             rows = c.fetchall()
 
             if not rows:
@@ -436,16 +476,28 @@ def defrag_availability(db_conn=None):
                     new_end = max(prev_end, curr_end)
                     if new_end != prev_end:
                         # Update prev block
-                        c.execute(
-                            f"UPDATE {table} SET end_time = ? WHERE id = ?",  # nosec B608
-                            (new_end, prev_row_id),
-                        )
+                        if table == "crew_availability":
+                            c.execute(
+                                "UPDATE crew_availability SET end_time = ? WHERE id = ?",
+                                (new_end, prev_row_id),
+                            )
+                        else:
+                            c.execute(
+                                "UPDATE appliance_availability SET end_time = ? WHERE id = ?",
+                                (new_end, prev_row_id),
+                            )
                         prev_end = new_end
 
                     # Delete current block
-                    c.execute(
-                        f"DELETE FROM {table} WHERE id = ?", (curr_row_id,)
-                    )  # nosec B608
+                    if table == "crew_availability":
+                        c.execute(
+                            "DELETE FROM crew_availability WHERE id = ?", (curr_row_id,)
+                        )
+                    else:
+                        c.execute(
+                            "DELETE FROM appliance_availability WHERE id = ?",
+                            (curr_row_id,),
+                        )
                     merged_count += 1
                 else:
                     # Move to next block
