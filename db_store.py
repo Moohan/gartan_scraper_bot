@@ -68,8 +68,7 @@ def init_db(db_path: str = DB_PATH, reset: bool = False):
         c.execute("DROP TABLE IF EXISTS crew")
         c.execute("DROP TABLE IF EXISTS appliance")
     # (Re)create tables if missing (use literals for strict static analysis)
-    c.execute(
-        """
+    c.execute("""
 CREATE TABLE IF NOT EXISTS crew (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
@@ -77,18 +76,14 @@ CREATE TABLE IF NOT EXISTS crew (
     skills TEXT,
     contract_hours TEXT
 );
-"""
-    )
-    c.execute(
-        """
+""")
+    c.execute("""
 CREATE TABLE IF NOT EXISTS appliance (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE
 );
-"""
-    )
-    c.execute(
-        """
+""")
+    c.execute("""
 CREATE TABLE IF NOT EXISTS crew_availability (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     crew_id INTEGER NOT NULL,
@@ -96,10 +91,8 @@ CREATE TABLE IF NOT EXISTS crew_availability (
     end_time DATETIME NOT NULL,
     FOREIGN KEY (crew_id) REFERENCES crew(id)
 );
-"""
-    )
-    c.execute(
-        """
+""")
+    c.execute("""
 CREATE TABLE IF NOT EXISTS appliance_availability (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     appliance_id INTEGER NOT NULL,
@@ -107,8 +100,7 @@ CREATE TABLE IF NOT EXISTS appliance_availability (
     end_time DATETIME NOT NULL,
     FOREIGN KEY (appliance_id) REFERENCES appliance(id)
 );
-"""
-    )
+""")
     # Idempotent indexes to prevent duplicate block inserts
     c.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_crew_block ON crew_availability(crew_id,start_time,end_time)"
