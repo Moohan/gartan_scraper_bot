@@ -443,7 +443,9 @@ def defrag_availability(db_conn=None):
                         prev_end = new_end
 
                     # Delete current block
-                    c.execute(f"DELETE FROM {table} WHERE id = ?", (curr_row_id,))  # nosec B608
+                    c.execute(
+                        f"DELETE FROM {table} WHERE id = ?", (curr_row_id,)
+                    )  # nosec B608
                     merged_count += 1
                 else:
                     # Move to next block
