@@ -292,9 +292,10 @@ def gartan_login_and_get_session():
     import time
 
     username, password = _get_credentials()
-    # Temporary debug: log credentials and cached session presence for bisecting test-order flakiness
+    # Redact username in debug logs to prevent sensitive information disclosure
+    redacted_user = f"{username[:3]}***" if username and len(username) > 3 else "***"
     print(
-        f"[DEBUG] gartan_login called: username={username!r}, password_set={'yes' if password else 'no'}, cached_session={'yes' if _authenticated_session is not None else 'no'}"
+        f"[DEBUG] gartan_login called: username={redacted_user!r}, password_set={'yes' if password else 'no'}, cached_session={'yes' if _authenticated_session is not None else 'no'}"
     )
     if not username or not password:
         log_debug("error", "Missing Gartan credentials in environment")
@@ -363,12 +364,6 @@ def _get_login_form(session):
     Returns the form element and the response object.
     """
     resp = session.get(LOGIN_URL)
-    # Some test fakes may not provide a full requests.Session-like cookies API; be defensive
-    try:
-        cookies_dict = session.cookies.get_dict()
-    except Exception:
-        cookies_dict = {}
-    log_debug("session", f"Initial cookies: {cookies_dict}")
 
     # Try lxml parser first for speed/consistency, but fall back to built-in parser when lxml is not available
     try:
@@ -474,21 +469,12 @@ def _post_login(session, post_url, payload, headers):
     Raises AuthenticationError if login fails.
     """
     encoded_payload = urlencode(payload)
-    try:
-        before_cookies = session.cookies.get_dict()
-    except Exception:
-        before_cookies = {}
-    log_debug("session", f"Cookies before login POST: {before_cookies}")
     # Some test doubles may not accept allow_redirects kw; call without extra kwargs
     login_resp = session.post(post_url, data=encoded_payload, headers=headers)
-    try:
-        after_cookies = session.cookies.get_dict()
-    except Exception:
-        after_cookies = {}
-    log_debug("session", f"Cookies after login POST: {after_cookies}")
     if login_resp.status_code != 200:
         log_debug("error", f"Login POST failed with status: {login_resp.status_code}")
-        log_debug("error", f"Response content: {login_resp.text}")
+        # Redact full response body in logs to prevent accidental disclosure of sensitive info or internal state
+        log_debug("error", f"Response body length: {len(login_resp.text)}")
         raise AuthenticationError("Login request failed - incorrect credentials")
 
     # Check for login failure indicators in response
@@ -645,7 +631,8 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
             "error",
             f"Schedule AJAX failed for {booking_date}: {schedule_resp.status_code}",
         )
-        log_debug("error", f"Response body: {schedule_resp.text}")
+        # Redact full response body in logs to prevent information disclosure
+        log_debug("error", f"Response body length: {len(schedule_resp.text)}")
     try:
         grid_html = schedule_resp.json().get("d", "")
         return grid_html
