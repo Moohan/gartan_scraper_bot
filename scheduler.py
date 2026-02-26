@@ -11,7 +11,6 @@ import sqlite3
 import subprocess
 import sys
 import time
-
 import schedule
 
 from config import Config
