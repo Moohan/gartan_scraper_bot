@@ -5,7 +5,7 @@ import logging
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from flask import Flask, jsonify, render_template_string
 
@@ -220,7 +220,8 @@ def health():
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"status": "degraded"}), 503
 
 
@@ -276,7 +277,8 @@ def root():
 def list_crew():
     try:
         return jsonify(get_crew_list())
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"error": "DB error"}), 500
 
 
@@ -288,7 +290,8 @@ def crew_avail(id):
             if not conn.execute("SELECT 1 FROM crew WHERE id = ?", (id,)).fetchone():
                 return jsonify({"error": "Not found"}), 404
         return jsonify(res["available"])
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"error": "DB error"}), 500
 
 
@@ -300,7 +303,8 @@ def crew_dur(id):
             if not conn.execute("SELECT 1 FROM crew WHERE id = ?", (id,)).fetchone():
                 return jsonify({"error": "Not found"}), 404
         return jsonify(res["duration"])
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"error": "DB error"}), 500
 
 
@@ -309,7 +313,8 @@ def crew_hrs_this(id):
     try:
         res = get_weekly_stats(id)
         return jsonify(res) if "error" not in res else (jsonify(res), 404)
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"error": "DB error"}), 500
 
 
@@ -322,7 +327,8 @@ def crew_hrs_planned(id):
             if "error" not in res
             else (jsonify(res), 404)
         )
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"error": "DB error"}), 500
 
 
@@ -335,7 +341,8 @@ def crew_contract(id):
             if "error" not in res
             else (jsonify(res), 404)
         )
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"error": "DB error"}), 500
 
 
@@ -348,7 +355,8 @@ def crew_hrs_achieved(id):
             if "error" not in res
             else (jsonify(res), 404)
         )
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"error": "DB error"}), 500
 
 
@@ -361,7 +369,8 @@ def crew_hrs_rem(id):
             if "error" not in res
             else (jsonify(res), 404)
         )
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"error": "DB error"}), 500
 
 
@@ -388,7 +397,8 @@ def app_avail(name):
                     base["available"] and check_rules(avail_ids)["rules_pass"]
                 )
             return jsonify(base["available"])
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"error": "DB error"}), 500
 
 
@@ -414,7 +424,8 @@ def app_dur(name):
                 if not (base["available"] and check_rules(avail_ids)["rules_pass"]):
                     return jsonify(None)
             return jsonify(base["duration"])
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"error": "DB error"}), 500
 
 
@@ -424,7 +435,8 @@ def station_now():
         html = fetch_station_feed_html(None)
         data = parse_station_feed_html(html) if html else None
         return jsonify(data) if data else (jsonify({"error": "Failed"}), 500)
-    except:
+    except Exception:
+        logger.exception("Endpoint error")
         return jsonify({"error": "DB error"}), 500
 
 

@@ -47,8 +47,8 @@ def cleanup_old_cache_files(cache_dir: str, today: datetime) -> None:
                 if file_date < today.replace(hour=0, minute=0, second=0, microsecond=0):
                     os.remove(os.path.join(cache_dir, fname))
                     logger.info(f"Deleted old cache file: {fname}")
-            except Exception as e:
-                logger.warning(f"Failed to process cache file {fname}: {e}")
+            except Exception:
+                logger.exception(f"Failed to process cache file {fname}")
 
 
 def main():
@@ -140,8 +140,8 @@ def main():
                     appliance_obj = result.get("appliance_availability", {})
                     daily_crew_lists.append(crew_list)
                     daily_appliance_lists.append(appliance_obj)
-                except Exception as exc:
-                    logger.error(f"Error parsing data for {date}: {exc}")
+                except Exception:
+                    logger.exception(f"Error parsing data for {date}")
 
             # Log progress
             elapsed = time.time() - start_time

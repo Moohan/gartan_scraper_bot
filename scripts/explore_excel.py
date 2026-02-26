@@ -13,5 +13,8 @@ try:
             f.write(f"Columns: {df.columns.tolist()}\n")
             f.write("First 15 rows:\n")
             f.write(df.head(15).to_string() + "\n")
-except Exception as e:
-    print("Error:", e)
+except Exception:
+    import traceback
+
+    traceback.print_exc()
+    raise

@@ -151,6 +151,7 @@ def aggregate_appliance_availability(
                 slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
                 slot_tuples.append((slot_dt, avail))
             except Exception:
+                log_debug("parsing", f"Failed to parse slot: {slot}")
                 continue
         slot_tuples.sort()
 
@@ -185,6 +186,7 @@ def _get_slot_datetimes(availability: dict) -> list[tuple[dt, bool]]:
             slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
             slot_datetimes.append((slot_dt, is_avail))
         except (ValueError, TypeError):
+            log_debug("parsing", f"Failed to parse slot: {slot}")
             continue
     slot_datetimes.sort()
     return slot_datetimes
@@ -653,6 +655,7 @@ def aggregate_crew_availability(
                 slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
                 slot_tuples.append((slot_dt, avail))
             except Exception:
+                log_debug("parsing", f"Failed to parse slot: {slot}")
                 continue
         slot_tuples.sort()
 
@@ -801,7 +804,6 @@ def _parse_availability_cells(
         elif entity_type == "appliance":
             style = cell.get("style", "")
             if isinstance(style, str):
-                style_str = style.replace(" ", "").lower()
                 if has_available_style(cell):
                     is_available = True
 

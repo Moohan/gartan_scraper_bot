@@ -1,6 +1,5 @@
 import os
 import sqlite3
-from datetime import datetime
 
 from dotenv import load_dotenv
 
@@ -20,7 +19,6 @@ load_dotenv()
 def verify():
     print("Initializing DB...")
     # Use a test database or ensure the default one is clean for the test date
-    import shutil
 
     if os.path.exists(config.db_path):
         print(f"Using existing DB: {config.db_path}")

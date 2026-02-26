@@ -11,8 +11,6 @@ import sqlite3
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
-from typing import Optional
 
 import schedule
 
@@ -176,8 +174,8 @@ def main():
 
     except KeyboardInterrupt:
         logger.info("Scheduler stopped by user")
-    except Exception as e:
-        logger.error(f"Scheduler error: {e}")
+    except Exception:
+        logger.exception("Scheduler error")
         raise
 
 
