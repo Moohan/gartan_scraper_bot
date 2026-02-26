@@ -351,9 +351,7 @@ def root():
 
         # Fetch P22P6 status
         p22p6_base = {"available": False, "duration": None}
-        app_p22 = db.execute(
-            "SELECT id FROM appliance WHERE name = 'P22P6'"
-        ).fetchone()
+        app_p22 = db.execute("SELECT id FROM appliance WHERE name = 'P22P6'").fetchone()
         if app_p22:
             query_app = """
                 SELECT end_time FROM appliance_availability
