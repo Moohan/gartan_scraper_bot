@@ -75,7 +75,7 @@ def main():
             current_date_obj = datetime.strptime(
                 date_str[4:].strip(), "%d/%m/%y"
             ).date()
-        except Exception:
+        except ValueError:
             print(f"Skipping malformed date: {date_str}")
             continue
 
