@@ -48,7 +48,9 @@ def fetch_and_cache_grid_html(
             f"No authenticated session provided for grid HTML fetch: {booking_date}",
         )
         # Try to use existing cache if it exists, even if expired, as a fallback
-        cache_file = os.path.join(cache_dir, f"grid_{booking_date.replace('/', '-')}.html")
+        cache_file = os.path.join(
+            cache_dir, f"grid_{booking_date.replace('/', '-')}.html"
+        )
         if os.path.exists(cache_file):
             try:
                 with open(cache_file, "r", encoding="utf-8") as f:
