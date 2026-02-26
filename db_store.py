@@ -2,7 +2,7 @@
 
 import sqlite3
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from config import config
 
@@ -324,6 +324,9 @@ def insert_crew_availability(crew_list: List[Dict[str, Any]], db_conn=None):
 
 def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
     """Convert appliance slot availability into blocks and insert non-duplicates."""
+    from logging_config import get_logger
+
+    logger = get_logger()
     if db_conn is not None:
         conn = db_conn
         should_close = False
@@ -341,6 +344,7 @@ def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
                 date_obj = datetime.strptime(date_str, "%d/%m/%Y").date()
                 all_dates.add(date_obj)
             except (ValueError, IndexError):
+                logger.debug(f"Failed to parse date from slot: {slot}")
                 continue
 
     min_date = min(all_dates) if all_dates else None
@@ -420,7 +424,7 @@ def defrag_availability(db_conn=None):
                 continue
 
             merged_count = 0
-            prev_id, prev_start, prev_end, prev_row_id = (
+            prev_id, _, prev_end, prev_row_id = (
                 rows[0][1],
                 rows[0][2],
                 rows[0][3],
@@ -447,7 +451,7 @@ def defrag_availability(db_conn=None):
                     merged_count += 1
                 else:
                     # Move to next block
-                    prev_id, prev_start, prev_end, prev_row_id = (
+                    prev_id, _, prev_end, prev_row_id = (
                         curr_id,
                         curr_start,
                         curr_end,

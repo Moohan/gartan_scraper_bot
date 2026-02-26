@@ -8,7 +8,6 @@ Runs both the periodic scheduler and API server in a single container
 import logging
 import os
 import signal
-import subprocess
 import sys
 import threading
 import time
@@ -46,8 +45,8 @@ def signal_handler(signum, frame):
                         f"Process {process.name} did not terminate gracefully"
                     )
                     process.kill()
-        except Exception as e:
-            logger.error(f"Error terminating process {process.name}: {e}")
+        except Exception:
+            logger.exception(f"Error terminating process {process.name}")
 
     logger.info("Shutdown complete")
     sys.exit(0)

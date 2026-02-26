@@ -64,3 +64,9 @@ repro_blocks.py
 # Tools
 tools/
 gartan_availability.db*
+
+# desloppify
+.desloppify/
+scorecard.png
+findings.json
+query.json
