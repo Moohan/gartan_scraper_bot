@@ -15,6 +15,5 @@ try:
             f.write(df.head(15).to_string() + "\n")
 except Exception:
     import traceback
-
     traceback.print_exc()
     raise

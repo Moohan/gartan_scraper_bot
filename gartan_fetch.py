@@ -42,6 +42,21 @@ def fetch_and_cache_grid_html(
     """
     import os
 
+    if not session:
+        log_debug(
+            "error",
+            f"No authenticated session provided for grid HTML fetch: {booking_date}",
+        )
+        # Try to use existing cache if it exists, even if expired, as a fallback
+        cache_file = os.path.join(cache_dir, f"grid_{booking_date.replace('/', '-')}.html")
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    return f.read()
+            except Exception:
+                pass
+        return ""
+
     cache_file = os.path.join(cache_dir, f"grid_{booking_date.replace('/', '-')}.html")
     cache_exists = os.path.exists(cache_file)
     grid_html = None
@@ -618,6 +633,12 @@ def _post_schedule_request(session, schedule_url, payload, headers, booking_date
     """
     Perform the AJAX request to fetch the schedule grid HTML for a given date.
     """
+    if not session:
+        log_debug(
+            "error", f"Cannot post schedule request without session for {booking_date}"
+        )
+        return ""
+
     # Manually construct the payload string to match Gartan's frontend JS exactly (unquoted keys, single-quoted values)
     # See js_fsi3.js line 275
     raw_payload = (
