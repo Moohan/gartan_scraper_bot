@@ -414,6 +414,18 @@ class TestAPIEndpoints:
         response = self.client.get("/health")
         assert response.status_code == 200
 
+    def test_security_headers(self):
+        """Test that security headers are present and correct."""
+        response = self.client.get("/health")
+        assert response.status_code == 200
+
+        headers = response.headers
+        assert headers["X-Content-Type-Options"] == "nosniff"
+        assert headers["X-Frame-Options"] == "DENY"
+        assert "default-src 'self'" in headers["Content-Security-Policy"]
+        assert headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+        assert "max-age=31536000" in headers["Strict-Transport-Security"]
+
     def test_database_connection_error_handling(self):
         """Test behavior when database is unavailable."""
         # Remove the database file to simulate connection error

@@ -81,12 +81,21 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
+    # Use static queries for whitelisted tables to prevent SQL injection
     with get_db() as conn:
-        curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-            (entity_id, now, now),
-        ).fetchone()
+        if table == "crew_availability":
+            curr = conn.execute(
+                "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+                (entity_id, now, now),
+            ).fetchone()
+        elif table == "appliance_availability":
+            curr = conn.execute(
+                "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+                (entity_id, now, now),
+            ).fetchone()
+        else:
+            return {"available": False, "duration": None, "end_time_display": None}
+
         if not curr:
             return {"available": False, "duration": None, "end_time_display": None}
 
@@ -161,7 +170,7 @@ def check_rules(available_ids: List[int]) -> Dict:
     with get_db() as conn:
         placeholders = ",".join("?" * len(available_ids))
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids  # nosec B608
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -502,6 +511,10 @@ def add_security_headers(response):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
     )
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
+    )
     return response
 
 
@@ -561,4 +574,4 @@ DASHBOARD_TEMPLATE = """
 """
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))  # nosec B104
