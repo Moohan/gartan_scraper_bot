@@ -114,9 +114,7 @@ class TestAPIEndpoints:
         assert response.headers["X-Content-Type-Options"] == "nosniff"
         assert response.headers["X-Frame-Options"] == "DENY"
         assert "Content-Security-Policy" in response.headers
-        assert (
-            response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
-        )
+        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
         assert "Strict-Transport-Security" in response.headers
 
     def test_root_dashboard_endpoint(self):
