@@ -502,6 +502,10 @@ def add_security_headers(response):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
     )
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
+    )
     return response
 
 
