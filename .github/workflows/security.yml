@@ -37,8 +37,8 @@ jobs:
         
     - name: Run safety check
       run: |
-        safety scan --output json > safety-report.json || true
-        safety scan
+        safety scan --key ${{ secrets.SAFETY_API_KEY }} --output json > safety-report.json || true
+        safety scan --key ${{ secrets.SAFETY_API_KEY }}
         
     - name: Run pip-audit
       run: |

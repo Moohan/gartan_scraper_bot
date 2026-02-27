@@ -12,7 +12,7 @@ pytest==9.0.2
 pytest-xdist==3.6.1
 
 # Remove pylint as it might have issues too, but let's keep it for now if it installs
-pylint==4.0.4
+pylint==4.0.5
 
 # Production server
 gunicorn==23.0.0
