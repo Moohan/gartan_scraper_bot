@@ -29,7 +29,9 @@ sqlite3.register_converter("datetime", lambda b: datetime.fromisoformat(b.decode
 def get_db():
     db = getattr(g, "_database", None)
     if db is None:
-        db = g._database = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+        db = g._database = sqlite3.connect(
+            DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES
+        )
         db.row_factory = sqlite3.Row
     return db
 
