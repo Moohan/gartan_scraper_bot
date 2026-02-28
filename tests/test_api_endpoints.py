@@ -442,9 +442,7 @@ class TestAPIEndpoints:
             response.headers["Strict-Transport-Security"]
             == "max-age=31536000; includeSubDomains"
         )
-        assert (
-            response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
-        )
+        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
 
 
 if __name__ == "__main__":
