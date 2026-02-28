@@ -432,6 +432,18 @@ class TestAPIEndpoints:
             503,
         ]  # Various error responses acceptable
 
+    def test_security_headers(self):
+        """Test that security headers are present in the response."""
+        response = self.client.get("/health")
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert "default-src 'self'" in response.headers["Content-Security-Policy"]
+        assert (
+            response.headers["Strict-Transport-Security"]
+            == "max-age=31536000; includeSubDomains"
+        )
+        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
