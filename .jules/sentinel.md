@@ -1,0 +1,4 @@
+## 2026-03-01 - Refactoring SQL to Satisfy Strict Static Analysis
+**Vulnerability:** Bandit and Sourcery flag SQL injection risks (B608) for any f-string used in database execution, even if the values are internally controlled (e.g., hardcoded table names).
+**Learning:** While `# nosec B608` can suppress warnings, strict static analysis tools often block all string concatenation in raw SQL. Refactoring to use explicit query strings for each whitelisted table/identifier and avoid dynamic placeholder generation (e.g., for `IN` clauses) ensures compliance and improves security.
+**Prevention:** Avoid f-strings and string concatenation in SQL queries. Use conditional logic to select from static query strings for different tables, and perform individual lookups or use established ORM patterns when dynamic queries are required.
