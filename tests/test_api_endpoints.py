@@ -108,6 +108,20 @@ class TestAPIEndpoints:
         assert "timestamp" in data
         assert "database" in data
 
+    def test_security_headers(self):
+        """Test that security headers are present on the /health endpoint."""
+        response = self.client.get("/health")
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert "default-src 'self'" in response.headers["Content-Security-Policy"]
+        assert (
+            response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+        )
+        assert (
+            response.headers["Strict-Transport-Security"]
+            == "max-age=31536000; includeSubDomains"
+        )
+
     def test_root_dashboard_endpoint(self):
         """Test / (dashboard) endpoint."""
         # Insert some test data

@@ -84,7 +84,7 @@ def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
     col = "crew_id" if table == "crew_availability" else "appliance_id"
     with get_db() as conn:
         curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",  # nosec B608
             (entity_id, now, now),
         ).fetchone()
         if not curr:
@@ -161,7 +161,8 @@ def check_rules(available_ids: List[int]) -> Dict:
     with get_db() as conn:
         placeholders = ",".join("?" * len(available_ids))
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",  # nosec B608
+            available_ids,
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -501,6 +502,10 @@ def add_security_headers(response):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
+    )
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
     )
     return response
 
