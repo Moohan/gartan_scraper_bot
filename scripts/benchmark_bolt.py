@@ -1,12 +1,13 @@
-import time
-import statistics
-import sys
 import os
 import sqlite3
+import statistics
+import sys
+import time
 from datetime import datetime, timedelta
 
 # Mocking parts of api_server to work with our test DB
 import api_server
+
 
 def setup_benchmark_db(db_path):
     if os.path.exists(db_path):
@@ -14,10 +15,16 @@ def setup_benchmark_db(db_path):
 
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute("CREATE TABLE crew (id INTEGER PRIMARY KEY, name TEXT, role TEXT, skills TEXT, contract_hours TEXT)")
-    c.execute("CREATE TABLE crew_availability (id INTEGER PRIMARY KEY, crew_id INTEGER, start_time DATETIME, end_time DATETIME)")
+    c.execute(
+        "CREATE TABLE crew (id INTEGER PRIMARY KEY, name TEXT, role TEXT, skills TEXT, contract_hours TEXT)"
+    )
+    c.execute(
+        "CREATE TABLE crew_availability (id INTEGER PRIMARY KEY, crew_id INTEGER, start_time DATETIME, end_time DATETIME)"
+    )
     c.execute("CREATE TABLE appliance (id INTEGER PRIMARY KEY, name TEXT)")
-    c.execute("CREATE TABLE appliance_availability (id INTEGER PRIMARY KEY, appliance_id INTEGER, start_time DATETIME, end_time DATETIME)")
+    c.execute(
+        "CREATE TABLE appliance_availability (id INTEGER PRIMARY KEY, appliance_id INTEGER, start_time DATETIME, end_time DATETIME)"
+    )
 
     # Insert 50 crew members
     crew_data = []
@@ -40,22 +47,24 @@ def setup_benchmark_db(db_path):
     conn.commit()
     conn.close()
 
+
 def benchmark_root(db_path, iterations=100):
     api_server.DB_PATH = db_path
 
     # Warm up
     with api_server.app.test_client() as client:
-        client.get('/')
+        client.get("/")
 
     latencies = []
     for _ in range(iterations):
         start_time = time.perf_counter()
         with api_server.app.test_client() as client:
-            client.get('/')
+            client.get("/")
         end_time = time.perf_counter()
         latencies.append((end_time - start_time) * 1000)
 
     return latencies
+
 
 if __name__ == "__main__":
     db_path = "benchmark.db"
