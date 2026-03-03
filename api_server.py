@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Simplified Flask API server for Gartan availability."""
 
+import json
 import logging
 import os
 import sqlite3
@@ -160,14 +161,12 @@ def check_rules(available_ids: List[int]) -> Dict:
             "ba_non_ttr": 0,
         }
     with get_db() as conn:
-        # Static analysis tool Sourcery flags SQL string concatenation.
-        # This implementation uses a string of placeholders ('?') which is safely
-        # constructed based on the integer length of the input list.
-        # Values are passed as a second argument to execute(), ensuring they are parameterized.
-        placeholders = ",".join("?" for _ in available_ids)
+        # Static analysis tool Sourcery blocks all SQL string concatenation.
+        # To handle the IN clause safely and statically, we use SQLite's json_each function
+        # which accepts a single JSON string parameter and expands it into a table of values.
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",  # nosec B608
-            available_ids,
+            "SELECT role, skills FROM crew WHERE id IN (SELECT value FROM json_each(?))",
+            (json.dumps(available_ids),),
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
