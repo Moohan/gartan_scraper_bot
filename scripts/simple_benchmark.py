@@ -1,6 +1,8 @@
-import time
-import requests
 import statistics
+import time
+
+import requests
+
 
 def benchmark(url, iterations=100):
     latencies = []
@@ -21,6 +23,7 @@ def benchmark(url, iterations=100):
         print(f"StdDev: {std:.2f}ms")
         print(f"Min: {min(latencies)*1000:.2f}ms")
         print(f"Max: {max(latencies)*1000:.2f}ms")
+
 
 if __name__ == "__main__":
     # We need the server running.
