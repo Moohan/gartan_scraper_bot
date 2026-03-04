@@ -413,9 +413,7 @@ def defrag_availability(db_conn=None):
         for table in ["crew_availability", "appliance_availability"]:
             if table == "crew_availability":
                 select_query = "SELECT id, crew_id, start_time, end_time FROM crew_availability ORDER BY crew_id, start_time"
-                update_query = (
-                    "UPDATE crew_availability SET end_time = ? WHERE id = ?"
-                )
+                update_query = "UPDATE crew_availability SET end_time = ? WHERE id = ?"
                 delete_query = "DELETE FROM crew_availability WHERE id = ?"
                 id_col_idx = 1
             else:
