@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, g, jsonify, render_template_string
 
 from config import config
 from gartan_fetch import fetch_station_feed_html
@@ -27,9 +27,19 @@ sqlite3.register_converter("datetime", lambda b: datetime.fromisoformat(b.decode
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Get or create a database connection for the current request."""
+    if "db" not in g:
+        g.db = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(error):
+    """Close the database connection at the end of the request."""
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
 
 
 def parse_dt(val):
@@ -72,6 +82,18 @@ def format_hours(minutes: Optional[int]) -> Optional[str]:
     if minutes is None or minutes <= 0:
         return None
     return f"{minutes / 60.0:.2f}h"
+
+
+def format_availability_display(end_time: datetime, now: datetime) -> str:
+    """Format the availability 'Until' string for consistent UI display."""
+    display = end_time.strftime("%H:%M")
+    if end_time.date() == now.date():
+        display += " today"
+    elif end_time.date() == (now + timedelta(days=1)).date():
+        display += " tomorrow"
+    else:
+        display += end_time.strftime(" on %d/%m")
+    return display
 
 
 def get_crew_list() -> List[Dict]:
@@ -150,35 +172,24 @@ def get_weekly_stats(crew_id: int) -> Dict:
         }
 
 
-def check_rules(available_ids: List[int]) -> Dict:
-    if not available_ids:
-        return {
-            "rules_pass": False,
-            "rules": {},
-            "skill_counts": {"TTR": 0, "LGV": 0, "BA": 0},
-            "ba_non_ttr": 0,
-        }
-    with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
-        rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids
-        ).fetchall()
-
+def check_rules_from_data(crew_data: List[Dict]) -> Dict:
+    """Check business rules using pre-fetched crew data to avoid extra DB queries."""
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
-    for r in rows:
-        c_skills = (r["skills"] or "").split()
-        role = r["role"]
+    count = 0
+
+    for crew in crew_data:
+        if not crew.get("available"):
+            continue
+        count += 1
+        c_skills = (crew.get("skills") or "").split()
+        role = crew.get("role")
 
         # Enhanced skill mapping
-        # 1. LGV mapping include ERD
         if "LGV" in c_skills or "ERD" in c_skills:
             skills["LGV"] += 1
-
-        # 2. TTR mapping include IC or CC role
         if "TTR" in c_skills or "IC" in c_skills or role in ["FFC", "CC", "WC", "CM"]:
             skills["TTR"] += 1
-
         if "BA" in c_skills:
             skills["BA"] += 1
             if (
@@ -191,7 +202,7 @@ def check_rules(available_ids: List[int]) -> Dict:
                 ffc_ba = True
 
     rules = {
-        "total_crew_ok": len(rows) >= 4,
+        "total_crew_ok": count >= 4,
         "ttr_present": skills["TTR"] > 0,
         "lgv_present": skills["LGV"] > 0,
         "ba_non_ttr_ok": ba_non_ttr >= 2,
@@ -203,6 +214,23 @@ def check_rules(available_ids: List[int]) -> Dict:
         "skill_counts": skills,
         "ba_non_ttr": ba_non_ttr,
     }
+
+
+def check_rules(available_ids: List[int]) -> Dict:
+    if not available_ids:
+        return {
+            "rules_pass": False,
+            "rules": {},
+            "skill_counts": {"TTR": 0, "LGV": 0, "BA": 0},
+            "ba_non_ttr": 0,
+        }
+    with get_db() as conn:
+        placeholders = ",".join("?" * len(available_ids))
+        # Use # nosec B608 because placeholders are generated from integer IDs list length
+        rows = conn.execute(
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids  # nosec B608
+        ).fetchall()
+    return check_rules_from_data([{"role": r["role"], "skills": r["skills"], "available": True} for r in rows])
 
 
 # --- Routes ---
@@ -229,19 +257,43 @@ def health():
 def root():
     try:
         now = datetime.now()
-        crew = get_crew_list()
         crew_data = []
-        for c in crew:
-            avail = get_availability(c["id"], "crew_availability", now)
-            crew_data.append({**c, **avail})
+        with get_db() as conn:
+            # Batch fetch all crew and their current availability in one JOIN query
+            # Uses MAX(end_time) and GROUP BY to ensure we get the latest window if overlaps exist
+            rows = conn.execute(
+                """
+                SELECT c.*, MAX(ca.end_time) as end_time
+                FROM crew c
+                LEFT JOIN crew_availability ca ON c.id = ca.crew_id
+                    AND ca.start_time <= ? AND ca.end_time > ?
+                GROUP BY c.id
+                ORDER BY c.name
+                """,
+                (now, now),
+            ).fetchall()
+
+            for r in rows:
+                c = dict(r)
+                if c["end_time"]:
+                    end_time = parse_dt(c["end_time"])
+                    duration_min = int((end_time - now).total_seconds() / 60)
+                    c.update({
+                        "available": True,
+                        "duration": format_hours(duration_min),
+                        "end_time_display": format_availability_display(end_time, now)
+                    })
+                else:
+                    c.update({"available": False, "duration": None, "end_time_display": None})
+                crew_data.append(c)
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
         crew_data.sort(
             key=lambda x: (not x["available"], ranks.get(x["role"], 99), x["name"])
         )
 
-        avail_ids = [c["id"] for c in crew_data if c["available"]]
-        rules_res = check_rules(avail_ids)
+        rules_res = check_rules_from_data(crew_data)
+        total_available = sum(1 for c in crew_data if c["available"])
 
         p22p6_base = {"available": False, "duration": None}
         with get_db() as conn:
@@ -259,7 +311,7 @@ def root():
             DASHBOARD_TEMPLATE,
             crew_data=crew_data,
             now=now,
-            total_available=len(avail_ids),
+            total_available=total_available,
             p22p6_avail=p22p6_avail,
             p22p6_duration=p22p6_base["duration"] if p22p6_avail else None,
             rules=rules_res["rules"],
