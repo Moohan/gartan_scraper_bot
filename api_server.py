@@ -103,12 +103,12 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
+    if table == "crew_availability":
+        query = "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    else:
+        query = "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
     with get_db() as conn:
-        curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-            (entity_id, now, now),
-        ).fetchone()
+        curr = conn.execute(query, (entity_id, now, now)).fetchone()
         if not curr:
             return {"available": False, "duration": None, "end_time_display": None}
 
@@ -225,15 +225,12 @@ def check_rules(available_ids: List[int]) -> Dict:
             "ba_non_ttr": 0,
         }
     with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
+        placeholders = ",".join("?" for _ in available_ids)
         # Use # nosec B608 because placeholders are generated from integer IDs list length
-        rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
-            available_ids,  # nosec B608
-        ).fetchall()
-    return check_rules_from_data(
-        [{"role": r["role"], "skills": r["skills"], "available": True} for r in rows]
-    )
+        # sourcery skip: sql-injection
+        query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
+        rows = conn.execute(query, available_ids).fetchall()
+    return check_rules_from_data([{"role": r["role"], "skills": r["skills"], "available": True} for r in rows])
 
 
 # --- Routes ---
@@ -281,19 +278,13 @@ def root():
                 if c["end_time"]:
                     end_time = parse_dt(c["end_time"])
                     duration_min = int((end_time - now).total_seconds() / 60)
-                    c.update(
-                        {
-                            "available": True,
-                            "duration": format_hours(duration_min),
-                            "end_time_display": format_availability_display(
-                                end_time, now
-                            ),
-                        }
-                    )
+                    c.update({
+                        "available": True,
+                        "duration": format_hours(duration_min),
+                        "end_time_display": format_availability_display(end_time, now)
+                    })
                 else:
-                    c.update(
-                        {"available": False, "duration": None, "end_time_display": None}
-                    )
+                    c.update({"available": False, "duration": None, "end_time_display": None})
                 crew_data.append(c)
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
