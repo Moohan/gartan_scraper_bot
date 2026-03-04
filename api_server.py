@@ -227,14 +227,10 @@ def check_rules(available_ids: List[int]) -> Dict:
     with get_db() as conn:
         placeholders = ",".join("?" for _ in available_ids)
         # Use # nosec B608 because placeholders are generated from integer IDs list length
+        query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"
         # sourcery skip: sql-injection
-        query = (
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
-        )
-        rows = conn.execute(query, available_ids).fetchall()
-    return check_rules_from_data(
-        [{"role": r["role"], "skills": r["skills"], "available": True} for r in rows]
-    )
+        rows = conn.execute(query, available_ids).fetchall()  # nosec B608
+    return check_rules_from_data([{"role": r["role"], "skills": r["skills"], "available": True} for r in rows])
 
 
 # --- Routes ---
@@ -282,19 +278,13 @@ def root():
                 if c["end_time"]:
                     end_time = parse_dt(c["end_time"])
                     duration_min = int((end_time - now).total_seconds() / 60)
-                    c.update(
-                        {
-                            "available": True,
-                            "duration": format_hours(duration_min),
-                            "end_time_display": format_availability_display(
-                                end_time, now
-                            ),
-                        }
-                    )
+                    c.update({
+                        "available": True,
+                        "duration": format_hours(duration_min),
+                        "end_time_display": format_availability_display(end_time, now)
+                    })
                 else:
-                    c.update(
-                        {"available": False, "duration": None, "end_time_display": None}
-                    )
+                    c.update({"available": False, "duration": None, "end_time_display": None})
                 crew_data.append(c)
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
