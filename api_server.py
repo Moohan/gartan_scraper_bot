@@ -163,7 +163,7 @@ def check_rules(available_ids: List[int]) -> Dict:
         placeholders = ",".join("?" * len(available_ids))
         # Safely using parameterized IN clause with generated placeholders
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",  # nosec B608
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",  # nosec B608 # sourcery skip: sql-injection
             available_ids,
         ).fetchall()
 
