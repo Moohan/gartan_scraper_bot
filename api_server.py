@@ -500,9 +500,7 @@ def get_crew_duration_data(id):
 def get_appliance_available_data(name):
     now = datetime.now()
     conn = get_db()
-    app = conn.execute(
-        "SELECT id FROM appliance WHERE name = ?", (name,)
-    ).fetchone()
+    app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
     if not app:
         return {"error": "Not found"}
     base = get_availability(app["id"], "appliance_availability", now)
