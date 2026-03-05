@@ -1,9 +1,11 @@
-import time
 import os
 import sqlite3
+import time
 from datetime import datetime, timedelta
+
 import api_server
 from api_server import app
+
 
 def setup_benchmark_db(db_path):
     if os.path.exists(db_path):
@@ -47,19 +49,26 @@ def setup_benchmark_db(db_path):
     for i in range(50):
         name = f"Crew Member {i}"
         role = roles[i % len(roles)]
-        conn.execute("INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-                     (name, role, "BA TTR LGV", "42 hours"))
+        conn.execute(
+            "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
+            (name, role, "BA TTR LGV", "42 hours"),
+        )
         crew_id = i + 1
         # Make all of them available
-        conn.execute("INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-                     (crew_id, start_time.isoformat(), end_time.isoformat()))
+        conn.execute(
+            "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
+            (crew_id, start_time.isoformat(), end_time.isoformat()),
+        )
 
     conn.execute("INSERT INTO appliance (name) VALUES ('P22P6')")
-    conn.execute("INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (1, ?, ?)",
-                 (start_time.isoformat(), end_time.isoformat()))
+    conn.execute(
+        "INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (1, ?, ?)",
+        (start_time.isoformat(), end_time.isoformat()),
+    )
 
     conn.commit()
     conn.close()
+
 
 def run_benchmark():
     db_path = "benchmark.db"
@@ -88,6 +97,7 @@ def run_benchmark():
 
     if os.path.exists(db_path):
         os.remove(db_path)
+
 
 if __name__ == "__main__":
     run_benchmark()
