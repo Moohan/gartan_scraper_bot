@@ -77,7 +77,7 @@ def run_api_server():
         from api_server import app
 
         port = int(os.environ.get("PORT", 5000))
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)  # nosec B104
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")
