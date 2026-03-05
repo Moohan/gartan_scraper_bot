@@ -223,7 +223,8 @@ def check_rules(available_ids: List[int]) -> Dict:
     # Bandit: B608 - SQL injection check (placeholders are generated but values are safe integer IDs)
     # Sourcery skip: sql-injection
     rows = conn.execute(
-        f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids  # nosec B608 # sourcery skip: sql-injection
+        f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
+        available_ids,  # nosec B608 # sourcery skip: sql-injection
     ).fetchall()
     return check_rules_from_data([dict(r) for r in rows])
 
@@ -503,9 +504,7 @@ def get_crew_duration_data(id):
 def get_appliance_available_data(name):
     now = datetime.now()
     conn = get_db()
-    app = conn.execute(
-        "SELECT id FROM appliance WHERE name = ?", (name,)
-    ).fetchone()
+    app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
     if not app:
         return {"error": "Not found"}
     base = get_availability(app["id"], "appliance_availability", now)
