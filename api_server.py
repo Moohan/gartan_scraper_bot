@@ -153,7 +153,7 @@ def get_weekly_stats(crew_id: int) -> Dict:
         }
 
 
-def check_rules(available_ids: List[int]) -> Dict:
+def check_rules(available_ids: List[int]) -> Dict:  # sourcery skip: sql-injection, avoid-sql-string-concatenation
     if not available_ids:
         return {
             "rules_pass": False,
@@ -163,10 +163,8 @@ def check_rules(available_ids: List[int]) -> Dict:
         }
     with get_db() as conn:
         placeholders = ",".join("?" for _ in available_ids)
-        sql = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # sourcery skip: sql-injection
-        rows = conn.execute(
-            sql, available_ids
-        ).fetchall()  # nosec B608 # sourcery skip: sql-injection
+        sql = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"
+        rows = conn.execute(sql, available_ids).fetchall()  # nosec B608
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
