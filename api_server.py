@@ -100,12 +100,17 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
     conn = get_db()
-    curr = conn.execute(
-        f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-        (entity_id, now, now),
-    ).fetchone()
+    if table == "crew_availability":
+        curr = conn.execute(
+            "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+            (entity_id, now, now),
+        ).fetchone()
+    else:
+        curr = conn.execute(
+            "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+            (entity_id, now, now),
+        ).fetchone()
     if not curr:
         return {"available": False, "duration": None, "end_time_display": None}
 
@@ -218,8 +223,7 @@ def check_rules(available_ids: List[int]) -> Dict:
     # Bandit: B608 - SQL injection check (placeholders are generated but values are safe integer IDs)
     # Sourcery skip: sql-injection
     rows = conn.execute(
-        f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
-        available_ids,  # nosec B608
+        f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids  # nosec B608 # sourcery skip: sql-injection
     ).fetchall()
     return check_rules_from_data([dict(r) for r in rows])
 
@@ -499,7 +503,9 @@ def get_crew_duration_data(id):
 def get_appliance_available_data(name):
     now = datetime.now()
     conn = get_db()
-    app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
+    app = conn.execute(
+        "SELECT id FROM appliance WHERE name = ?", (name,)
+    ).fetchone()
     if not app:
         return {"error": "Not found"}
     base = get_availability(app["id"], "appliance_availability", now)
