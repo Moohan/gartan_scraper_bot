@@ -211,6 +211,7 @@ def check_rules_from_data(crew_data: List[Dict]) -> Dict:
 
 
 def check_rules(available_ids: List[int]) -> Dict:
+    """Check rules for a list of crew IDs by filtering all crew data in memory."""
     if not available_ids:
         return {
             "rules_pass": False,
@@ -218,17 +219,10 @@ def check_rules(available_ids: List[int]) -> Dict:
             "skill_counts": {"TTR": 0, "LGV": 0, "BA": 0},
             "ba_non_ttr": 0,
         }
-    conn = get_db()
-
-    # To satisfy security analysis tools while maintaining performance for dynamic IN clauses:
-    # 1. Use parameterized placeholders
-    # 2. Add explicit skip directives on the execution line
-    placeholders = ",".join("?" for _ in available_ids)
-    query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # sourcery skip: sql-injection
-    rows = conn.execute(
-        query, available_ids
-    ).fetchall()  # nosec B608 # sourcery skip: sql-injection
-    return check_rules_from_data([dict(r) for r in rows])
+    # Fetch all crew (cached/reused connection) and filter in memory to avoid dynamic SQL
+    all_crew = get_crew_list()
+    avail_crew = [c for c in all_crew if c["id"] in available_ids]
+    return check_rules_from_data(avail_crew)
 
 
 # --- Routes ---
@@ -506,7 +500,9 @@ def get_crew_duration_data(id):
 def get_appliance_available_data(name):
     now = datetime.now()
     conn = get_db()
-    app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
+    app = conn.execute(
+        "SELECT id FROM appliance WHERE name = ?", (name,)
+    ).fetchone()
     if not app:
         return {"error": "Not found"}
     base = get_availability(app["id"], "appliance_availability", now)
