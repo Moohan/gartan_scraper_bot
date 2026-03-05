@@ -153,7 +153,9 @@ def get_weekly_stats(crew_id: int) -> Dict:
         }
 
 
-def check_rules(available_ids: List[int]) -> Dict:  # sourcery skip: sql-injection, avoid-sql-string-concatenation
+def check_rules(
+    available_ids: List[int],
+) -> Dict:  # sourcery skip: sql-injection, avoid-sql-string-concatenation
     if not available_ids:
         return {
             "rules_pass": False,
