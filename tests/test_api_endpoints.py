@@ -391,9 +391,7 @@ class TestAPIEndpoints:
         assert response.headers["X-Content-Type-Options"] == "nosniff"
         assert response.headers["X-Frame-Options"] == "DENY"
         assert "default-src 'self'" in response.headers["Content-Security-Policy"]
-        assert (
-            response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
-        )
+        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
 
     def test_error_handling_robustness(self):
         """Test various error conditions and edge cases."""
