@@ -416,7 +416,7 @@ def defrag_availability(db_conn=None):
             # Simple iterative merging logic:
             # 1. Select all blocks sorted by id and start_time
             c.execute(
-                f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time"  # nosec B608
+                f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time"  # nosec B608 # sourcery skip: sql-injection
             )
             rows = c.fetchall()
 
@@ -441,15 +441,13 @@ def defrag_availability(db_conn=None):
                     if new_end != prev_end:
                         # Update prev block
                         c.execute(
-                            f"UPDATE {table} SET end_time = ? WHERE id = ?",  # nosec B608
+                            f"UPDATE {table} SET end_time = ? WHERE id = ?",  # nosec B608 # sourcery skip: sql-injection
                             (new_end, prev_row_id),
                         )
                         prev_end = new_end
 
                     # Delete current block
-                    c.execute(
-                        f"DELETE FROM {table} WHERE id = ?", (curr_row_id,)
-                    )  # nosec B608
+                    c.execute(f"DELETE FROM {table} WHERE id = ?", (curr_row_id,))  # nosec B608 # sourcery skip: sql-injection
                     merged_count += 1
                 else:
                     # Move to next block
