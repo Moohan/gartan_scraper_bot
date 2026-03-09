@@ -274,18 +274,18 @@ def root():
             if c["end_time"]:
                 end_time = parse_dt(c["end_time"])
                 duration_min = int((end_time - now).total_seconds() / 60)
-                c.update({
-                    "available": True,
-                    "duration": format_hours(duration_min),
-                    "end_time_display": format_availability_display(end_time, now)
-                })
+                c.update(
+                    {
+                        "available": True,
+                        "duration": format_hours(duration_min),
+                        "end_time_display": format_availability_display(end_time, now),
+                    }
+                )
                 avail_ids.append(c["id"])
             else:
-                c.update({
-                    "available": False,
-                    "duration": None,
-                    "end_time_display": None
-                })
+                c.update(
+                    {"available": False, "duration": None, "end_time_display": None}
+                )
             crew_data.append(c)
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
@@ -305,16 +305,13 @@ def root():
             WHERE a.name = 'P22P6' AND aa.start_time <= ? AND aa.end_time > ?
             LIMIT 1
             """,
-            (now, now)
+            (now, now),
         ).fetchone()
 
         if app_p22:
             end_time = parse_dt(app_p22["end_time"])
             duration_min = int((end_time - now).total_seconds() / 60)
-            p22p6_base = {
-                "available": True,
-                "duration": format_hours(duration_min)
-            }
+            p22p6_base = {"available": True, "duration": format_hours(duration_min)}
 
         p22p6_avail = p22p6_base["available"] and rules_res["rules_pass"]
 
