@@ -37,8 +37,13 @@ jobs:
         
     - name: Run safety check
       run: |
-        safety scan --key ${{ secrets.SAFETY_API_KEY }} --output json > safety-report.json || true
-        safety scan --key ${{ secrets.SAFETY_API_KEY }}
+        if [ -n "${{ secrets.SAFETY_API_KEY }}" ]; then
+          safety scan --key ${{ secrets.SAFETY_API_KEY }} --output json > safety-report.json || true
+          safety scan --key ${{ secrets.SAFETY_API_KEY }}
+        else
+          echo "SAFETY_API_KEY not set, skipping safety scan"
+          echo "{}" > safety-report.json
+        fi
         
     - name: Run pip-audit
       run: |
