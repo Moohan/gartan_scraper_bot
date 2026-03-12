@@ -268,7 +268,11 @@ def root():
         for r in rows:
             c = dict(r)
             is_avail = c["end_time"] is not None
-            avail_info = {"available": False, "duration": None, "end_time_display": None}
+            avail_info = {
+                "available": False,
+                "duration": None,
+                "end_time_display": None,
+            }
 
             if is_avail:
                 end_time = parse_dt(c["end_time"])

@@ -1,7 +1,8 @@
-
 import sqlite3
 from datetime import datetime, timedelta
-from db_store import init_db, insert_crew_details, insert_crew_availability
+
+from db_store import init_db, insert_crew_availability, insert_crew_details
+
 
 def setup_benchmark_data():
     DB_PATH = "data/benchmark.db"
@@ -11,12 +12,14 @@ def setup_benchmark_data():
     # Insert 50 crew members
     crew_list = []
     for i in range(50):
-        crew_list.append({
-            "name": f"Crew Member {i}",
-            "role": ["WC", "CM", "CC", "FFC", "FFD", "FFT"][i % 6],
-            "skills": "TTR LGV BA" if i % 2 == 0 else "BA",
-            "contract_hours": "42.0 hours"
-        })
+        crew_list.append(
+            {
+                "name": f"Crew Member {i}",
+                "role": ["WC", "CM", "CC", "FFC", "FFD", "FFT"][i % 6],
+                "skills": "TTR LGV BA" if i % 2 == 0 else "BA",
+                "contract_hours": "42.0 hours",
+            }
+        )
     insert_crew_details(crew_list, db_conn=conn)
 
     # Insert availability for each
@@ -35,13 +38,11 @@ def setup_benchmark_data():
 
     crew_avail_list = []
     for i in range(50):
-        crew_avail_list.append({
-            "name": f"Crew Member {i}",
-            "availability": slots
-        })
+        crew_avail_list.append({"name": f"Crew Member {i}", "availability": slots})
     insert_crew_availability(crew_avail_list, db_conn=conn)
     conn.close()
     return DB_PATH
+
 
 if __name__ == "__main__":
     path = setup_benchmark_data()
