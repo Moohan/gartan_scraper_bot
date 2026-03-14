@@ -374,7 +374,9 @@ class TestAPIEndpoints:
         assert response.headers["X-Content-Type-Options"] == "nosniff"
         assert response.headers["X-Frame-Options"] == "DENY"
         assert "default-src 'self'" in response.headers["Content-Security-Policy"]
-        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+        assert (
+            response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+        )
 
     def test_content_type_headers(self):
         """Test that endpoints return correct content types."""
