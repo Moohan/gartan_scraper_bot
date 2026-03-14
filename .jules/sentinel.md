@@ -1,0 +1,4 @@
+## 2026-03-14 - Hardened SQL Query Patterns
+**Vulnerability:** Static analysis (Bandit B608) flagged string-based SQL query construction using f-strings for table and column names.
+**Learning:** While the identifiers were determined by internal application logic and not direct user input, using f-strings for SQL construction triggers high-severity warnings in security scanners and creates a maintenance risk where future changes might inadvertently introduce unsanitized input.
+**Prevention:** Refactor dynamic queries into static, hardcoded strings within conditional blocks where table and column names are known literals. For dynamic `IN` clauses with safe integer lists, use parameterized placeholders (`?`) and explicitly suppress the scanner warning with `# nosec B608` only after verifying the source of the input.
