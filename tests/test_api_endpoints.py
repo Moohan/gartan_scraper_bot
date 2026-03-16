@@ -384,6 +384,14 @@ class TestAPIEndpoints:
         # Dashboard may return HTML or JSON depending on error conditions
         assert response.content_type.startswith(("text/html", "application/json"))
 
+    def test_security_headers(self):
+        """Test that security headers are present in responses."""
+        response = self.client.get("/health")
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert "Content-Security-Policy" in response.headers
+        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+
     def test_error_handling_robustness(self):
         """Test various error conditions and edge cases."""
         # Test invalid crew ID types
