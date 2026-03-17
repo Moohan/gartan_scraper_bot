@@ -163,12 +163,9 @@ def check_rules(available_ids: List[int]) -> Dict:
     with get_db() as conn:
         placeholders = ",".join("?" * len(available_ids))
         # Use dynamic placeholders for IN clause with security suppression
-        query = (
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
-        )
-        rows = conn.execute(
-            query, available_ids
-        ).fetchall()  # sourcery skip: sql-injection, avoid-sql-string-concatenation
+        query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"
+        # nosec B608
+        rows = conn.execute(query, available_ids).fetchall()  # sourcery skip: sql-injection, avoid-sql-string-concatenation
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
