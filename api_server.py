@@ -274,7 +274,9 @@ def root():
                     }
                 )
             else:
-                c.update({"available": False, "duration": None, "end_time_display": None})
+                c.update(
+                    {"available": False, "duration": None, "end_time_display": None}
+                )
             crew_data.append(c)
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
