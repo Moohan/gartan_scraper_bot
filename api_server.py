@@ -84,13 +84,17 @@ def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
     # Sentinel: Refactored to use static SQL strings to satisfy Sourcery and ensure security.
     with get_db() as conn:
         if table == "crew_availability":
-            query = "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+            curr = conn.execute(
+                "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+                (entity_id, now, now),
+            ).fetchone()
         elif table == "appliance_availability":
-            query = "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+            curr = conn.execute(
+                "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+                (entity_id, now, now),
+            ).fetchone()
         else:
             raise ValueError(f"Unauthorized table access: {table}")
-
-        curr = conn.execute(query, (entity_id, now, now)).fetchone()
         if not curr:
             return {"available": False, "duration": None, "end_time_display": None}
 
@@ -155,7 +159,6 @@ def get_weekly_stats(crew_id: int) -> Dict:
 
 
 def check_rules(available_ids: List[int]) -> Dict:
-    """Check business rules against available crew members."""
     if not available_ids:
         return {
             "rules_pass": False,
@@ -169,8 +172,7 @@ def check_rules(available_ids: List[int]) -> Dict:
         # sourcery skip: avoid-sql-string-concatenation, sql-injection
         placeholders = ",".join("?" * len(available_ids))
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",  # nosec B608
-            available_ids,
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids  # nosec B608
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
