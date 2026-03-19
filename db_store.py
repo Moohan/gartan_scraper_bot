@@ -413,10 +413,14 @@ def defrag_availability(db_conn=None):
         for table in ["crew_availability", "appliance_availability"]:
             # Sentinel: Refactored to use static SQL literals to satisfy Sourcery and improve security.
             if table == "crew_availability":
-                c.execute("SELECT id, crew_id, start_time, end_time FROM crew_availability ORDER BY crew_id, start_time")
+                c.execute(
+                    "SELECT id, crew_id, start_time, end_time FROM crew_availability ORDER BY crew_id, start_time"
+                )
                 rows = c.fetchall()
             else:
-                c.execute("SELECT id, appliance_id, start_time, end_time FROM appliance_availability ORDER BY appliance_id, start_time")
+                c.execute(
+                    "SELECT id, appliance_id, start_time, end_time FROM appliance_availability ORDER BY appliance_id, start_time"
+                )
                 rows = c.fetchall()
 
             if not rows:
@@ -440,16 +444,27 @@ def defrag_availability(db_conn=None):
                     if new_end != prev_end:
                         # Update prev block
                         if table == "crew_availability":
-                            c.execute("UPDATE crew_availability SET end_time = ? WHERE id = ?", (new_end, prev_row_id))
+                            c.execute(
+                                "UPDATE crew_availability SET end_time = ? WHERE id = ?",
+                                (new_end, prev_row_id),
+                            )
                         else:
-                            c.execute("UPDATE appliance_availability SET end_time = ? WHERE id = ?", (new_end, prev_row_id))
+                            c.execute(
+                                "UPDATE appliance_availability SET end_time = ? WHERE id = ?",
+                                (new_end, prev_row_id),
+                            )
                         prev_end = new_end
 
                     # Delete current block
                     if table == "crew_availability":
-                        c.execute("DELETE FROM crew_availability WHERE id = ?", (curr_row_id,))
+                        c.execute(
+                            "DELETE FROM crew_availability WHERE id = ?", (curr_row_id,)
+                        )
                     else:
-                        c.execute("DELETE FROM appliance_availability WHERE id = ?", (curr_row_id,))
+                        c.execute(
+                            "DELETE FROM appliance_availability WHERE id = ?",
+                            (curr_row_id,),
+                        )
                     merged_count += 1
                 else:
                     # Move to next block

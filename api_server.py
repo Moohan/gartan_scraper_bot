@@ -172,7 +172,8 @@ def check_rules(available_ids: List[int]) -> Dict:
         # sourcery skip: avoid-sql-string-concatenation, sql-injection
         placeholders = ",".join("?" * len(available_ids))
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids  # nosec B608
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
+            available_ids,  # nosec B608
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
