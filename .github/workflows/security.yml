@@ -39,7 +39,7 @@ jobs:
       run: |
         safety scan --key ${{ secrets.SAFETY_API_KEY }} --output json > safety-report.json || true
         safety scan --key ${{ secrets.SAFETY_API_KEY }}
-        
+
     - name: Run pip-audit
       run: |
         pip-audit --format=json --output=pip-audit-report.json || true
