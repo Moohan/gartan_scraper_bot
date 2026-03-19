@@ -410,13 +410,15 @@ def defrag_availability(db_conn=None):
     c = conn.cursor()
 
     try:
-        for table in ["crew_availability", "appliance_availability"]:
+        allowed_tables = ["crew_availability", "appliance_availability"]
+        for table in allowed_tables:
+            # Sentinel: Strict allow-list and col mapping for security.
             id_col = "crew_id" if table == "crew_availability" else "appliance_id"
 
             # Simple iterative merging logic:
             # 1. Select all blocks sorted by id and start_time
             c.execute(
-                f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time"
+                f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time"  # nosec B608
             )
             rows = c.fetchall()
 
@@ -441,13 +443,13 @@ def defrag_availability(db_conn=None):
                     if new_end != prev_end:
                         # Update prev block
                         c.execute(
-                            f"UPDATE {table} SET end_time = ? WHERE id = ?",
+                            f"UPDATE {table} SET end_time = ? WHERE id = ?",  # nosec B608
                             (new_end, prev_row_id),
                         )
                         prev_end = new_end
 
                     # Delete current block
-                    c.execute(f"DELETE FROM {table} WHERE id = ?", (curr_row_id,))
+                    c.execute(f"DELETE FROM {table} WHERE id = ?", (curr_row_id,))  # nosec B608
                     merged_count += 1
                 else:
                     # Move to next block

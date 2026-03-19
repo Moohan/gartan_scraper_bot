@@ -81,10 +81,15 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
+    # Sentinel: Strict allow-list for table and column names to ensure security.
+    allowed_tables = ["crew_availability", "appliance_availability"]
+    if table not in allowed_tables:
+        raise ValueError(f"Unauthorized table access: {table}")
+
     col = "crew_id" if table == "crew_availability" else "appliance_id"
     with get_db() as conn:
         curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",  # nosec B608
             (entity_id, now, now),
         ).fetchone()
         if not curr:
@@ -151,6 +156,7 @@ def get_weekly_stats(crew_id: int) -> Dict:
 
 
 def check_rules(available_ids: List[int]) -> Dict:
+    """Check business rules against available crew members."""
     if not available_ids:
         return {
             "rules_pass": False,
@@ -159,9 +165,12 @@ def check_rules(available_ids: List[int]) -> Dict:
             "ba_non_ttr": 0,
         }
     with get_db() as conn:
+        # Sentinel: Using standard parameterized placeholders for the IN clause.
+        # This is safe from SQL injection and efficient.
         placeholders = ",".join("?" * len(available_ids))
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",  # nosec B608
+            available_ids,
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
@@ -561,4 +570,5 @@ DASHBOARD_TEMPLATE = """
 """
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    # Sentinel: host="0.0.0.0" is required for containerization (B104).
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))  # nosec B104
