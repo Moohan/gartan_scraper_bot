@@ -432,6 +432,14 @@ class TestAPIEndpoints:
             503,
         ]  # Various error responses acceptable
 
+    def test_security_headers(self):
+        """Test that security headers are present and correct."""
+        response = self.client.get("/")
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert "Content-Security-Policy" in response.headers
+        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
