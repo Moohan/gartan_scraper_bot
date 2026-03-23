@@ -170,14 +170,13 @@ def check_rules(available_ids: List[int]) -> Dict:
             "ba_non_ttr": 0,
         }
     with get_db() as conn:
-        # 🛡️ Sentinel: Using a parameterized query with a dynamic number of placeholders.
-        # This is safe because placeholders (?) are used for the actual values.
-        # We use '# nosec B608' to suppress Bandit's warning about f-string SQL,
-        # as the interpolation here is only for placeholders, not user input.
+        # 🛡️ Sentinel: Using a parameterized query for the 'IN' clause with placeholders.
+        # This preserves database performance (indexed lookup) while remaining safe
+        # by parameterizing the actual values. We use a separate variable with
+        # '# nosec B608' and '# sourcery skip: avoid-sql-string-concatenation'
+        # to satisfy security scanners flagging the dynamic SQL construction.
         placeholders = ",".join("?" * len(available_ids))
-        query = (
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
-        )
+        query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608 # sourcery skip: avoid-sql-string-concatenation
         rows = conn.execute(query, available_ids).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
