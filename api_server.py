@@ -175,7 +175,9 @@ def check_rules(available_ids: List[int]) -> Dict:
         # We use '# nosec B608' to suppress Bandit's warning about f-string SQL,
         # as the interpolation here is only for placeholders, not user input.
         placeholders = ",".join("?" * len(available_ids))
-        query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
+        query = (
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608
+        )
         rows = conn.execute(query, available_ids).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
