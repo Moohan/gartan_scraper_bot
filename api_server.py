@@ -170,14 +170,13 @@ def check_rules(available_ids: List[int]) -> Dict:
             "ba_non_ttr": 0,
         }
     with get_db() as conn:
-        # 🛡️ Sentinel: Using a parameterized query for the 'IN' clause with placeholders.
-        # This preserves database performance (indexed lookup) while remaining safe
-        # by parameterizing the actual values. We use a separate variable with
-        # '# nosec B608' and '# sourcery skip: avoid-sql-string-concatenation'
-        # to satisfy security scanners flagging the dynamic SQL construction.
-        placeholders = ",".join("?" * len(available_ids))
-        query = f"SELECT role, skills FROM crew WHERE id IN ({placeholders})"  # nosec B608 # sourcery skip: avoid-sql-string-concatenation
-        rows = conn.execute(query, available_ids).fetchall()
+        # 🛡️ Sentinel: Refactored to fetch all crew and filter in Python.
+        # This avoids all dynamic SQL construction, satisfying strict security
+        # scanners (Sourcery avoid-sql-string-concatenation) while remaining
+        # efficient for the expected small dataset of a single station.
+        all_crew = conn.execute("SELECT id, role, skills FROM crew").fetchall()
+        available_set = set(available_ids)
+        rows = [r for r in all_crew if r["id"] in available_set]
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
