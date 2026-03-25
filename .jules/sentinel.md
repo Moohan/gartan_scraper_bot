@@ -1,0 +1,4 @@
+## 2026-03-25 - SQL Injection Whitelisting and Environment Awareness
+**Vulnerability:** Potential SQL injection via f-string interpolation of table and column names in SQLite queries.
+**Learning:** Standard parameterization (?) cannot be used for identifiers like table or column names. The project previously used f-strings which triggered security scanners. Refactoring to a whitelist-based approach with hardcoded static queries satisfies scanners and improves security. Additionally, always verify the environment date (March 2026 here) to avoid hallucination claims when referencing "future" dates that are actually current or past in the sandbox context.
+**Prevention:** Use explicit table whitelists and hardcoded query strings for dynamic table selection. Use `# nosec B608` only for cases where dynamic parts (like safely generated `IN` clause placeholders) are genuinely safe but flagged as false positives.
