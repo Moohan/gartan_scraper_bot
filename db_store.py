@@ -468,7 +468,7 @@ def defrag_availability(db_conn=None):
                     )
 
             if merged_count > 0:
-                logger.info(f"Merged {merged_count} blocks in {table}")
+                logger.info(f"Merged {merged_count} blocks in {table_info['name']}")
 
         conn.commit()
     finally:

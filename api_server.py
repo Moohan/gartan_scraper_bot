@@ -163,12 +163,10 @@ def check_rules(available_ids: List[int]) -> Dict:
             "ba_non_ttr": 0,
         }
     with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
-        # Safely use dynamic placeholders for IN clause
-        rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",  # nosec B608
-            available_ids,
-        ).fetchall()
+        # To satisfy strict CI scanners like Sourcery on small datasets,
+        # we fetch all and filter in Python rather than constructing a dynamic IN clause.
+        all_crew = conn.execute("SELECT id, role, skills FROM crew").fetchall()
+        rows = [r for r in all_crew if r["id"] in available_ids]
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
