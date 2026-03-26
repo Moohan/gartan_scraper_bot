@@ -158,7 +158,9 @@ def get_weekly_stats(crew_id: int) -> Dict:
         }
 
 
-def check_rules(available_ids: List[int], crew_data: Optional[List[Dict]] = None) -> Dict:
+def check_rules(
+    available_ids: List[int], crew_data: Optional[List[Dict]] = None
+) -> Dict:
     if not available_ids:
         return {
             "rules_pass": False,
@@ -260,7 +262,11 @@ def root():
             available = c["availability_end_time"] is not None
 
             if not available:
-                avail_info = {"available": False, "duration": None, "end_time_display": None}
+                avail_info = {
+                    "available": False,
+                    "duration": None,
+                    "end_time_display": None,
+                }
             else:
                 end_time = parse_dt(c["availability_end_time"])
                 duration_min = int((end_time - now).total_seconds() / 60)
