@@ -410,14 +410,24 @@ def defrag_availability(db_conn=None):
     c = conn.cursor()
 
     try:
-        for table in ["crew_availability", "appliance_availability"]:
-            id_col = "crew_id" if table == "crew_availability" else "appliance_id"
+        # Predefined queries for each table to avoid Bandit B608 (f-string SQL construction)
+        queries = {
+            "crew_availability": {
+                "select": "SELECT id, crew_id, start_time, end_time FROM crew_availability ORDER BY crew_id, start_time",
+                "update": "UPDATE crew_availability SET end_time = ? WHERE id = ?",
+                "delete": "DELETE FROM crew_availability WHERE id = ?",
+            },
+            "appliance_availability": {
+                "select": "SELECT id, appliance_id, start_time, end_time FROM appliance_availability ORDER BY appliance_id, start_time",
+                "update": "UPDATE appliance_availability SET end_time = ? WHERE id = ?",
+                "delete": "DELETE FROM appliance_availability WHERE id = ?",
+            },
+        }
 
+        for table, q in queries.items():
             # Simple iterative merging logic:
             # 1. Select all blocks sorted by id and start_time
-            c.execute(
-                f"SELECT id, {id_col}, start_time, end_time FROM {table} ORDER BY {id_col}, start_time"
-            )
+            c.execute(q["select"])
             rows = c.fetchall()
 
             if not rows:
@@ -440,14 +450,11 @@ def defrag_availability(db_conn=None):
                     new_end = max(prev_end, curr_end)
                     if new_end != prev_end:
                         # Update prev block
-                        c.execute(
-                            f"UPDATE {table} SET end_time = ? WHERE id = ?",
-                            (new_end, prev_row_id),
-                        )
+                        c.execute(q["update"], (new_end, prev_row_id))
                         prev_end = new_end
 
                     # Delete current block
-                    c.execute(f"DELETE FROM {table} WHERE id = ?", (curr_row_id,))
+                    c.execute(q["delete"], (curr_row_id,))
                     merged_count += 1
                 else:
                     # Move to next block
