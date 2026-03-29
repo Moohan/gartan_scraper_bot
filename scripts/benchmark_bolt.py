@@ -1,14 +1,13 @@
-import os
-import sqlite3
-import statistics
-import time
-from datetime import datetime, timedelta
 
+import time
+import statistics
+import sqlite3
+import os
+from datetime import datetime, timedelta
 from api_server import app
 from db_store import init_db
 
 DB_PATH = "benchmark.db"
-
 
 def setup_benchmark_db():
     if os.path.exists(DB_PATH):
@@ -24,7 +23,7 @@ def setup_benchmark_db():
 
     c.executemany(
         "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-        crew_data,
+        crew_data
     )
 
     # Get IDs
@@ -42,7 +41,7 @@ def setup_benchmark_db():
 
     c.executemany(
         "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-        avail_data,
+        avail_data
     )
 
     # Appliance
@@ -51,20 +50,16 @@ def setup_benchmark_db():
     app_id = c.fetchone()[0]
     c.execute(
         "INSERT INTO appliance_availability (appliance_id, start_time, end_time) VALUES (?, ?, ?)",
-        (app_id, start_time, end_time),
+        (app_id, start_time, end_time)
     )
 
     conn.commit()
     conn.close()
 
-
 def benchmark():
-    os.environ["DATABASE_URL"] = (
-        DB_PATH  # This won't work as api_server uses config.db_path
-    )
+    os.environ["DATABASE_URL"] = DB_PATH # This won't work as api_server uses config.db_path
     # We need to monkeypatch config or api_server.DB_PATH
     import api_server
-
     api_server.DB_PATH = DB_PATH
 
     setup_benchmark_db()
@@ -74,11 +69,11 @@ def benchmark():
 
     # Warm up
     for _ in range(5):
-        client.get("/")
+        client.get('/')
 
     for _ in range(100):
         start = time.perf_counter()
-        res = client.get("/")
+        res = client.get('/')
         end = time.perf_counter()
         if res.status_code != 200:
             print(f"Error: {res.status_code}")
@@ -94,7 +89,6 @@ def benchmark():
     print(f"95th percentile: {p95*1000:.2f}ms")
 
     os.remove(DB_PATH)
-
 
 if __name__ == "__main__":
     benchmark()
