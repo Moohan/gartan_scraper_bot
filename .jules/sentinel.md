@@ -4,4 +4,4 @@
 
 **Learning:** Database drivers (like `sqlite3`) do not support parameterization for identifiers (table names, column names). Using f-strings or `.format()` for these creates potential injection vectors if the inputs aren't strictly controlled.
 
-**Prevention:** Use a whitelist-based approach to map allowed input strings to hardcoded static queries. For dynamic `IN` clauses, generating placeholders (e.g., `?,?,?`) is safe if the values themselves are parameterized, but requires `# nosec B608` to satisfy static analysis tools.
+**Prevention:** Use a whitelist-based approach to map allowed input strings to hardcoded static queries. For dynamic `IN` clauses, strict CI scanners like Sourcery may block placeholder generation (e.g., `",".join("?" * len(ids))`); Python-side filtering (fetching all records and filtering in Python) is the standard project workaround for small datasets.
