@@ -1,8 +1,10 @@
-import time
 import os
 import sqlite3
+import time
 from datetime import datetime, timedelta
+
 from api_server import app, get_db
+
 
 def setup_dummy_data(num_crew=50):
     with app.app_context():
@@ -13,14 +15,19 @@ def setup_dummy_data(num_crew=50):
         now = datetime.now()
         for i in range(num_crew):
             name = f"Crew {i}"
-            conn.execute("INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
-                         (name, "FFD", "BA", "40 hours"))
+            conn.execute(
+                "INSERT INTO crew (name, role, skills, contract_hours) VALUES (?, ?, ?, ?)",
+                (name, "FFD", "BA", "40 hours"),
+            )
             crew_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
             # Available for next 4 hours
-            conn.execute("INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
-                         (crew_id, now - timedelta(hours=1), now + timedelta(hours=3)))
+            conn.execute(
+                "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (?, ?, ?)",
+                (crew_id, now - timedelta(hours=1), now + timedelta(hours=3)),
+            )
         conn.commit()
+
 
 def benchmark_root():
     client = app.test_client()
@@ -38,9 +45,11 @@ def benchmark_root():
     print(f"Average time for /: {avg_time:.4f}s")
     return avg_time
 
+
 if __name__ == "__main__":
     # Ensure DB is initialized
     from db_store import init_db
+
     init_db()
 
     setup_dummy_data(50)

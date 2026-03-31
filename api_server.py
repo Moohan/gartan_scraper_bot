@@ -272,9 +272,7 @@ def root():
             "SELECT id FROM appliance WHERE name = 'P22P6'"
         ).fetchone()
         if app_p22:
-            p22p6_base = get_availability(
-                app_p22["id"], "appliance_availability", now
-            )
+            p22p6_base = get_availability(app_p22["id"], "appliance_availability", now)
 
         p22p6_avail = p22p6_base["available"] and rules_res["rules_pass"]
 
@@ -473,9 +471,7 @@ def get_crew_duration_data(id):
 def get_appliance_available_data(name):
     now = datetime.now()
     conn = get_db()
-    app = conn.execute(
-        "SELECT id FROM appliance WHERE name = ?", (name,)
-    ).fetchone()
+    app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
     if not app:
         return {"error": "Not found"}
     base = get_availability(app["id"], "appliance_availability", now)
@@ -493,9 +489,7 @@ def get_appliance_available_data(name):
 def get_appliance_duration_data(name):
     now = datetime.now()
     conn = get_db()
-    app = conn.execute(
-        "SELECT id FROM appliance WHERE name = ?", (name,)
-    ).fetchone()
+    app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
     if not app:
         return {"error": "Not found"}
     return get_availability(app["id"], "appliance_availability", now)
