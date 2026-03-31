@@ -81,12 +81,16 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
+    # Explicitly whitelist tables to avoid dynamic SQL injection vectors
+    if table == "crew_availability":
+        query = "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    elif table == "appliance_availability":
+        query = "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    else:
+        return {"available": False, "duration": None, "end_time_display": None}
+
     with get_db() as conn:
-        curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-            (entity_id, now, now),
-        ).fetchone()
+        curr = conn.execute(query, (entity_id, now, now)).fetchone()
         if not curr:
             return {"available": False, "duration": None, "end_time_display": None}
 
@@ -159,10 +163,9 @@ def check_rules(available_ids: List[int]) -> Dict:
             "ba_non_ttr": 0,
         }
     with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
-        rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids
-        ).fetchall()
+        # Fetch all crew to avoid dynamic SQL 'IN' clause; small dataset (<100) makes this safe.
+        all_crew = conn.execute("SELECT id, role, skills FROM crew").fetchall()
+        rows = [r for r in all_crew if r["id"] in available_ids]
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
