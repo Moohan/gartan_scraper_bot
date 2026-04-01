@@ -168,7 +168,10 @@ def check_rules(available_ids_or_crew: Union[List[int], List[Dict]]) -> Dict:
     if all(isinstance(x, int) for x in available_ids_or_crew):
         # If IDs provided, fetch and filter in-memory to avoid dynamic SQL IN clauses
         with get_db() as conn:
-            all_crew = [dict(r) for r in conn.execute("SELECT id, role, skills FROM crew").fetchall()]
+            all_crew = [
+                dict(r)
+                for r in conn.execute("SELECT id, role, skills FROM crew").fetchall()
+            ]
         available_crew = [c for c in all_crew if c["id"] in available_ids_or_crew]
     else:
         available_crew = cast(List[Dict], available_ids_or_crew)
@@ -406,7 +409,12 @@ def app_avail(name):
                 ]
                 # Efficiently fetch only needed crew data using Python-side filtering
                 # to avoid dynamic SQL IN clauses and satisfy security scanners.
-                all_crew = [dict(r) for r in conn.execute("SELECT id, role, skills FROM crew").fetchall()]
+                all_crew = [
+                    dict(r)
+                    for r in conn.execute(
+                        "SELECT id, role, skills FROM crew"
+                    ).fetchall()
+                ]
                 available_crew = [c for c in all_crew if c["id"] in avail_ids]
                 return jsonify(
                     base["available"] and check_rules(available_crew)["rules_pass"]
@@ -436,9 +444,16 @@ def app_dur(name):
                         (now, now),
                     ).fetchall()
                 ]
-                all_crew = [dict(r) for r in conn.execute("SELECT id, role, skills FROM crew").fetchall()]
+                all_crew = [
+                    dict(r)
+                    for r in conn.execute(
+                        "SELECT id, role, skills FROM crew"
+                    ).fetchall()
+                ]
                 available_crew = [c for c in all_crew if c["id"] in avail_ids]
-                if not (base["available"] and check_rules(available_crew)["rules_pass"]):
+                if not (
+                    base["available"] and check_rules(available_crew)["rules_pass"]
+                ):
                     return jsonify(None)
             return jsonify(base["duration"])
     except Exception:
@@ -487,10 +502,14 @@ def get_appliance_available_data(name):
                     (now, now),
                 ).fetchall()
             ]
-            all_crew = [dict(r) for r in conn.execute("SELECT id, role, skills FROM crew").fetchall()]
+            all_crew = [
+                dict(r)
+                for r in conn.execute("SELECT id, role, skills FROM crew").fetchall()
+            ]
             available_crew = [c for c in all_crew if c["id"] in avail_ids]
             return {
-                "available": base["available"] and check_rules(available_crew)["rules_pass"]
+                "available": base["available"]
+                and check_rules(available_crew)["rules_pass"]
             }
         return {"available": base["available"]}
 
