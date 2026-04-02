@@ -1,0 +1,4 @@
+## 2026-04-02 - SQL Injection via Dynamic Identifiers and IN Clauses
+**Vulnerability:** SQL Injection in `api_server.py` through f-string interpolation of table names in `get_availability` and dynamic `IN` clause generation in `check_rules`.
+**Learning:** SQLite parameters only support values, not identifiers like table or column names. Static analysis (Bandit) correctly identifies f-string interpolation in queries as a risk (B608), even for "internal" strings if they could be influenced by input. Dynamic `IN` clauses are also a common trigger for these alerts.
+**Prevention:** Use explicit whitelisting for dynamic identifiers and hardcoded query strings. For `IN` clause patterns on small datasets, fetching all rows and filtering in Python is a secure and performant alternative that satisfies CI scanners without requiring unsafe f-string generation.
