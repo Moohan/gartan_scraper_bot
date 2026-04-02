@@ -179,7 +179,8 @@ def check_rules(available_crew: List) -> Dict:
         conn = get_db()
         placeholders = ",".join("?" * len(available_crew))
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_crew
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",
+            available_crew,
         ).fetchall()
     else:
         rows = available_crew
@@ -267,7 +268,11 @@ def root():
             if c.get("end_time"):
                 avail_info = _format_avail_info(parse_dt(c["end_time"]), now)
             else:
-                avail_info = {"available": False, "duration": None, "end_time_display": None}
+                avail_info = {
+                    "available": False,
+                    "duration": None,
+                    "end_time_display": None,
+                }
             crew_data.append({**c, **avail_info})
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
