@@ -111,16 +111,22 @@ def _format_avail_info(end_time: datetime, now: datetime) -> Dict:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    # Security: Explicitly whitelist allowed table names
-    if table not in ["crew_availability", "appliance_availability"]:
-        return {"available": False, "duration": None, "end_time_display": None}
-
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
     conn = get_db()
 
-    # Security: Use whitelisted table name and parameterized query
-    query = f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1"
-    curr = conn.execute(query, (entity_id, now, now)).fetchone()
+    # Security: Use explicit whitelisted queries to satisfy Sourcery's SQL checks
+    if table == "crew_availability":
+        curr = conn.execute(
+            "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+            (entity_id, now, now),
+        ).fetchone()
+    elif table == "appliance_availability":
+        curr = conn.execute(
+            "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1",
+            (entity_id, now, now),
+        ).fetchone()
+    else:
+        return {"available": False, "duration": None, "end_time_display": None}
+
     if not curr:
         return {"available": False, "duration": None, "end_time_display": None}
 
@@ -270,11 +276,7 @@ def root():
             if c.get("end_time"):
                 avail_info = _format_avail_info(parse_dt(c["end_time"]), now)
             else:
-                avail_info = {
-                    "available": False,
-                    "duration": None,
-                    "end_time_display": None,
-                }
+                avail_info = {"available": False, "duration": None, "end_time_display": None}
             crew_data.append({**c, **avail_info})
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
