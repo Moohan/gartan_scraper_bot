@@ -81,12 +81,16 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
+    # Use explicit whitelisting and hardcoded queries to prevent SQL Injection (Bandit B608)
+    if table == "crew_availability":
+        query = "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    elif table == "appliance_availability":
+        query = "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    else:
+        raise ValueError(f"Invalid table name: {table}")
+
     with get_db() as conn:
-        curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-            (entity_id, now, now),
-        ).fetchone()
+        curr = conn.execute(query, (entity_id, now, now)).fetchone()
         if not curr:
             return {"available": False, "duration": None, "end_time_display": None}
 
@@ -150,19 +154,26 @@ def get_weekly_stats(crew_id: int) -> Dict:
         }
 
 
-def check_rules(available_ids: List[int]) -> Dict:
-    if not available_ids:
+def check_rules(
+    available_ids: List[int], available_crew: Optional[List[Dict]] = None
+) -> Dict:
+    """Evaluate staffing rules. Accepts IDs or pre-fetched crew data for performance/security."""
+    if not available_ids and not available_crew:
         return {
             "rules_pass": False,
             "rules": {},
             "skill_counts": {"TTR": 0, "LGV": 0, "BA": 0},
             "ba_non_ttr": 0,
         }
-    with get_db() as conn:
-        placeholders = ",".join("?" * len(available_ids))
-        rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids
-        ).fetchall()
+
+    if available_crew is not None:
+        rows = available_crew
+    else:
+        # To avoid dynamic SQL IN clauses (Bandit B608), we fetch all crew and filter in memory.
+        # This is safe and performant for small datasets like a single fire station's crew.
+        with get_db() as conn:
+            all_rows = conn.execute("SELECT id, role, skills FROM crew").fetchall()
+            rows = [r for r in all_rows if r["id"] in available_ids]
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
@@ -240,8 +251,10 @@ def root():
             key=lambda x: (not x["available"], ranks.get(x["role"], 99), x["name"])
         )
 
-        avail_ids = [c["id"] for c in crew_data if c["available"]]
-        rules_res = check_rules(avail_ids)
+        available_crew = [c for c in crew_data if c["available"]]
+        rules_res = check_rules(
+            [c["id"] for c in available_crew], available_crew=available_crew
+        )
 
         p22p6_base = {"available": False, "duration": None}
         with get_db() as conn:
@@ -259,7 +272,7 @@ def root():
             DASHBOARD_TEMPLATE,
             crew_data=crew_data,
             now=now,
-            total_available=len(avail_ids),
+            total_available=len(available_crew),
             p22p6_avail=p22p6_avail,
             p22p6_duration=p22p6_base["duration"] if p22p6_avail else None,
             rules=rules_res["rules"],
