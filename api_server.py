@@ -81,12 +81,17 @@ def get_crew_list() -> List[Dict]:
 
 
 def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
+    # Whitelist tables and use static queries to prevent SQL injection (Bandit B608)
+    if table == "crew_availability":
+        query = "SELECT end_time FROM crew_availability WHERE crew_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    elif table == "appliance_availability":
+        query = "SELECT end_time FROM appliance_availability WHERE appliance_id = ? AND start_time <= ? AND end_time > ? LIMIT 1"
+    else:
+        logger.error(f"Invalid table name provided to get_availability: {table}")
+        return {"available": False, "duration": None, "end_time_display": None}
+
     with get_db() as conn:
-        curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-            (entity_id, now, now),
-        ).fetchone()
+        curr = conn.execute(query, (entity_id, now, now)).fetchone()
         if not curr:
             return {"available": False, "duration": None, "end_time_display": None}
 
@@ -159,9 +164,14 @@ def check_rules(available_ids: List[int]) -> Dict:
             "ba_non_ttr": 0,
         }
     with get_db() as conn:
+        # Security: Parameterized IN clause is safe from SQL injection.
+        # We use a placeholder string generated based on the number of IDs.
+        # This is flagged by Bandit B608 but is a false positive as long as
+        # the values are passed as a second argument to execute().
         placeholders = ",".join("?" * len(available_ids))
         rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})", available_ids
+            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",  # nosec B608
+            available_ids,
         ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
