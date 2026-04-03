@@ -422,7 +422,9 @@ def app_dur(name):
                     "SELECT role, skills FROM crew WHERE id IN (SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?)",
                     (now, now),
                 ).fetchall()
-                if not (base["available"] and check_rules(available_crew)["rules_pass"]):
+                if not (
+                    base["available"] and check_rules(available_crew)["rules_pass"]
+                ):
                     return jsonify(None)
             return jsonify(base["duration"])
     except Exception:
@@ -469,7 +471,8 @@ def get_appliance_available_data(name):
                 (now, now),
             ).fetchall()
             return {
-                "available": base["available"] and check_rules(available_crew)["rules_pass"]
+                "available": base["available"]
+                and check_rules(available_crew)["rules_pass"]
             }
         return {"available": base["available"]}
 
