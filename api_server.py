@@ -424,7 +424,9 @@ def app_avail(name):
     try:
         now = datetime.now()
         conn = get_db()
-        app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
+        app = conn.execute(
+            "SELECT id FROM appliance WHERE name = ?", (name,)
+        ).fetchone()
         if not app:
             return jsonify({"error": "Not found"}), 404
         base = get_availability(app["id"], "appliance_availability", now)
@@ -448,7 +450,9 @@ def app_dur(name):
     try:
         now = datetime.now()
         conn = get_db()
-        app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
+        app = conn.execute(
+            "SELECT id FROM appliance WHERE name = ?", (name,)
+        ).fetchone()
         if not app:
             return jsonify({"error": "Not found"}), 404
         base = get_availability(app["id"], "appliance_availability", now)
