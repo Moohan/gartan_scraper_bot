@@ -155,30 +155,26 @@ def get_weekly_stats(crew_id: int) -> Dict:
         }
 
 
-def check_rules(available_ids: List[int]) -> Dict:
-    if not available_ids:
+def check_rules(available_crew: List[Dict]) -> Dict:
+    """Check business rules against a list of available crew member dictionaries."""
+    if not available_crew:
         return {
             "rules_pass": False,
             "rules": {},
             "skill_counts": {"TTR": 0, "LGV": 0, "BA": 0},
             "ba_non_ttr": 0,
         }
-    with get_db() as conn:
-        # Security: Parameterized IN clause is safe from SQL injection.
-        # We use a placeholder string generated based on the number of IDs.
-        # This is flagged by Bandit B608 but is a false positive as long as
-        # the values are passed as a second argument to execute().
-        placeholders = ",".join("?" * len(available_ids))
-        rows = conn.execute(
-            f"SELECT role, skills FROM crew WHERE id IN ({placeholders})",  # nosec B608
-            available_ids,
-        ).fetchall()
 
     skills = {"TTR": 0, "LGV": 0, "BA": 0}
     ba_non_ttr, ffc_ba = 0, False
-    for r in rows:
-        c_skills = (r["skills"] or "").split()
-        role = r["role"]
+    for r in available_crew:
+        # Handle both dicts and sqlite3.Row objects
+        if isinstance(r, dict):
+            c_skills = (r.get("skills") or "").split()
+            role = r.get("role")
+        else:
+            c_skills = (r["skills"] or "").split()
+            role = r["role"]
 
         # Enhanced skill mapping
         # 1. LGV mapping include ERD
@@ -201,7 +197,7 @@ def check_rules(available_ids: List[int]) -> Dict:
                 ffc_ba = True
 
     rules = {
-        "total_crew_ok": len(rows) >= 4,
+        "total_crew_ok": len(available_crew) >= 4,
         "ttr_present": skills["TTR"] > 0,
         "lgv_present": skills["LGV"] > 0,
         "ba_non_ttr_ok": ba_non_ttr >= 2,
@@ -250,8 +246,9 @@ def root():
             key=lambda x: (not x["available"], ranks.get(x["role"], 99), x["name"])
         )
 
-        avail_ids = [c["id"] for c in crew_data if c["available"]]
-        rules_res = check_rules(avail_ids)
+        available_crew = [c for c in crew_data if c.get("available")]
+        avail_ids = [c["id"] for c in crew_data if c.get("available")]
+        rules_res = check_rules(available_crew)
 
         p22p6_base = {"available": False, "duration": None}
         with get_db() as conn:
@@ -396,15 +393,12 @@ def app_avail(name):
                 return jsonify({"error": "Not found"}), 404
             base = get_availability(app["id"], "appliance_availability", now)
             if name == "P22P6":
-                avail_ids = [
-                    r[0]
-                    for r in conn.execute(
-                        "SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?",
-                        (now, now),
-                    ).fetchall()
-                ]
+                available_crew = conn.execute(
+                    "SELECT role, skills FROM crew WHERE id IN (SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?)",
+                    (now, now),
+                ).fetchall()
                 return jsonify(
-                    base["available"] and check_rules(avail_ids)["rules_pass"]
+                    base["available"] and check_rules(available_crew)["rules_pass"]
                 )
             return jsonify(base["available"])
     except Exception:
@@ -424,14 +418,11 @@ def app_dur(name):
                 return jsonify({"error": "Not found"}), 404
             base = get_availability(app["id"], "appliance_availability", now)
             if name == "P22P6":
-                avail_ids = [
-                    r[0]
-                    for r in conn.execute(
-                        "SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?",
-                        (now, now),
-                    ).fetchall()
-                ]
-                if not (base["available"] and check_rules(avail_ids)["rules_pass"]):
+                available_crew = conn.execute(
+                    "SELECT role, skills FROM crew WHERE id IN (SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?)",
+                    (now, now),
+                ).fetchall()
+                if not (base["available"] and check_rules(available_crew)["rules_pass"]):
                     return jsonify(None)
             return jsonify(base["duration"])
     except Exception:
@@ -473,15 +464,12 @@ def get_appliance_available_data(name):
             return {"error": "Not found"}
         base = get_availability(app["id"], "appliance_availability", now)
         if name == "P22P6":
-            avail_ids = [
-                r[0]
-                for r in conn.execute(
-                    "SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?",
-                    (now, now),
-                ).fetchall()
-            ]
+            available_crew = conn.execute(
+                "SELECT role, skills FROM crew WHERE id IN (SELECT crew_id FROM crew_availability WHERE start_time <= ? AND end_time > ?)",
+                (now, now),
+            ).fetchall()
             return {
-                "available": base["available"] and check_rules(avail_ids)["rules_pass"]
+                "available": base["available"] and check_rules(available_crew)["rules_pass"]
             }
         return {"available": base["available"]}
 
