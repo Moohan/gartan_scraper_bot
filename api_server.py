@@ -272,13 +272,17 @@ def root():
                     display += " tomorrow"
                 else:
                     display += end_time.strftime(" on %d/%m")
-                c.update({
-                    "available": True,
-                    "duration": format_hours(duration_min),
-                    "end_time_display": display
-                })
+                c.update(
+                    {
+                        "available": True,
+                        "duration": format_hours(duration_min),
+                        "end_time_display": display,
+                    }
+                )
             else:
-                c.update({"available": False, "duration": None, "end_time_display": None})
+                c.update(
+                    {"available": False, "duration": None, "end_time_display": None}
+                )
             crew_data.append(c)
 
         ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
@@ -295,9 +299,7 @@ def root():
             "SELECT id FROM appliance WHERE name = 'P22P6'"
         ).fetchone()
         if app_p22:
-                p22p6_base = get_availability(
-                    app_p22["id"], "appliance_availability", now
-                )
+            p22p6_base = get_availability(app_p22["id"], "appliance_availability", now)
 
         p22p6_avail = p22p6_base["available"] and rules_res["rules_pass"]
 
@@ -438,9 +440,7 @@ def app_avail(name):
                 (now, now),
             ).fetchall()
             avail_crew = [dict(r) for r in avail_rows]
-            return jsonify(
-                base["available"] and check_rules(avail_crew)["rules_pass"]
-            )
+            return jsonify(base["available"] and check_rules(avail_crew)["rules_pass"])
         return jsonify(base["available"])
     except Exception:
         logger.exception("Endpoint error")
@@ -499,9 +499,7 @@ def get_crew_duration_data(id):
 def get_appliance_available_data(name):
     now = datetime.now()
     conn = get_db()
-    app = conn.execute(
-        "SELECT id FROM appliance WHERE name = ?", (name,)
-    ).fetchone()
+    app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
     if not app:
         return {"error": "Not found"}
     base = get_availability(app["id"], "appliance_availability", now)
@@ -520,9 +518,7 @@ def get_appliance_available_data(name):
 def get_appliance_duration_data(name):
     now = datetime.now()
     conn = get_db()
-    app = conn.execute(
-        "SELECT id FROM appliance WHERE name = ?", (name,)
-    ).fetchone()
+    app = conn.execute("SELECT id FROM appliance WHERE name = ?", (name,)).fetchone()
     if not app:
         return {"error": "Not found"}
     return get_availability(app["id"], "appliance_availability", now)
