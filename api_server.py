@@ -397,7 +397,8 @@ def app_avail(name):
                 ).fetchall()
                 # sqlite3.Row acts like a dict for .get()
                 return jsonify(
-                    base["available"] and check_rules([dict(r) for r in avail_crew])["rules_pass"]
+                    base["available"]
+                    and check_rules([dict(r) for r in avail_crew])["rules_pass"]
                 )
             return jsonify(base["available"])
     except Exception:
@@ -427,7 +428,10 @@ def app_dur(name):
                     """,
                     (now, now),
                 ).fetchall()
-                if not (base["available"] and check_rules([dict(r) for r in avail_crew])["rules_pass"]):
+                if not (
+                    base["available"]
+                    and check_rules([dict(r) for r in avail_crew])["rules_pass"]
+                ):
                     return jsonify(None)
             return jsonify(base["duration"])
     except Exception:
@@ -480,7 +484,8 @@ def get_appliance_available_data(name):
                 (now, now),
             ).fetchall()
             return {
-                "available": base["available"] and check_rules([dict(r) for r in avail_crew])["rules_pass"]
+                "available": base["available"]
+                and check_rules([dict(r) for r in avail_crew])["rules_pass"]
             }
         return {"available": base["available"]}
 
