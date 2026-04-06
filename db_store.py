@@ -2,6 +2,7 @@
 
 import sqlite3
 from datetime import datetime, timedelta
+from utils import parse_uk_datetime, parse_uk_date, ensure_london
 from typing import Any, Dict, List
 
 from config import config
@@ -9,7 +10,7 @@ from config import config
 # Configure sqlite3 datetime adapters for Python 3.12+ compatibility
 sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
 sqlite3.register_converter(
-    "datetime", lambda dt: datetime.fromisoformat(dt.decode("utf-8"))
+    "datetime", lambda dt: ensure_london(datetime.fromisoformat(dt.decode("utf-8")))
 )
 
 CREW_DETAILS_TABLE = """
@@ -107,7 +108,7 @@ def _convert_slots_to_blocks(
     # Sort availability by timestamp
     sorted_slots = sorted(
         [
-            (datetime.strptime(slot, "%d/%m/%Y %H%M"), is_available)
+            (parse_uk_datetime(slot), is_available)
             for slot, is_available in availability.items()
         ]
     )
@@ -240,7 +241,7 @@ def insert_crew_availability(crew_list: List[Dict[str, Any]], db_conn=None):
         for crew in crew_list:
             for slot_time in crew.get("availability", {}):
                 date_str = slot_time.split()[0]  # Extract date part
-                date_obj = datetime.strptime(date_str, "%d/%m/%Y").date()
+                date_obj = parse_uk_date(date_str).date()
                 all_dates.add(date_obj)
 
         if all_dates:
@@ -341,7 +342,7 @@ def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
         for slot in info.get("availability", {}).keys():
             try:
                 date_str = slot.split(" ")[0]
-                date_obj = datetime.strptime(date_str, "%d/%m/%Y").date()
+                date_obj = parse_uk_date(date_str).date()
                 all_dates.add(date_obj)
             except (ValueError, IndexError):
                 logger.debug(f"Failed to parse date from slot: {slot}")

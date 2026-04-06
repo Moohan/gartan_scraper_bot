@@ -12,6 +12,7 @@ from flask import Flask, g, jsonify, render_template_string
 from config import config
 from gartan_fetch import fetch_station_feed_html
 from parse_grid import parse_station_feed_html
+from utils import get_now, ensure_london
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,8 +23,8 @@ app = Flask(__name__, static_url_path="/static", static_folder="static")
 # Database configuration
 DB_PATH = config.db_path
 sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
-sqlite3.register_converter("DATETIME", lambda b: datetime.fromisoformat(b.decode()))
-sqlite3.register_converter("datetime", lambda b: datetime.fromisoformat(b.decode()))
+sqlite3.register_converter("DATETIME", lambda b: ensure_london(datetime.fromisoformat(b.decode())))
+sqlite3.register_converter("datetime", lambda b: ensure_london(datetime.fromisoformat(b.decode())))
 
 
 def get_db():
@@ -52,9 +53,9 @@ def close_db(error):
 
 def parse_dt(val):
     if isinstance(val, datetime):
-        return val
+        return ensure_london(val)
     if isinstance(val, str):
-        return datetime.fromisoformat(val)
+        return ensure_london(datetime.fromisoformat(val))
     return val
 
 
@@ -62,7 +63,8 @@ def parse_dt(val):
 
 
 def get_week_boundaries() -> Tuple[datetime, datetime]:
-    now = datetime.now()
+    now = get_now()
+    # Monday is start of week in UK
     monday = (now - timedelta(days=now.weekday())).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
@@ -155,7 +157,7 @@ def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
 
 def get_weekly_stats(crew_id: int) -> Dict:
     start, end = get_week_boundaries()
-    now = datetime.now()
+    now = get_now()
     with get_db() as conn:
         rows = conn.execute(
             "SELECT start_time, end_time FROM crew_availability WHERE crew_id = ? AND end_time > ? AND start_time < ?",
@@ -268,7 +270,7 @@ def health():
 @app.route("/")
 def root():
     try:
-        now = datetime.now()
+        now = get_now()
         crew_data = []
         with get_db() as conn:
             # Join crew with their CURRENT availability (if any)
@@ -337,7 +339,7 @@ def list_crew():
 @app.route("/crew/<int:id>/available")
 def crew_avail(id):
     try:
-        res = get_availability(id, "crew_availability", datetime.now())
+        res = get_availability(id, "crew_availability", get_now())
         with get_db() as conn:
             if not conn.execute("SELECT 1 FROM crew WHERE id = ?", (id,)).fetchone():
                 return jsonify({"error": "Not found"}), 404
@@ -350,7 +352,7 @@ def crew_avail(id):
 @app.route("/crew/<int:id>/duration")
 def crew_dur(id):
     try:
-        res = get_availability(id, "crew_availability", datetime.now())
+        res = get_availability(id, "crew_availability", get_now())
         with get_db() as conn:
             if not conn.execute("SELECT 1 FROM crew WHERE id = ?", (id,)).fetchone():
                 return jsonify({"error": "Not found"}), 404
@@ -429,7 +431,7 @@ def crew_hrs_rem(id):
 @app.route("/appliances/<name>/available")
 def app_avail(name):
     try:
-        now = datetime.now()
+        now = get_now()
         with get_db() as conn:
             app = conn.execute(
                 "SELECT id FROM appliance WHERE name = ?", (name,)
@@ -454,7 +456,7 @@ def app_avail(name):
 @app.route("/appliances/<name>/duration")
 def app_dur(name):
     try:
-        now = datetime.now()
+        now = get_now()
         with get_db() as conn:
             app = conn.execute(
                 "SELECT id FROM appliance WHERE name = ?", (name,)
@@ -494,15 +496,15 @@ def get_crew_list_data():
 
 
 def get_crew_available_data(id):
-    return get_availability(id, "crew_availability", datetime.now())
+    return get_availability(id, "crew_availability", get_now())
 
 
 def get_crew_duration_data(id):
-    return get_availability(id, "crew_availability", datetime.now())
+    return get_availability(id, "crew_availability", get_now())
 
 
 def get_appliance_available_data(name):
-    now = datetime.now()
+    now = get_now()
     with get_db() as conn:
         app = conn.execute(
             "SELECT id FROM appliance WHERE name = ?", (name,)
@@ -523,7 +525,7 @@ def get_appliance_available_data(name):
 
 
 def get_appliance_duration_data(name):
-    now = datetime.now()
+    now = get_now()
     with get_db() as conn:
         app = conn.execute(
             "SELECT id FROM appliance WHERE name = ?", (name,)

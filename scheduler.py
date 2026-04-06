@@ -15,6 +15,8 @@ import time
 import schedule
 
 from config import Config
+from utils import get_now
+from datetime import timedelta
 
 # Configure logging
 logging.basicConfig(
@@ -49,8 +51,8 @@ def check_database_health() -> bool:
         # Check if we have recent availability data
         cursor.execute("""
             SELECT COUNT(*) FROM crew_availability
-            WHERE datetime(end_time) > datetime('now', '-1 day')
-        """)
+            WHERE end_time > ?
+        """, (get_now() - timedelta(days=1),))
         recent_blocks = cursor.fetchone()[0]
 
         conn.close()
