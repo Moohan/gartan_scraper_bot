@@ -512,25 +512,34 @@ DASHBOARD_TEMPLATE = """
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gartan Scraper Bot - Dashboard</title>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <script defer src="/static/js/refresh.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>Managing Station: P22</h1>
-        <div class="timestamp">Updated: {{ now.strftime('%H:%M:%S on %d/%m/%Y') }}</div>
+        <div class="header">
+            <h1>Managing Station: P22</h1>
+            <div class="timestamp-container">
+                <span class="live-indicator" aria-hidden="true"></span>
+                <span class="timestamp">Updated: {{ now.strftime('%H:%M:%S on %d/%m/%Y') }}</span>
+                <button id="refresh-btn" class="refresh-button" aria-label="Refresh Dashboard">
+                    <span class="refresh-icon">🔄</span>
+                </button>
+            </div>
+        </div>
 
-        <div class="summary-stats">
+        <div class="summary-stats" role="status" aria-live="polite">
             <div class="stat"><div class="stat-number">{{ total_available }}</div><div class="stat-label">Crew</div></div>
             <div class="stat"><div class="stat-number">{{ skill_counts.TTR }}</div><div class="stat-label">Officer</div></div>
             <div class="stat"><div class="stat-number">{{ skill_counts.LGV }}</div><div class="stat-label">Driver</div></div>
             <div class="stat"><div class="stat-number">{{ skill_counts.BA }}</div><div class="stat-label">BA</div></div>
         </div>
 
-        <div class="appliance-section">
-            <h2>🚒 P22P6 Status</h2>
-            <div class="appliance-status {{ 'operational' if p22p6_avail else 'unavailable' }}">
+        <div class="appliance-section" role="region" aria-labelledby="appliance-heading">
+            <h2 id="appliance-heading">🚒 P22P6 Status</h2>
+            <div class="appliance-status {{ 'operational' if p22p6_avail else 'unavailable' }}" role="status" aria-live="polite">
                 {{ 'OPERATIONAL' if p22p6_avail else 'NOT AVAILABLE' }}
             </div>
-            {% if p22p6_duration %}<div>Available for: {{ p22p6_duration }}</div>{% endif %}
+            {% if p22p6_duration %}<div class="duration-info">Available for: {{ p22p6_duration }}</div>{% endif %}
 
             <div class="business-rules">
                 <div class="rule {{ 'pass' if rules.total_crew_ok else 'fail' }}">Min Crew (≥4): {{ 'PASS' if rules.total_crew_ok else 'FAIL' }}</div>
@@ -539,8 +548,8 @@ DASHBOARD_TEMPLATE = """
             </div>
         </div>
 
-        <div class="section">
-            <h2>Individual Crew</h2>
+        <div class="section" role="region" aria-labelledby="crew-heading">
+            <h2 id="crew-heading">Individual Crew</h2>
             <div class="grid">
                 {% for crew in crew_data %}
                 <div class="card {{ 'available' if crew.available else 'unavailable' }}">

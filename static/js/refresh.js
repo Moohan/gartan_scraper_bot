@@ -1,2 +1,18 @@
-// Auto-refresh every 30 seconds
-setTimeout(() => window.location.reload(), 30000);
+// Palette: Auto-refresh and manual refresh logic
+document.addEventListener('DOMContentLoaded', () => {
+    // Auto-refresh every 30 seconds
+    const AUTO_REFRESH_INTERVAL = 30000;
+    setTimeout(() => window.location.reload(), AUTO_REFRESH_INTERVAL);
+
+    // Manual refresh button
+    const refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            refreshBtn.classList.add('refreshing');
+            // Slight delay for visual feedback
+            setTimeout(() => {
+                window.location.reload();
+            }, 100);
+        });
+    }
+});

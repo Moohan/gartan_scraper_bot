@@ -1,0 +1,3 @@
+## 2026-04-06 - Enhancing Real-time Dashboard Accessibility
+**Learning:** For monitoring dashboards that auto-refresh, using `aria-live="polite"` on key status indicators and summary statistics provides a better experience for screen reader users by announcing changes without aggressive interruption. Adding a visual pulsating indicator (with `aria-hidden="true"`) helps sighted users quickly identify that the data is live and actively updating.
+**Action:** Always pair auto-refreshing UI with `aria-live` regions and a "Live" visual state to provide multi-modal feedback about the data's freshness.
