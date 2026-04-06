@@ -8,8 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const refreshBtn = document.getElementById('refresh-btn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', () => {
-            refreshBtn.classList.add('refreshing');
-            // Slight delay for visual feedback
+            // Slight delay so the click interaction is perceptible before reload
             setTimeout(() => {
                 window.location.reload();
             }, 100);

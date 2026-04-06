@@ -268,3 +268,14 @@ body {
     font-weight: 500;
     margin-bottom: 10px;
 }
+
+/* Respect user preferences for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .live-indicator {
+        animation: none;
+        box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.4);
+    }
+    .card:hover {
+        transform: none;
+    }
+}
