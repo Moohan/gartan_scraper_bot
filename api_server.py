@@ -12,7 +12,7 @@ from flask import Flask, g, jsonify, render_template_string
 from config import config
 from gartan_fetch import fetch_station_feed_html
 from parse_grid import parse_station_feed_html
-from utils import get_now, ensure_london
+from utils import ensure_london, get_now
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -23,8 +23,12 @@ app = Flask(__name__, static_url_path="/static", static_folder="static")
 # Database configuration
 DB_PATH = config.db_path
 sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
-sqlite3.register_converter("DATETIME", lambda b: ensure_london(datetime.fromisoformat(b.decode())))
-sqlite3.register_converter("datetime", lambda b: ensure_london(datetime.fromisoformat(b.decode())))
+sqlite3.register_converter(
+    "DATETIME", lambda b: ensure_london(datetime.fromisoformat(b.decode()))
+)
+sqlite3.register_converter(
+    "datetime", lambda b: ensure_london(datetime.fromisoformat(b.decode()))
+)
 
 
 def get_db():
