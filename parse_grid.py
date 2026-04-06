@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
 
 from bs4 import BeautifulSoup, NavigableString, Tag  # type: ignore
 
-from utils import log_debug, get_now, parse_uk_datetime, parse_uk_date
+from utils import get_now, log_debug, parse_uk_date, parse_uk_datetime
 
 # Type aliases for clarity
 GridElement = Union[Tag, NavigableString]
