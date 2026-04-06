@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
 
 from bs4 import BeautifulSoup, NavigableString, Tag  # type: ignore
 
-from utils import log_debug
+from utils import get_now, log_debug, parse_uk_date, parse_uk_datetime
 
 # Type aliases for clarity
 GridElement = Union[Tag, NavigableString]
@@ -142,13 +142,13 @@ def aggregate_appliance_availability(
             _merge_appliance_data(appliance_dict, appliance, data)
 
     # Now recalculate summary fields for each appliance
-    now = dt.now()
+    now = get_now()
     for entry in appliance_dict.values():
         availability = entry["availability"]
         slot_tuples = []
         for slot, avail in availability.items():
             try:
-                slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+                slot_dt = parse_uk_datetime(slot)
                 slot_tuples.append((slot_dt, avail))
             except Exception:
                 log_debug("parsing", f"Failed to parse slot: {slot}")
@@ -183,7 +183,7 @@ def _get_slot_datetimes(availability: dict) -> list[tuple[dt, bool]]:
     slot_datetimes = []
     for slot, is_avail in availability.items():
         try:
-            slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+            slot_dt = parse_uk_datetime(slot)
             slot_datetimes.append((slot_dt, is_avail))
         except (ValueError, TypeError):
             log_debug("parsing", f"Failed to parse slot: {slot}")
@@ -211,7 +211,7 @@ def _extract_crew_availability(
 ) -> Dict[str, list]:
     """Extract crew availability."""
     date_prefix = _normalize_date(date)
-    now = dt.now()
+    now = get_now()
     crew_data = []
     for tr in _extract_crew_rows(table):
         crew_data.append(_parse_crew_row(tr, time_slots, date_prefix, now))
@@ -372,7 +372,7 @@ def _normalize_date(date: Optional[str]) -> str:
         return ""
 
     try:
-        date_obj = dt.strptime(str(date), "%d/%m/%Y")
+        date_obj = parse_uk_date(str(date))
         return date_obj.strftime("%d/%m/%Y")
     except ValueError:
         return str(date)
@@ -645,14 +645,14 @@ def aggregate_crew_availability(
                 crew_dict[name]["_all_slots"].append((slot, avail))
 
     # Calculate summaries
-    now = dt.now()
+    now = get_now()
     log_debug("crew", f"Aggregated into {len(crew_dict)} unique crew members.")
 
     for crew in crew_dict.values():
         slot_tuples = []
         for slot, avail in crew["_all_slots"]:
             try:
-                slot_dt = dt.strptime(slot, "%d/%m/%Y %H%M")
+                slot_dt = parse_uk_datetime(slot)
                 slot_tuples.append((slot_dt, avail))
             except Exception:
                 log_debug("parsing", f"Failed to parse slot: {slot}")
