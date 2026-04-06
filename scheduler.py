@@ -11,12 +11,12 @@ import sqlite3
 import subprocess
 import sys
 import time
-from datetime import timedelta
 
 import schedule
 
 from config import Config
 from utils import get_now
+from datetime import timedelta
 
 # Configure logging
 logging.basicConfig(
@@ -36,7 +36,7 @@ def check_database_health() -> bool:
             logger.warning("Database does not exist")
             return False
 
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
         cursor = conn.cursor()
 
         # Check if we have crew data
@@ -49,13 +49,10 @@ def check_database_health() -> bool:
             return False
 
         # Check if we have recent availability data
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT COUNT(*) FROM crew_availability
             WHERE end_time > ?
-        """,
-            (get_now() - timedelta(days=1),),
-        )
+        """, (get_now() - timedelta(days=1),))
         recent_blocks = cursor.fetchone()[0]
 
         conn.close()

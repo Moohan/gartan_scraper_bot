@@ -2,10 +2,10 @@
 
 import sqlite3
 from datetime import datetime, timedelta
+from utils import parse_uk_datetime, parse_uk_date, ensure_london, LONDON_TZ, LONDON_TZ
 from typing import Any, Dict, List
 
 from config import config
-from utils import ensure_london, parse_uk_date, parse_uk_datetime
 
 # Configure sqlite3 datetime adapters for Python 3.12+ compatibility
 sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS appliance (
     name TEXT NOT NULL UNIQUE
 );
 """
-sqlite3.register_converter("DATETIME", lambda b: datetime.fromisoformat(b.decode()))
+sqlite3.register_converter("DATETIME", lambda b: ensure_london(datetime.fromisoformat(b.decode())))
 
 DB_PATH = config.db_path
 
@@ -267,10 +267,8 @@ def insert_crew_availability(crew_list: List[Dict[str, Any]], db_conn=None):
                 # We use a half-open interval [start, end) for the processed range.
                 # A block is deleted if it has ANY overlap with this range.
                 # Logic: start_time < range_end AND end_time > range_start
-                range_start = datetime.combine(min_date, datetime.min.time())
-                range_end = datetime.combine(
-                    max_date + timedelta(days=1), datetime.min.time()
-                )
+                range_start = datetime.combine(min_date, datetime.min.time()).replace(tzinfo=LONDON_TZ)
+                range_end = datetime.combine(max_date + timedelta(days=1), datetime.min.time()).replace(tzinfo=LONDON_TZ)
 
                 c.execute(
                     """
@@ -362,10 +360,8 @@ def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
 
             # Clean up existing blocks that overlap with the date range being processed
             if min_date and max_date:
-                range_start = datetime.combine(min_date, datetime.min.time())
-                range_end = datetime.combine(
-                    max_date + timedelta(days=1), datetime.min.time()
-                )
+                range_start = datetime.combine(min_date, datetime.min.time()).replace(tzinfo=LONDON_TZ)
+                range_end = datetime.combine(max_date + timedelta(days=1), datetime.min.time()).replace(tzinfo=LONDON_TZ)
 
                 c.execute(
                     """
