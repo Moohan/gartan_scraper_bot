@@ -118,7 +118,9 @@ def main():
             # Check if processes are still running
             for process in processes:
                 if not process.is_alive():
-                    logger.error(f"Process {process.name} died unexpectedly (exit code: {process.exitcode})")
+                    logger.error(
+                        f"Process {process.name} died unexpectedly (exit code: {process.exitcode})"
+                    )
                     shutdown_flag.set()
                     break
 
