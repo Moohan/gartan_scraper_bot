@@ -5,11 +5,12 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
 from config import config
+from utils import LONDON_TZ, ensure_london, parse_uk_date, parse_uk_datetime
 
 # Configure sqlite3 datetime adapters for Python 3.12+ compatibility
 sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
 sqlite3.register_converter(
-    "datetime", lambda dt: datetime.fromisoformat(dt.decode("utf-8"))
+    "datetime", lambda dt: ensure_london(datetime.fromisoformat(dt.decode("utf-8")))
 )
 
 CREW_DETAILS_TABLE = """
@@ -28,7 +29,9 @@ CREATE TABLE IF NOT EXISTS appliance (
     name TEXT NOT NULL UNIQUE
 );
 """
-sqlite3.register_converter("DATETIME", lambda b: datetime.fromisoformat(b.decode()))
+sqlite3.register_converter(
+    "DATETIME", lambda b: ensure_london(datetime.fromisoformat(b.decode()))
+)
 
 DB_PATH = config.db_path
 
@@ -107,7 +110,7 @@ def _convert_slots_to_blocks(
     # Sort availability by timestamp
     sorted_slots = sorted(
         [
-            (datetime.strptime(slot, "%d/%m/%Y %H%M"), is_available)
+            (parse_uk_datetime(slot), is_available)
             for slot, is_available in availability.items()
         ]
     )
@@ -240,7 +243,7 @@ def insert_crew_availability(crew_list: List[Dict[str, Any]], db_conn=None):
         for crew in crew_list:
             for slot_time in crew.get("availability", {}):
                 date_str = slot_time.split()[0]  # Extract date part
-                date_obj = datetime.strptime(date_str, "%d/%m/%Y").date()
+                date_obj = parse_uk_date(date_str).date()
                 all_dates.add(date_obj)
 
         if all_dates:
@@ -266,10 +269,12 @@ def insert_crew_availability(crew_list: List[Dict[str, Any]], db_conn=None):
                 # We use a half-open interval [start, end) for the processed range.
                 # A block is deleted if it has ANY overlap with this range.
                 # Logic: start_time < range_end AND end_time > range_start
-                range_start = datetime.combine(min_date, datetime.min.time())
+                range_start = datetime.combine(min_date, datetime.min.time()).replace(
+                    tzinfo=LONDON_TZ
+                )
                 range_end = datetime.combine(
                     max_date + timedelta(days=1), datetime.min.time()
-                )
+                ).replace(tzinfo=LONDON_TZ)
 
                 c.execute(
                     """
@@ -341,7 +346,7 @@ def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
         for slot in info.get("availability", {}).keys():
             try:
                 date_str = slot.split(" ")[0]
-                date_obj = datetime.strptime(date_str, "%d/%m/%Y").date()
+                date_obj = parse_uk_date(date_str).date()
                 all_dates.add(date_obj)
             except (ValueError, IndexError):
                 logger.debug(f"Failed to parse date from slot: {slot}")
@@ -361,10 +366,12 @@ def insert_appliance_availability(appliance_obj: Dict[str, Any], db_conn=None):
 
             # Clean up existing blocks that overlap with the date range being processed
             if min_date and max_date:
-                range_start = datetime.combine(min_date, datetime.min.time())
+                range_start = datetime.combine(min_date, datetime.min.time()).replace(
+                    tzinfo=LONDON_TZ
+                )
                 range_end = datetime.combine(
                     max_date + timedelta(days=1), datetime.min.time()
-                )
+                ).replace(tzinfo=LONDON_TZ)
 
                 c.execute(
                     """
@@ -418,9 +425,7 @@ def defrag_availability(db_conn=None):
                 delete_query = "DELETE FROM crew_availability WHERE id = ?"
             elif table == "appliance_availability":
                 select_query = "SELECT id, appliance_id, start_time, end_time FROM appliance_availability ORDER BY appliance_id, start_time"
-                update_query = (
-                    "UPDATE appliance_availability SET end_time = ? WHERE id = ?"
-                )
+                update_query = "UPDATE appliance_availability SET end_time = ? WHERE id = ?"
                 delete_query = "DELETE FROM appliance_availability WHERE id = ?"
             else:
                 continue

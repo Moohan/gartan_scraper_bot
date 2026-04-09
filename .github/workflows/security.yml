@@ -36,9 +36,16 @@ jobs:
         pip install safety pip-audit
         
     - name: Run safety check
+      env:
+        SAFETY_API_KEY: ${{ secrets.SAFETY_API_KEY }}
       run: |
-        safety scan --key ${{ secrets.SAFETY_API_KEY }} --output json > safety-report.json || true
-        safety scan --key ${{ secrets.SAFETY_API_KEY }}
+        if [ -n "$SAFETY_API_KEY" ]; then
+          safety scan --key "$SAFETY_API_KEY" --output json > safety-report.json || true
+          safety scan --key "$SAFETY_API_KEY"
+        else
+          echo "SAFETY_API_KEY is not set, skipping safety scan."
+          echo "{}" > safety-report.json
+        fi
         
     - name: Run pip-audit
       run: |
