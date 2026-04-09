@@ -2,7 +2,8 @@
 """
 Container orchestrator for Gartan Scraper Bot
 
-Runs both the periodic scheduler and API server in a single container
+Runs both the periodic scheduler and API server in a single container.
+Starts the API server immediately to ensure port binding on hosting providers like Render.
 """
 
 import logging
@@ -61,7 +62,8 @@ def run_scheduler():
         scheduler_main()
     except Exception as e:
         logger.error(f"Scheduler process failed: {e}")
-        raise
+        # In a container, if the scheduler dies, we might want the whole container to restart
+        os._exit(1)
 
 
 def run_api_server():
@@ -77,44 +79,12 @@ def run_api_server():
         from api_server import app
 
         port = int(os.environ.get("PORT", 5000))
+        # Use a proper production WSGI server if possible, but keep compatibility with current setup
         app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
     except Exception as e:
         logger.error(f"API server process failed: {e}")
-        raise
-
-
-def wait_for_database():
-    """Wait for initial database to be populated"""
-    import sqlite3
-
-    max_wait = 300  # 5 minutes
-    wait_time = 0
-
-    while wait_time < max_wait and not shutdown_flag.is_set():
-        try:
-            if os.path.exists(config.db_path):
-                conn = sqlite3.connect(config.db_path)
-                cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM crew")
-                crew_count = cursor.fetchone()[0]
-                conn.close()
-
-                if crew_count > 0:
-                    logger.info(f"Database ready with {crew_count} crew members")
-                    return True
-
-            logger.info(f"Waiting for database... ({wait_time}s/{max_wait}s)")
-            time.sleep(10)
-            wait_time += 10
-
-        except Exception as e:
-            logger.debug(f"Database check failed: {e}")
-            time.sleep(10)
-            wait_time += 10
-
-    logger.warning("Database not ready after maximum wait time")
-    return False
+        os._exit(1)
 
 
 def main():
@@ -126,24 +96,20 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     try:
+        # Start the API server process FIRST and IMMEDIATELY
+        # This ensures that hosting providers (like Render) see the port binding and mark the deploy as successful
+        api_process = Process(target=run_api_server, name="api_server")
+        api_process.daemon = True
+        api_process.start()
+        processes.append(api_process)
+        logger.info("API server process started (immediate bind)")
+
         # Start the scheduler process
         scheduler_process = Process(target=run_scheduler, name="scheduler")
+        scheduler_process.daemon = True
         scheduler_process.start()
         processes.append(scheduler_process)
         logger.info("Scheduler process started")
-
-        # Wait for database to be populated
-        logger.info("Waiting for initial data...")
-        if wait_for_database():
-            logger.info("Database ready - starting API server")
-        else:
-            logger.warning("Starting API server without confirmed database")
-
-        # Start the API server process
-        api_process = Process(target=run_api_server, name="api_server")
-        api_process.start()
-        processes.append(api_process)
-        logger.info("API server process started")
 
         # Monitor processes
         logger.info("All processes started - monitoring health")
@@ -152,9 +118,7 @@ def main():
             # Check if processes are still running
             for process in processes:
                 if not process.is_alive():
-                    logger.error(f"Process {process.name} died unexpectedly")
-                    # In production, you might want to restart the process
-                    # For now, we'll trigger a shutdown
+                    logger.error(f"Process {process.name} died unexpectedly (exit code: {process.exitcode})")
                     shutdown_flag.set()
                     break
 
