@@ -44,7 +44,7 @@ RUN mkdir -p /app/data /app/_cache /app/logs && \
     chown -R gartan:gartan /app
 
 # Copy application code (do this after creating directories for better caching)
-COPY --chown=gartan:gartan *.py ./
+COPY --chown=gartan:gartan . ./
 
 # Set environment variables
 ENV PATH=/home/gartan/.local/bin:$PATH

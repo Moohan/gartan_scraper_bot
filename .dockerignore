@@ -44,10 +44,6 @@ _cache/
 .env.local
 .env.production
 
-# Documentation
-*.md
-docs/
-specification/
 
 # Development tools
 docker-compose.dev.yml
