@@ -43,8 +43,12 @@ COPY --from=builder /root/.local /home/gartan/.local
 RUN mkdir -p /app/data /app/_cache /app/logs && \
     chown -R gartan:gartan /app
 
-# Copy application code (do this after creating directories for better caching)
+# Copy application source code explicitly
 COPY --chown=gartan:gartan *.py ./
+COPY --chown=gartan:gartan static/ ./static/
+COPY --chown=gartan:gartan docs/ ./docs/
+COPY --chown=gartan:gartan scripts/ ./scripts/
+COPY --chown=gartan:gartan README.md ./
 
 # Set environment variables
 ENV PATH=/home/gartan/.local/bin:$PATH
