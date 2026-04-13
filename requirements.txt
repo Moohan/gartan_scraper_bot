@@ -9,7 +9,7 @@ schedule==1.2.2
 
 
 # Production server
-gunicorn==25.1.0
+gunicorn==25.3.0
 
 # Logging and monitoring
 Werkzeug==3.1.6
