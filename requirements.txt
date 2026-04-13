@@ -8,7 +8,7 @@ flask==3.1.3
 schedule==1.2.2
 
 # Testing
-pytest==9.0.2
+pytest==9.0.3 # Security fix: resolve CVE-2025-71176
 pytest-xdist==3.6.1
 
 # Remove pylint as it might have issues too, but let's keep it for now if it installs
