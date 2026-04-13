@@ -53,3 +53,11 @@ Dockerfile.dev
 *.log
 *.sqlite
 *.db
+
+# Development and tool-specific files
+.claude/
+.jules/
+.githooks/
+.flake8
+.pylintrc
+tests/
