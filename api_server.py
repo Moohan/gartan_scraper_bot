@@ -2,6 +2,9 @@
 """Simplified Flask API server for Gartan availability."""
 
 import logging
+import threading
+import subprocess
+import sys
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -17,6 +20,10 @@ from utils import ensure_london, get_now
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Global state for background fetch
+fetch_lock = threading.Lock()
+fetch_state = {"in_progress": False, "error": None}
 
 app = Flask(__name__, static_url_path="/static", static_folder="static")
 
@@ -98,65 +105,45 @@ def format_hours(minutes: Optional[int]) -> Optional[str]:
     return f"{minutes / 60.0:.2f}h"
 
 
-def _format_avail_info(row, now):
-    """Format availability info from a database row (crew or appliance)."""
-    # Use index-based check or try/except because sqlite3.Row doesn't have .get()
-    try:
-        if not row or row["end_time"] is None:
-            return {"available": False, "duration": None, "end_time_display": None}
-    except (IndexError, KeyError, TypeError):
-        return {"available": False, "duration": None, "end_time_display": None}
-
-    end_time = parse_dt(row["end_time"])
-    duration_min = int((end_time - now).total_seconds() / 60)
-
-    display = end_time.strftime("%H:%M")
-    if end_time.date() == now.date():
-        display += " today"
-    elif end_time.date() == (now + timedelta(days=1)).date():
-        display += " tomorrow"
-    else:
-        display += end_time.strftime(" on %d/%m")
-
-    return {
-        "available": True,
-        "duration": format_hours(duration_min),
-        "end_time_display": display,
-    }
+def get_availability(target_id: int, table: str, now: datetime) -> Dict:
+    with get_db() as conn:
+        row = conn.execute(
+            f"SELECT end_time FROM {table} WHERE {table[:-13]}_id = ? AND start_time <= ? AND end_time > ? ORDER BY end_time DESC LIMIT 1",
+            (target_id, now, now),
+        ).fetchone()
+        if not row:
+            return {"available": False, "duration": None}
+        end = parse_dt(row[0])
+        dur = int((end - now).total_seconds() / 60)
+        return {"available": True, "duration": format_hours(dur)}
 
 
 def get_crew_list() -> List[Dict]:
+    now = get_now()
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM crew ORDER BY name").fetchall()
-        return [dict(r) for r in rows]
+        rows = conn.execute(
+            """
+            SELECT c.id, c.name, c.role, c.skills, c.contract_hours, ca.end_time
+            FROM crew c
+            LEFT JOIN crew_availability ca ON c.id = ca.crew_id
+            AND ca.start_time <= ? AND ca.end_time > ?
+            ORDER BY c.name
+            """,
+            (now, now),
+        ).fetchall()
+        return [{**dict(r), **_format_avail_info(r, now)} for r in rows]
 
 
-def get_availability(entity_id: int, table: str, now: datetime) -> Dict:
-    col = "crew_id" if table == "crew_availability" else "appliance_id"
-    with get_db() as conn:
-        curr = conn.execute(
-            f"SELECT end_time FROM {table} WHERE {col} = ? AND start_time <= ? AND end_time > ? LIMIT 1",
-            (entity_id, now, now),
-        ).fetchone()
-        if not curr:
-            return {"available": False, "duration": None, "end_time_display": None}
-
-        end_time = parse_dt(curr["end_time"])
-        duration_min = int((end_time - now).total_seconds() / 60)
-
-        display = end_time.strftime("%H:%M")
-        if end_time.date() == now.date():
-            display += " today"
-        elif end_time.date() == (now + timedelta(days=1)).date():
-            display += " tomorrow"
-        else:
-            display += end_time.strftime(" on %d/%m")
-
-        return {
-            "available": True,
-            "duration": format_hours(duration_min),
-            "end_time_display": display,
-        }
+def _format_avail_info(row, now):
+    if not row["end_time"]:
+        return {"available": False, "duration": None, "end_time_display": None}
+    end = parse_dt(row["end_time"])
+    dur = int((end - now).total_seconds() / 60)
+    return {
+        "available": True,
+        "duration": format_hours(dur),
+        "end_time_display": end.strftime("%H:%M on %d/%m/%Y"),
+    }
 
 
 def get_weekly_stats(crew_id: int) -> Dict:
@@ -249,6 +236,82 @@ def check_rules(available_crew: List[Dict]) -> Dict:
         "skill_counts": skills,
         "ba_non_ttr": ba_non_ttr,
     }
+
+
+def get_current_max_days() -> int:
+    """Determine how many days of data are currently in the database forward from now."""
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT MAX(end_time) FROM crew_availability")
+        row = c.fetchone()
+        if not row or not row[0]:
+            return 3  # Default if no data
+
+        max_end_time = row[0]
+        if isinstance(max_end_time, str):
+            max_end_time = datetime.fromisoformat(max_end_time)
+        max_end_time = ensure_london(max_end_time)
+
+        now = get_now()
+        delta = max_end_time - now
+        days = max(1, delta.days)
+        return days
+    except Exception as e:
+        logger.error(f"Error calculating max days: {e}")
+        return 3
+
+
+def run_scraper_task(max_days: int):
+    """Run the scraper in a background thread."""
+    global fetch_state
+    try:
+        logger.info(f"Background fetch started for {max_days} days")
+        cmd = [sys.executable, "run_bot.py", "--max-days", str(max_days)]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        with fetch_lock:
+            if result.returncode == 0:
+                logger.info("Background fetch completed successfully")
+                fetch_state = {"in_progress": False, "error": None}
+            else:
+                logger.error(f"Background fetch failed: {result.stderr}")
+                fetch_state = {"in_progress": False, "error": "Scraper failed"}
+    except Exception as e:
+        logger.exception("Error in background fetch task")
+        with fetch_lock:
+            fetch_state = {"in_progress": False, "error": str(e)}
+
+
+@app.route("/retrieve_more", methods=["POST"])
+def retrieve_more():
+    """Trigger a fetch for 7 more days of data."""
+    global fetch_state
+    with fetch_lock:
+        if fetch_state["in_progress"]:
+            return (
+                jsonify({"status": "error", "message": "Fetch already in progress"}),
+                400,
+            )
+
+        current_days = get_current_max_days()
+        new_max_days = current_days + 7
+        fetch_state = {"in_progress": True, "error": None}
+
+        thread = threading.Thread(target=run_scraper_task, args=(new_max_days,))
+        thread.daemon = True
+        thread.start()
+
+        return jsonify(
+            {"status": "ok", "message": f"Fetch started for {new_max_days} days"}
+        )
+
+
+@app.route("/fetch_status")
+def fetch_status():
+    """Return the current status of the background fetch."""
+    with fetch_lock:
+        return jsonify(fetch_state)
 
 
 # --- Routes ---
@@ -576,7 +639,9 @@ DASHBOARD_TEMPLATE = """
                 <button id="refresh-btn" class="refresh-button" aria-label="Refresh Dashboard">
                     <span class="refresh-icon">🔄</span>
                 </button>
+                <button id="retrieve-btn" class="retrieve-button">Retrieve More Data</button>
             </div>
+            <div id="fetch-status-container" class="fetch-status-container"></div>
         </div>
 
         <div class="summary-stats" role="status" aria-live="polite">
