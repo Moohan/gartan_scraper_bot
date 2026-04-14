@@ -2,11 +2,11 @@
 """Simplified Flask API server for Gartan availability."""
 
 import logging
-import os
-import sqlite3
+import threading
 import subprocess
 import sys
-import threading
+import os
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
@@ -246,10 +246,10 @@ def check_rules(available_crew: List[Dict]) -> Dict:
 def get_current_max_days() -> int:
     """Determine how many days of data are currently in the database forward from now."""
     try:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("SELECT MAX(end_time) FROM crew_availability")
-        row = c.fetchone()
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute("SELECT MAX(end_time) FROM crew_availability")
+            row = c.fetchone()
         if not row or not row[0]:
             return 3  # Default if no data
 
