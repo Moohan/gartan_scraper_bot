@@ -2,11 +2,11 @@
 """Simplified Flask API server for Gartan availability."""
 
 import logging
-import os
-import sqlite3
+import threading
 import subprocess
 import sys
-import threading
+import os
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
@@ -272,7 +272,7 @@ def run_scraper_task(max_days: int):
     global fetch_state
     try:
         logger.info(f"Background fetch started for {max_days} days")
-        # Ensure max_days is a string and use list for security
+        # Use a list for arguments to prevent shell injection (satisfied by str(int(max_days)))
         cmd = [sys.executable, "run_bot.py", "--max-days", str(int(max_days))]
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
