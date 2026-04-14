@@ -2,11 +2,11 @@
 """Simplified Flask API server for Gartan availability."""
 
 import logging
-import threading
-import subprocess
-import sys
 import os
 import sqlite3
+import subprocess
+import sys
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
