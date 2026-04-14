@@ -2,11 +2,11 @@
 """Simplified Flask API server for Gartan availability."""
 
 import logging
-import threading
-import subprocess
-import sys
 import os
 import sqlite3
+import subprocess
+import sys
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
@@ -126,6 +126,7 @@ def get_availability(target_id: int, table: str, now: datetime) -> Dict:
         end = parse_dt(row[0])
         dur = int((end - now).total_seconds() / 60)
         return {"available": True, "duration": format_hours(dur)}
+
 
 def get_crew_list() -> List[Dict]:
     now = get_now()
@@ -295,6 +296,7 @@ def run_scraper_task(max_days: int):
         logger.exception("Error in background fetch task")
         with fetch_lock:
             fetch_state = {"in_progress": False, "error": str(e)}
+
 
 @app.route("/retrieve_more", methods=["POST"])
 def retrieve_more():
