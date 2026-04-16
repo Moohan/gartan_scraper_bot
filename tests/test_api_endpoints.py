@@ -211,7 +211,7 @@ class TestAPIEndpoints:
         response = self.client.get("/appliances/P22P6/available")
         assert response.status_code == 200
         # This endpoint returns a boolean directly
-        assert response.get_json() is False  # False because no crew yet
+        assert response.get_json() is False # False because no crew yet
 
     def test_appliance_duration_endpoint(self):
         """Test /appliances/<name>/duration endpoint."""
@@ -293,16 +293,16 @@ class TestAPIEndpoints:
     def test_retrieve_more_endpoint(self):
         """Test the /retrieve_more POST endpoint."""
         # First call should succeed
-        resp = self.client.post("/retrieve_more")
+        resp = self.client.post('/retrieve_more')
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["status"] == "ok"
-        assert "Fetch started" in data["message"]
+        assert data['status'] == 'ok'
+        assert 'Fetch started' in data['message']
 
         # Second call while in progress should fail
-        resp2 = self.client.post("/retrieve_more")
+        resp2 = self.client.post('/retrieve_more')
         assert resp2.status_code == 400
-        assert resp2.get_json()["message"] == "Fetch already in progress"
+        assert resp2.get_json()['message'] == 'Fetch already in progress'
 
         # Reset state for other tests
         with api_server.fetch_lock:
@@ -310,10 +310,10 @@ class TestAPIEndpoints:
 
     def test_fetch_status_endpoint(self):
         """Test the /fetch_status GET endpoint."""
-        resp = self.client.get("/fetch_status")
+        resp = self.client.get('/fetch_status')
         assert resp.status_code == 200
         data = resp.get_json()
-        assert "in_progress" in data
+        assert 'in_progress' in data
 
 
 if __name__ == "__main__":
