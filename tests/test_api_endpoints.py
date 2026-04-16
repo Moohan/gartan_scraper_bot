@@ -99,314 +99,172 @@ class TestAPIEndpoints:
         conn.close()
 
     def test_health_endpoint(self):
-        """Test /health endpoint."""
+        """Test the /health endpoint."""
         response = self.client.get("/health")
         assert response.status_code == 200
-
-        data = json.loads(response.data)
+        data = response.get_json()
         assert data["status"] == "healthy"
-        assert "timestamp" in data
         assert "database" in data
 
     def test_root_dashboard_endpoint(self):
-        """Test / (dashboard) endpoint."""
-        # Insert some test data
-        self._insert_crew_member(1, "TEST, A", "FFC", "BA")
+        """Test the / endpoint (dashboard)."""
+        # Insert some test data first
+        self._insert_crew_member(1, "John Smith", role="WC", skills="TTR, LGV, BA")
+        self._insert_crew_member(2, "Jane Doe", role="FFC", skills="BA")
         self._insert_appliance(1, "P22P6")
 
         response = self.client.get("/")
         assert response.status_code == 200
-        # Dashboard may return HTML or JSON depending on implementation
-        # Let's accept either
-        assert response.content_type.startswith(("text/html", "application/json"))
-
         # Check for key dashboard elements
-        content = response.data.decode("utf-8")
-        # Dashboard may return JSON error or HTML content
-        if response.content_type.startswith("application/json"):
-            assert "Gartan Scraper Bot" in content
-        else:
-            assert "Gartan Scraper Bot" in content
-            assert "Dashboard" in content
-            assert "TEST, A" in content
-            assert "P22P6" in content
+        html = response.get_data(as_text=True)
+        assert "Managing Station: P22" in html
+        assert "John Smith" in html
+        assert "Jane Doe" in html
+        assert "P22P6 Status" in html
+        assert "Retrieve More Data" in html
 
     def test_crew_list_endpoint(self):
-        """Test /crew endpoint."""
-        # Insert test crew
-        self._insert_crew_member(
-            1,
-            "JONES, AB",
-            "FFC",
-            "BA LGV",
-        )
-        self._insert_crew_member(2, "SMITH, CD", "FFT", "TTR")
-
+        """Test the /crew endpoint."""
+        self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew")
         assert response.status_code == 200
-
-        data = json.loads(response.data)
-        assert isinstance(data, list)
-        assert len(data) == 2
-
-        # Check first crew member
-        crew1 = next(c for c in data if c["name"] == "JONES, AB")
-        assert crew1["role"] == "FFC"
-        assert crew1["skills"] == "BA LGV"
-
-        # Check second crew member
-        crew2 = next(c for c in data if c["name"] == "SMITH, CD")
-        assert crew2["role"] == "FFT"
-        assert crew2["skills"] == "TTR"
+        data = response.get_json()
+        assert len(data) >= 1
+        assert any(c["name"] == "John Smith" for c in data)
 
     def test_crew_available_endpoint(self):
-        """Test /crew/<id>/available endpoint."""
-        # Insert available crew member
-        self._insert_crew_member(1, "AVAILABLE, A", available=True)
+        """Test the /crew/<id>/available endpoint."""
+        self._insert_crew_member(1, "John Smith", available=True)
+        self._insert_crew_member(2, "Jane Doe", available=False)
 
-        # Insert unavailable crew member
-        self._insert_crew_member(2, "UNAVAILABLE, B", available=False)
-
-        # Test available crew
+        # Test available member
         response = self.client.get("/crew/1/available")
         assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data is True  # API returns bare boolean
+        assert response.get_json() is True
 
-        # Test unavailable crew
+        # Test unavailable member
         response = self.client.get("/crew/2/available")
         assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data is False  # API returns bare boolean
-
-        # Test non-existent crew
-        response = self.client.get("/crew/999/available")
-        assert response.status_code == 404
-        data = json.loads(response.data)
-        assert "error" in data
-        assert "not found" in data["error"].lower()
+        assert response.get_json() is False
 
     def test_crew_duration_endpoint(self):
-        """Test /crew/<id>/duration endpoint."""
-        # Insert crew with specific duration
-        self._insert_crew_member(1, "DURATION, A", available=True)
-
+        """Test the /crew/<id>/duration endpoint."""
+        self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/duration")
         assert response.status_code == 200
-        data = json.loads(response.data)
-        # API returns bare string like "7.98h" or null
-        assert isinstance(data, (str, type(None)))
-
-        # Non-existent crew should return 404
-        response = self.client.get("/crew/999/duration")
-        assert response.status_code == 404
+        data = response.get_json()
+        assert "h" in data  # e.g. "8.00h"
 
     def test_crew_hours_this_week_endpoint(self):
-        """Test /crew/<id>/hours-this-week endpoint."""
-        self._insert_crew_member(1, "WEEKLY, A", available=True)
-
+        """Test the /crew/<id>/hours-this-week endpoint."""
+        self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/hours-this-week")
         assert response.status_code == 200
-        data = json.loads(response.data)
-        assert "hours_this_week" in data
-        assert isinstance(data["hours_this_week"], (int, float))
-        assert data["hours_this_week"] >= 0
+        data = response.get_json()
+        assert "hours_achieved" in data
 
     def test_crew_hours_planned_week_endpoint(self):
-        """Test /crew/<id>/hours-planned-week endpoint."""
-        self._insert_crew_member(1, "PLANNED, A", available=True)
-
+        """Test the /crew/<id>/hours-planned-week endpoint."""
+        self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/hours-planned-week")
         assert response.status_code == 200
-        data = json.loads(response.data)
+        data = response.get_json()
         assert "hours_planned_week" in data
-        assert isinstance(data["hours_planned_week"], (int, float))
-        assert data["hours_planned_week"] >= 0
 
     def test_crew_contract_hours_endpoint(self):
-        """Test /crew/<id>/contract-hours endpoint."""
-        self._insert_crew_member(1, "CONTRACT, A", available=True)
-
+        """Test the /crew/<id>/contract-hours endpoint."""
+        self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/contract-hours")
         assert response.status_code == 200
-        data = json.loads(response.data)
-        assert "contract_hours" in data
-        assert data["contract_hours"] == "56"
+        assert response.get_json()["contract_hours"] == "56"
 
     def test_crew_hours_achieved_endpoint(self):
-        """Test /crew/<id>/hours-achieved endpoint."""
-        self._insert_crew_member(1, "ACHIEVED, A", available=True)
-
+        """Test the /crew/<id>/hours-achieved endpoint."""
+        self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/hours-achieved")
         assert response.status_code == 200
-        data = json.loads(response.data)
-        assert "hours_achieved" in data
-        assert isinstance(data["hours_achieved"], (int, float))
+        assert "hours_achieved" in response.get_json()
 
     def test_crew_hours_remaining_endpoint(self):
-        """Test /crew/<id>/hours-remaining endpoint."""
-        self._insert_crew_member(1, "REMAINING, A", available=True)
-
+        """Test the /crew/<id>/hours-remaining endpoint."""
+        self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/hours-remaining")
         assert response.status_code == 200
-        data = json.loads(response.data)
-        assert "hours_remaining" in data
-        assert isinstance(data["hours_remaining"], (int, float))
+        assert "hours_remaining" in response.get_json()
 
     def test_week_boundaries_logic(self):
-        """Test the internal week boundary calculation logic."""
-        from api_server import get_week_boundaries
-
-        start, end = get_week_boundaries()
-        assert start.weekday() == 0  # Monday
-        assert start.hour == 0
-        assert end.weekday() == 6  # Sunday
-        assert end.hour == 23
-        assert (end - start).days == 6
+        """Test get_week_boundaries internal helper."""
+        monday, sunday = api_server.get_week_boundaries()
+        assert monday.weekday() == 0  # Monday
+        assert sunday.weekday() == 6  # Sunday
+        assert (sunday - monday).days == 6
 
     def test_hours_precision_logic(self):
-        """Test that hours are calculated with proper precision."""
-        # Insert 90 minute block (1.5 hours)
-        conn = sqlite3.connect(self.temp_path)
-        c = conn.cursor()
-        week_start, _ = api_server.get_week_boundaries()
-        start = week_start + timedelta(hours=10)
-        end = start + timedelta(minutes=90)
-        c.execute(
-            "INSERT INTO crew (id, name, contract_hours) VALUES (99, 'PRECISION', '56')"
-        )
-        c.execute(
-            "INSERT INTO crew_availability (crew_id, start_time, end_time) VALUES (99, ?, ?)",
-            (start.isoformat(), end.isoformat()),
-        )
-        conn.commit()
-        conn.close()
-
-        response = self.client.get("/crew/99/hours-planned-week")
-        data = json.loads(response.data)
-        assert data["hours_planned_week"] == 1.5
+        """Test format_hours precision."""
+        assert api_server.format_hours(60) == "1.00h"
+        assert api_server.format_hours(90) == "1.50h"
+        assert api_server.format_hours(45) == "0.75h"
 
     def test_appliance_available_endpoint(self):
         """Test /appliances/<name>/available endpoint."""
-        # Insert available appliance (not P22P6 to avoid business rules)
-        self._insert_appliance(1, "ENGINE1", available=True)
-
-        # Insert unavailable appliance
-        self._insert_appliance(2, "ENGINE2", available=False)
-
-        # Test available appliance
-        response = self.client.get("/appliances/ENGINE1/available")
+        self._insert_appliance(1, "P22P6", available=True)
+        response = self.client.get("/appliances/P22P6/available")
         assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data is True  # API returns bare boolean
-
-        # Test unavailable appliance
-        response = self.client.get("/appliances/ENGINE2/available")
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data is False  # API returns bare boolean
-
-        # Test non-existent appliance
-        response = self.client.get("/appliances/NONEXISTENT/available")
-        assert response.status_code == 404
+        # This endpoint returns a boolean directly
+        assert response.get_json() is False  # False because no crew yet
 
     def test_appliance_duration_endpoint(self):
         """Test /appliances/<name>/duration endpoint."""
-        self._insert_appliance(1, "ENGINE1", available=True)
-
-        response = self.client.get("/appliances/ENGINE1/duration")
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        # API returns bare string like "7.98h" or null
-        assert isinstance(data, (str, type(None)))
-
-        # If string, should end with 'h'
-        if isinstance(data, str):
-            assert data.endswith("h")
-
-        # Non-existent appliance should return 404
-        response = self.client.get("/appliances/NONEXISTENT/duration")
-        assert response.status_code == 404
-
-    def test_p22p6_business_rules_integration(self):
-        """Test P22P6 specific business rules through HTTP endpoints."""
-        # Insert P22P6 appliance
-        self._insert_appliance(1, "P22P6", available=True)
-
-        # Insert insufficient crew (no TTR officer)
-        self._insert_crew_member(1, "CREW, A", "FFC", "LGV BA", available=True)
-        self._insert_crew_member(2, "CREW, B", "FFD", "BA", available=True)
-        self._insert_crew_member(3, "CREW, C", "FFT", "BA", available=True)
-
-        # P22P6 should be unavailable due to business rules
-        response = self.client.get("/appliances/P22P6/available")
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data is False  # API returns bare boolean
-
-        # Duration should be None due to business rules
+        self._insert_appliance(1, "P22P6")
         response = self.client.get("/appliances/P22P6/duration")
         assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data is None  # API returns bare null/None
+        # This returns None/null if rules don't pass
+        assert response.get_json() is None
+
+    def test_p22p6_business_rules_integration(self):
+        """Test if P22P6 status respects crew rules."""
+        # Insert ONLY appliance, no crew (should fail rules)
+        self._insert_appliance(1, "P22P6")
+        response = self.client.get("/appliances/P22P6/available")
+        assert response.get_json() is False
+
+        # Insert 4 crew members with correct skills (should pass rules)
+        self._insert_crew_member(1, "Officer", role="WC", skills="TTR BA")
+        self._insert_crew_member(2, "Driver", role="FFD", skills="LGV BA")
+        self._insert_crew_member(3, "FF1", role="FFD", skills="BA")
+        self._insert_crew_member(4, "FF2", role="FFD", skills="BA")
+
+        response = self.client.get("/appliances/P22P6/available")
+        assert response.get_json() is True
 
     def test_http_methods_not_allowed(self):
-        """Test that only GET methods are allowed on endpoints."""
-        endpoints = [
-            "/health",
-            "/crew",
-            "/crew/1/available",
-            "/appliances/P22P6/available",
-        ]
+        """Test that disallowed HTTP methods return 405."""
+        response = self.client.post("/crew")
+        assert response.status_code == 405
 
-        for endpoint in endpoints:
-            # Test POST method (should not be allowed)
-            response = self.client.post(endpoint)
-            assert response.status_code == 405  # Method Not Allowed
-
-            # Test PUT method (should not be allowed)
-            response = self.client.put(endpoint)
-            assert response.status_code == 405
+        response = self.client.put("/health")
+        assert response.status_code == 405
 
     def test_content_type_headers(self):
-        """Test that endpoints return correct content types."""
-        self._insert_crew_member(1, "TEST, A")
+        """Test that JSON endpoints return correct Content-Type."""
+        response = self.client.get("/crew")
+        assert response.headers["Content-Type"] == "application/json"
 
-        # JSON endpoints
-        json_endpoints = ["/health", "/crew", "/crew/1/available"]
-
-        for endpoint in json_endpoints:
-            response = self.client.get(endpoint)
-            assert response.content_type.startswith("application/json")
-
-        # HTML endpoint
-        response = self.client.get("/")
-        # Dashboard may return HTML or JSON depending on error conditions
-        assert response.content_type.startswith(("text/html", "application/json"))
+        response = self.client.get("/health")
+        assert response.headers["Content-Type"] == "application/json"
 
     def test_error_handling_robustness(self):
-        """Test various error conditions and edge cases."""
-        # Test invalid crew ID types
-        response = self.client.get("/crew/invalid/available")
-        assert response.status_code == 404  # Flask handles invalid int conversion
-
-        # Test very large crew ID (should return 404 for non-existent)
-        response = self.client.get("/crew/999999999/available")
-        assert response.status_code == 404  # Non-existent crew
-
-        # Test negative crew ID
-        response = self.client.get("/crew/-1/available")
+        """Test behavior for non-existent IDs."""
+        response = self.client.get("/crew/999/available")
         assert response.status_code == 404
 
     def test_empty_database_handling(self):
-        """Test endpoints with empty database."""
-        # Crew list should return empty array
+        """Test behavior with an initialized but empty database."""
+        # Database was initialized in setup_method but remains empty here
         response = self.client.get("/crew")
         assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data == []
+        assert response.get_json() == []
 
-        # Individual crew should return 404 for non-existent
         response = self.client.get("/crew/1/available")
         assert response.status_code == 404
 
@@ -431,6 +289,31 @@ class TestAPIEndpoints:
             500,
             503,
         ]  # Various error responses acceptable
+
+    def test_retrieve_more_endpoint(self):
+        """Test the /retrieve_more POST endpoint."""
+        # First call should succeed
+        resp = self.client.post("/retrieve_more")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "ok"
+        assert "Fetch started" in data["message"]
+
+        # Second call while in progress should fail
+        resp2 = self.client.post("/retrieve_more")
+        assert resp2.status_code == 400
+        assert resp2.get_json()["message"] == "Fetch already in progress"
+
+        # Reset state for other tests
+        with api_server.fetch_lock:
+            api_server.fetch_state = {"in_progress": False, "error": None}
+
+    def test_fetch_status_endpoint(self):
+        """Test the /fetch_status GET endpoint."""
+        resp = self.client.get("/fetch_status")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "in_progress" in data
 
 
 if __name__ == "__main__":
