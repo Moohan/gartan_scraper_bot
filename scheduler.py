@@ -6,9 +6,9 @@ Background scheduler for periodic data collection
 Runs the Gartan scraper every 5 minutes using intelligent cache rules
 """
 
-import shlex
 import logging
 import os
+import shlex
 import sqlite3
 import subprocess
 import sys
@@ -80,7 +80,12 @@ def run_scraper(max_days: int = 3) -> bool:
         # Use cache-first mode for efficiency in production
         # Run the scraper with static command parts to satisfy security scanners
         result = subprocess.run(
-            [sys.executable, "run_bot.py", "--max-days", shlex.quote(str(int(max_days)))],
+            [
+                sys.executable,
+                "run_bot.py",
+                "--max-days",
+                shlex.quote(str(int(max_days))),
+            ],
             capture_output=True,
             text=True,
             timeout=300,  # 5 minute timeout
