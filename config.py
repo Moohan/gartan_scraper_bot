@@ -12,6 +12,7 @@ class Config:
         in_container = (
             os.path.exists("/app") and "PYTEST_CURRENT_TEST" not in os.environ
         )
+        is_test = "PYTEST_CURRENT_TEST" in os.environ
 
         self.db_path = (
             "/app/data/gartan_availability.db"
@@ -28,6 +29,27 @@ class Config:
         )
         self.max_log_size = 10 * 1024 * 1024  # 10MB
         self.max_workers = 4  # For concurrent processing
+
+        self.flask_secret_key = os.environ.get("FLASK_SECRET_KEY")
+        if not self.flask_secret_key:
+            if not is_test:
+                print(
+                    "WARNING: FLASK_SECRET_KEY not set. Using a temporary random key. "
+                    "Sessions will be cleared on restart. Please set FLASK_SECRET_KEY for persistence."
+                )
+            self.flask_secret_key = os.urandom(24).hex()
+
+        self.default_admin_user = os.environ.get("DEFAULT_ADMIN_USER") or "admin"
+        self.default_admin_pass = os.environ.get("DEFAULT_ADMIN_PASS") or "Admin123!"
+
+        if not os.environ.get("DEFAULT_ADMIN_USER") or not os.environ.get(
+            "DEFAULT_ADMIN_PASS"
+        ):
+            if not is_test:
+                print(
+                    "WARNING: DEFAULT_ADMIN_USER or DEFAULT_ADMIN_PASS not set. "
+                    "Using default 'admin' / 'Admin123!'. Change these in environment for security."
+                )
 
     def get_cache_minutes(self, day_offset: int) -> int:
         """

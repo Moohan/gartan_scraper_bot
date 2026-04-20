@@ -11,9 +11,21 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
-from flask import Flask, g, jsonify, render_template_string
+from flask import (
+    Flask,
+    flash,
+    g,
+    jsonify,
+    redirect,
+    render_template_string,
+    request,
+    session,
+    url_for,
+)
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from config import config
+from db_store import ensure_admin_user
 from gartan_fetch import fetch_station_feed_html
 from parse_grid import parse_station_feed_html
 from utils import ensure_london, get_now
@@ -26,7 +38,99 @@ logger = logging.getLogger(__name__)
 fetch_lock = threading.Lock()
 fetch_state = {"in_progress": False, "error": None}
 
+
+# Initialize Database and Admin User
+from db_store import init_db
+
+init_db()
+ensure_admin_user(config.default_admin_user, config.default_admin_pass)
+
 app = Flask(__name__, static_url_path="/static", static_folder="static")
+
+app.secret_key = config.flask_secret_key
+app.permanent_session_lifetime = timedelta(days=365)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=os.environ.get("RENDER")
+    is not None,  # Set to True in production with HTTPS
+    SESSION_COOKIE_SAMESITE="Lax",
+)
+
+
+@app.before_request
+def require_login():
+    # Allow-list static assets and health check
+    if request.path.startswith("/static") or request.path.rstrip("/") == "/health":
+        return
+
+    if request.endpoint in ("login", "static", "health"):
+        return
+
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if session.get("must_change_password") and request.endpoint != "change_password":
+        flash("You must change your password before continuing.", "warning")
+        return redirect(url_for("change_password"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        with get_db() as conn:
+            user = conn.execute(
+                "SELECT * FROM users WHERE username = ?", (username,)
+            ).fetchone()
+            if user and check_password_hash(user["password_hash"], password):
+                session.permanent = True
+                session["user_id"] = user["id"]
+                session["username"] = user["username"]
+                session["must_change_password"] = bool(user["must_change_password"])
+                logger.info(f"Successful login for user: {username}")
+                return redirect(url_for("root"))
+            else:
+                logger.warning(f"Failed login attempt for user: {username}")
+                flash("Invalid username or password", "error")
+
+    return render_template_string(LOGIN_TEMPLATE)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/change-password", methods=["GET", "POST"])
+def change_password():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        new_password = request.form.get("new_password")
+        confirm_password = request.form.get("confirm_password")
+
+        if not new_password:
+            flash("Password cannot be empty", "error")
+        elif new_password != confirm_password:
+            flash("Passwords do not match", "error")
+        else:
+            hashed = generate_password_hash(new_password)
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?",
+                    (hashed, session["user_id"]),
+                )
+                conn.commit()
+            session["must_change_password"] = False
+            flash("Password updated successfully", "success")
+            return redirect(url_for("root"))
+
+    return render_template_string(CHANGE_PASSWORD_TEMPLATE)
+
 
 # Database configuration
 DB_PATH = config.db_path
@@ -357,6 +461,7 @@ def health():
 
 @app.route("/")
 def root():
+
     try:
         now = get_now()
         crew_data = []
@@ -641,6 +746,131 @@ def add_security_headers(response):
     return response
 
 
+LOGIN_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login - Gartan Scraper</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <h1>Gartan Scraper</h1>
+        <form method="POST" class="auth-form">
+            <h2>Login</h2>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autofocus>
+            </div>
+
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div class="password-container">
+                    <input type="password" id="password" name="password" required style="padding-right: 40px;">
+                    <span id="toggle-icon" class="password-toggle" onclick="togglePassword('password', 'toggle-icon')">👁️</span>
+                </div>
+            </div>
+
+
+            <button type="submit" class="auth-button">Login</button>
+        </form>
+    </div>
+
+
+
+
+
+<script>
+function togglePassword(id, iconId) {
+    var x = document.getElementById(id);
+    var icon = document.getElementById(iconId);
+    if (x.type === "password") {
+        x.type = "text";
+        icon.textContent = "🔒";
+    } else {
+        x.type = "password";
+        icon.textContent = "👁️";
+    }
+}
+</script>
+</body>
+</html>
+"""
+
+
+CHANGE_PASSWORD_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Change Password - Gartan Scraper</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <h1>Gartan Scraper</h1>
+        <form method="POST" class="auth-form">
+            <h2>Change Password</h2>
+            <p>You must change your password before continuing.</p>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+
+            <div class="form-group">
+                <label for="new_password">New Password</label>
+                <div class="password-container">
+                    <input type="password" id="new_password" name="new_password" required autofocus style="padding-right: 40px;">
+                    <span id="toggle-icon-1" class="password-toggle" onclick="togglePassword('new_password', 'toggle-icon-1')">👁️</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="confirm_password">Confirm New Password</label>
+                <div class="password-container">
+                    <input type="password" id="confirm_password" name="confirm_password" required style="padding-right: 40px;">
+                    <span id="toggle-icon-2" class="password-toggle" onclick="togglePassword('confirm_password', 'toggle-icon-2')">👁️</span>
+                </div>
+            </div>
+
+
+            <button type="submit" class="auth-button">Update Password</button>
+        </form>
+    </div>
+
+
+
+
+
+<script>
+function togglePassword(id, iconId) {
+    var x = document.getElementById(id);
+    var icon = document.getElementById(iconId);
+    if (x.type === "password") {
+        x.type = "text";
+        icon.textContent = "🔒";
+    } else {
+        x.type = "password";
+        icon.textContent = "👁️";
+    }
+}
+</script>
+</body>
+</html>
+"""
+
 DASHBOARD_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -653,7 +883,7 @@ DASHBOARD_TEMPLATE = """
 <body>
     <div class="container">
         <div class="header">
-            <h1>Managing Station: P22</h1>
+            <div style="display: flex; justify-content: space-between; align-items: center;"><h1>Managing Station: P22</h1><a href="/logout" class="logout-link">Logout</a></div>
             <div class="timestamp-container">
                 <span class="live-indicator" aria-hidden="true"></span>
                 <span class="timestamp">Updated: {{ now.strftime('%H:%M:%S on %d/%m/%Y') }}</span>
@@ -703,9 +933,14 @@ DASHBOARD_TEMPLATE = """
             </div>
         </div>
     </div>
+
+
+
+
 </body>
 </html>
 """
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

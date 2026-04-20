@@ -129,6 +129,9 @@ jobs:
         env:
           GARTAN_USERNAME: ${{ secrets.GARTAN_USERNAME }}
           GARTAN_PASSWORD: ${{ secrets.GARTAN_PASSWORD }}
+          DEFAULT_ADMIN_USER: admin
+          DEFAULT_ADMIN_PASS: Admin123!
+          FLASK_SECRET_KEY: test_secret_key
         run: |
           if [ -z "${GARTAN_USERNAME}" ] || [ -z "${GARTAN_PASSWORD}" ]; then
             echo "Warning: GARTAN_USERNAME / GARTAN_PASSWORD secrets not set. Tests that require credentials may fail." >&2

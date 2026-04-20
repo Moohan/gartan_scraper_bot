@@ -55,6 +55,15 @@ CREATE TABLE IF NOT EXISTS appliance_availability (
 );
 """
 
+USERS_TABLE = """
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    must_change_password INTEGER DEFAULT 1
+);
+"""
+
 
 def init_db(db_path: str = DB_PATH, reset: bool = False):
     """Initialise the database schema.
@@ -70,11 +79,13 @@ def init_db(db_path: str = DB_PATH, reset: bool = False):
         c.execute("DROP TABLE IF EXISTS appliance_availability")
         c.execute("DROP TABLE IF EXISTS crew")
         c.execute("DROP TABLE IF EXISTS appliance")
+        c.execute("DROP TABLE IF EXISTS users")
     # (Re)create tables if missing
     c.execute(CREW_DETAILS_TABLE)
     c.execute(APPLIANCE_META_TABLE)
     c.execute(CREW_TABLE)
     c.execute(APPLIANCE_TABLE)
+    c.execute(USERS_TABLE)
     # Idempotent indexes to prevent duplicate block inserts
     c.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_crew_block ON crew_availability(crew_id,start_time,end_time)"
@@ -469,6 +480,53 @@ def defrag_availability(db_conn=None):
                 logger.info(f"Merged {merged_count} blocks in {table}")
 
         conn.commit()
+    finally:
+        if should_close:
+            conn.close()
+
+
+def ensure_admin_user(username, password, db_conn=None):
+    """Ensure the default admin user exists in the database.
+    If the user exists but hasn't changed their password yet, sync it with the provided password.
+    """
+    from werkzeug.security import generate_password_hash
+
+    from logging_config import get_logger
+
+    logger = get_logger()
+
+    if db_conn is not None:
+        conn = db_conn
+        should_close = False
+    else:
+        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+        conn.row_factory = sqlite3.Row
+        should_close = True
+
+    try:
+        c = conn.cursor()
+        c.execute(
+            "SELECT id, must_change_password FROM users WHERE username = ?", (username,)
+        )
+        user = c.fetchone()
+
+        if not user:
+            logger.info(f"Creating default admin user: {username}")
+            password_hash = generate_password_hash(password)
+            c.execute(
+                "INSERT INTO users (username, password_hash, must_change_password) VALUES (?, ?, 1)",
+                (username, password_hash),
+            )
+            conn.commit()
+        elif user["must_change_password"]:
+            # If they haven't changed it yet, allow updating it via env var
+            logger.info(f"Syncing default admin password for: {username}")
+            password_hash = generate_password_hash(password)
+            c.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (password_hash, user["id"]),
+            )
+            conn.commit()
     finally:
         if should_close:
             conn.close()
