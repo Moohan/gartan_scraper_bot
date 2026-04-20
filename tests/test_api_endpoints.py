@@ -19,6 +19,7 @@ from api_server import app
 class TestAPIEndpoints:
     """Test API server HTTP endpoints."""
 
+
     def setup_method(self):
         """Set up test database and Flask test client for each test."""
         # Create temporary database
@@ -30,7 +31,6 @@ class TestAPIEndpoints:
         conn = sqlite3.connect(self.temp_path)
         c = conn.cursor()
 
-        # Create all required tables
         c.execute(
             "CREATE TABLE crew (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, role TEXT, skills TEXT, contract_hours TEXT)"
         )
@@ -43,12 +43,35 @@ class TestAPIEndpoints:
         c.execute(
             "CREATE TABLE appliance_availability (id INTEGER PRIMARY KEY AUTOINCREMENT, appliance_id INTEGER NOT NULL, start_time DATETIME NOT NULL, end_time DATETIME NOT NULL)"
         )
+        c.execute(
+            "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, must_change_password INTEGER DEFAULT 1)"
+        )
         conn.commit()
         conn.close()
 
         # Set up Flask test client
         app.config["TESTING"] = True
         self.client = app.test_client()
+
+
+    def _login(self):
+        """Helper to authenticate the client and change default password."""
+        from werkzeug.security import generate_password_hash
+        conn = sqlite3.connect(self.temp_path)
+        c = conn.cursor()
+        # Clean start for users
+        c.execute("DELETE FROM users")
+        hashed = generate_password_hash("Admin123!")
+        c.execute("INSERT INTO users (username, password_hash, must_change_password) VALUES (?, ?, 1)", ("admin", hashed))
+        conn.commit()
+        conn.close()
+
+        # 1. Login with default credentials
+        self.client.post("/login", data={"username": "admin", "password": "Admin123!"})
+        # 2. Change password as required
+        self.client.post("/change-password", data={"new_password": "NewAdmin123!", "confirm_password": "NewAdmin123!"})
+
+
 
     def teardown_method(self):
         """Clean up after each test."""
@@ -107,6 +130,7 @@ class TestAPIEndpoints:
         assert "database" in data
 
     def test_root_dashboard_endpoint(self):
+        self._login()
         """Test the / endpoint (dashboard)."""
         # Insert some test data first
         self._insert_crew_member(1, "John Smith", role="WC", skills="TTR, LGV, BA")
@@ -124,6 +148,7 @@ class TestAPIEndpoints:
         assert "Retrieve More Data" in html
 
     def test_crew_list_endpoint(self):
+        self._login()
         """Test the /crew endpoint."""
         self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew")
@@ -133,6 +158,7 @@ class TestAPIEndpoints:
         assert any(c["name"] == "John Smith" for c in data)
 
     def test_crew_available_endpoint(self):
+        self._login()
         """Test the /crew/<id>/available endpoint."""
         self._insert_crew_member(1, "John Smith", available=True)
         self._insert_crew_member(2, "Jane Doe", available=False)
@@ -148,6 +174,7 @@ class TestAPIEndpoints:
         assert response.get_json() is False
 
     def test_crew_duration_endpoint(self):
+        self._login()
         """Test the /crew/<id>/duration endpoint."""
         self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/duration")
@@ -156,6 +183,7 @@ class TestAPIEndpoints:
         assert "h" in data  # e.g. "8.00h"
 
     def test_crew_hours_this_week_endpoint(self):
+        self._login()
         """Test the /crew/<id>/hours-this-week endpoint."""
         self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/hours-this-week")
@@ -164,6 +192,7 @@ class TestAPIEndpoints:
         assert "hours_achieved" in data
 
     def test_crew_hours_planned_week_endpoint(self):
+        self._login()
         """Test the /crew/<id>/hours-planned-week endpoint."""
         self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/hours-planned-week")
@@ -172,6 +201,7 @@ class TestAPIEndpoints:
         assert "hours_planned_week" in data
 
     def test_crew_contract_hours_endpoint(self):
+        self._login()
         """Test the /crew/<id>/contract-hours endpoint."""
         self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/contract-hours")
@@ -179,6 +209,7 @@ class TestAPIEndpoints:
         assert response.get_json()["contract_hours"] == "56"
 
     def test_crew_hours_achieved_endpoint(self):
+        self._login()
         """Test the /crew/<id>/hours-achieved endpoint."""
         self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/hours-achieved")
@@ -186,6 +217,7 @@ class TestAPIEndpoints:
         assert "hours_achieved" in response.get_json()
 
     def test_crew_hours_remaining_endpoint(self):
+        self._login()
         """Test the /crew/<id>/hours-remaining endpoint."""
         self._insert_crew_member(1, "John Smith")
         response = self.client.get("/crew/1/hours-remaining")
@@ -206,6 +238,7 @@ class TestAPIEndpoints:
         assert api_server.format_hours(45) == "0.75h"
 
     def test_appliance_available_endpoint(self):
+        self._login()
         """Test /appliances/<name>/available endpoint."""
         self._insert_appliance(1, "P22P6", available=True)
         response = self.client.get("/appliances/P22P6/available")
@@ -214,6 +247,7 @@ class TestAPIEndpoints:
         assert response.get_json() is False  # False because no crew yet
 
     def test_appliance_duration_endpoint(self):
+        self._login()
         """Test /appliances/<name>/duration endpoint."""
         self._insert_appliance(1, "P22P6")
         response = self.client.get("/appliances/P22P6/duration")
@@ -222,6 +256,7 @@ class TestAPIEndpoints:
         assert response.get_json() is None
 
     def test_p22p6_business_rules_integration(self):
+        self._login()
         """Test if P22P6 status respects crew rules."""
         # Insert ONLY appliance, no crew (should fail rules)
         self._insert_appliance(1, "P22P6")
@@ -238,6 +273,7 @@ class TestAPIEndpoints:
         assert response.get_json() is True
 
     def test_http_methods_not_allowed(self):
+        self._login()
         """Test that disallowed HTTP methods return 405."""
         response = self.client.post("/crew")
         assert response.status_code == 405
@@ -246,6 +282,7 @@ class TestAPIEndpoints:
         assert response.status_code == 405
 
     def test_content_type_headers(self):
+        self._login()
         """Test that JSON endpoints return correct Content-Type."""
         response = self.client.get("/crew")
         assert response.headers["Content-Type"] == "application/json"
@@ -254,11 +291,13 @@ class TestAPIEndpoints:
         assert response.headers["Content-Type"] == "application/json"
 
     def test_error_handling_robustness(self):
+        self._login()
         """Test behavior for non-existent IDs."""
         response = self.client.get("/crew/999/available")
         assert response.status_code == 404
 
     def test_empty_database_handling(self):
+        self._login()
         """Test behavior with an initialized but empty database."""
         # Database was initialized in setup_method but remains empty here
         response = self.client.get("/crew")
@@ -273,6 +312,7 @@ class TestAPIEndpoints:
         assert response.status_code == 200
 
     def test_database_connection_error_handling(self):
+        self._login()
         """Test behavior when database is unavailable."""
         # Remove the database file to simulate connection error
         os.unlink(self.temp_path)
@@ -291,6 +331,7 @@ class TestAPIEndpoints:
         ]  # Various error responses acceptable
 
     def test_retrieve_more_endpoint(self):
+        self._login()
         """Test the /retrieve_more POST endpoint."""
         # First call should succeed
         resp = self.client.post("/retrieve_more")
@@ -309,6 +350,7 @@ class TestAPIEndpoints:
             api_server.fetch_state = {"in_progress": False, "error": None}
 
     def test_fetch_status_endpoint(self):
+        self._login()
         """Test the /fetch_status GET endpoint."""
         resp = self.client.get("/fetch_status")
         assert resp.status_code == 200

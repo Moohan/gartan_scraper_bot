@@ -10,22 +10,12 @@ import sys
 import threading
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
-
-from flask import (
-    Flask,
-    flash,
-    g,
-    jsonify,
-    redirect,
-    render_template_string,
-    request,
-    session,
-    url_for,
-)
 from werkzeug.security import check_password_hash, generate_password_hash
+from db_store import ensure_admin_user
+
+from flask import Flask, g, jsonify, render_template_string, session, redirect, url_for, request, flash
 
 from config import config
-from db_store import ensure_admin_user
 from gartan_fetch import fetch_station_feed_html
 from parse_grid import parse_station_feed_html
 from utils import ensure_london, get_now
@@ -39,79 +29,80 @@ fetch_lock = threading.Lock()
 fetch_state = {"in_progress": False, "error": None}
 
 
+
 app = Flask(__name__, static_url_path="/static", static_folder="static")
 app.secret_key = config.flask_secret_key
 app.permanent_session_lifetime = timedelta(days=365)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=False,  # Set to True in production with HTTPS
+    SESSION_COOKIE_SAMESITE='Lax',
+)
+
 
 
 @app.before_request
 def require_login():
-    if request.path.startswith("/static"):
-        return
-    if request.endpoint in ("login", "static"):
+    if request.path.startswith('/static') or request.path == '/health':
         return
 
-    if "user_id" not in session:
-        return redirect(url_for("login"))
+    if request.endpoint in ('login', 'static'):
+        return
 
-    if session.get("must_change_password") and request.endpoint != "change_password":
-        flash("You must change your password before continuing.", "warning")
-        return redirect(url_for("change_password"))
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
 
+    if session.get('must_change_password') and request.endpoint != 'change_password':
+        flash('You must change your password before continuing.', 'warning')
+        return redirect(url_for('change_password'))
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
 
         with get_db() as conn:
-            user = conn.execute(
-                "SELECT * FROM users WHERE username = ?", (username,)
-            ).fetchone()
+            user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
 
-            if user and check_password_hash(user["password_hash"], password):
+            if user and check_password_hash(user['password_hash'], password):
                 session.permanent = True
-                session["user_id"] = user["id"]
-                session["username"] = user["username"]
-                session["must_change_password"] = bool(user["must_change_password"])
-                return redirect(url_for("root"))
+                session['user_id'] = user['id']
+                session['username'] = user['username']
+                session['must_change_password'] = bool(user['must_change_password'])
+                return redirect(url_for('root'))
             else:
-                flash("Invalid username or password", "error")
+                flash('Invalid username or password', 'error')
 
     return render_template_string(LOGIN_TEMPLATE)
 
-
-@app.route("/logout")
+@app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for("login"))
+    return redirect(url_for('login'))
 
-
-@app.route("/change-password", methods=["GET", "POST"])
+@app.route('/change-password', methods=['GET', 'POST'])
 def change_password():
-    if "user_id" not in session:
-        return redirect(url_for("login"))
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
 
-    if request.method == "POST":
-        new_password = request.form.get("new_password")
-        confirm_password = request.form.get("confirm_password")
+    if request.method == 'POST':
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
 
         if not new_password:
-            flash("Password cannot be empty", "error")
+            flash('Password cannot be empty', 'error')
         elif new_password != confirm_password:
-            flash("Passwords do not match", "error")
+            flash('Passwords do not match', 'error')
         else:
             hashed = generate_password_hash(new_password)
             with get_db() as conn:
-                conn.execute(
-                    "UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?",
-                    (hashed, session["user_id"]),
-                )
+                conn.execute("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?",
+                           (hashed, session['user_id']))
                 conn.commit()
-            session["must_change_password"] = False
-            flash("Password updated successfully", "success")
-            return redirect(url_for("root"))
+            session['must_change_password'] = False
+            flash('Password updated successfully', 'success')
+            return redirect(url_for('root'))
 
     return render_template_string(CHANGE_PASSWORD_TEMPLATE)
 
@@ -730,6 +721,7 @@ def add_security_headers(response):
     return response
 
 
+
 LOGIN_TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -871,7 +863,6 @@ DASHBOARD_TEMPLATE = """
 
 if __name__ == "__main__":
     from db_store import init_db
-
     init_db()
     ensure_admin_user(config.default_admin_user, config.default_admin_pass)
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

@@ -484,13 +484,10 @@ def defrag_availability(db_conn=None):
         if should_close:
             conn.close()
 
-
 def ensure_admin_user(username, password, db_conn=None):
     """Ensure the default admin user exists in the database."""
     from werkzeug.security import generate_password_hash
-
     from logging_config import get_logger
-
     logger = get_logger()
 
     if db_conn is not None:
@@ -508,7 +505,7 @@ def ensure_admin_user(username, password, db_conn=None):
             password_hash = generate_password_hash(password)
             c.execute(
                 "INSERT INTO users (username, password_hash, must_change_password) VALUES (?, ?, 1)",
-                (username, password_hash),
+                (username, password_hash)
             )
             conn.commit()
     finally:
