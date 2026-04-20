@@ -6,7 +6,6 @@ import os
 class Config:
     """Configuration class with attribute access."""
 
-
     def __init__(self):
         self.log_level = "DEBUG"
         # Use container path if running in container, local path otherwise
@@ -32,18 +31,22 @@ class Config:
         self.max_workers = 4  # For concurrent processing
         self.flask_secret_key = os.environ.get("FLASK_SECRET_KEY")
         if not self.flask_secret_key and not is_test:
-             raise RuntimeError("FLASK_SECRET_KEY environment variable is required for security.")
+            raise RuntimeError(
+                "FLASK_SECRET_KEY environment variable is required for security."
+            )
         elif is_test:
-             self.flask_secret_key = "test_secret_key"
+            self.flask_secret_key = "test_secret_key"
 
         self.default_admin_user = os.environ.get("DEFAULT_ADMIN_USER")
         self.default_admin_pass = os.environ.get("DEFAULT_ADMIN_PASS")
 
         if not is_test and (not self.default_admin_user or not self.default_admin_pass):
-             raise RuntimeError("DEFAULT_ADMIN_USER and DEFAULT_ADMIN_PASS environment variables are required.")
+            raise RuntimeError(
+                "DEFAULT_ADMIN_USER and DEFAULT_ADMIN_PASS environment variables are required."
+            )
         elif is_test:
-             self.default_admin_user = self.default_admin_user or "admin"
-             self.default_admin_pass = self.default_admin_pass or "Admin123!"
+            self.default_admin_user = self.default_admin_user or "admin"
+            self.default_admin_pass = self.default_admin_pass or "Admin123!"
 
     def get_cache_minutes(self, day_offset: int) -> int:
         """
