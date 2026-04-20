@@ -484,13 +484,12 @@ def defrag_availability(db_conn=None):
         if should_close:
             conn.close()
 
-
 def ensure_admin_user(username, password, db_conn=None):
-    """Ensure the default admin user exists in the database."""
+    """Ensure the default admin user exists in the database.
+    If the user exists but hasn't changed their password yet, sync it with the provided password.
+    """
     from werkzeug.security import generate_password_hash
-
     from logging_config import get_logger
-
     logger = get_logger()
 
     if db_conn is not None:
@@ -498,17 +497,29 @@ def ensure_admin_user(username, password, db_conn=None):
         should_close = False
     else:
         conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+        conn.row_factory = sqlite3.Row
         should_close = True
 
     try:
         c = conn.cursor()
-        c.execute("SELECT id FROM users WHERE username = ?", (username,))
-        if not c.fetchone():
+        c.execute("SELECT id, must_change_password FROM users WHERE username = ?", (username,))
+        user = c.fetchone()
+
+        if not user:
             logger.info(f"Creating default admin user: {username}")
             password_hash = generate_password_hash(password)
             c.execute(
                 "INSERT INTO users (username, password_hash, must_change_password) VALUES (?, ?, 1)",
-                (username, password_hash),
+                (username, password_hash)
+            )
+            conn.commit()
+        elif user['must_change_password']:
+            # If they haven't changed it yet, allow updating it via env var
+            logger.info(f"Syncing default admin password for: {username}")
+            password_hash = generate_password_hash(password)
+            c.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (password_hash, user['id'])
             )
             conn.commit()
     finally:

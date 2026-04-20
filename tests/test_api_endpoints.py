@@ -19,6 +19,7 @@ from api_server import app
 class TestAPIEndpoints:
     """Test API server HTTP endpoints."""
 
+
     def setup_method(self):
         """Set up test database and Flask test client for each test."""
         # Create temporary database
@@ -52,29 +53,25 @@ class TestAPIEndpoints:
         app.config["TESTING"] = True
         self.client = app.test_client()
 
+
     def _login(self):
         """Helper to authenticate the client and change default password."""
         from werkzeug.security import generate_password_hash
-
         conn = sqlite3.connect(self.temp_path)
         c = conn.cursor()
         # Clean start for users
         c.execute("DELETE FROM users")
         hashed = generate_password_hash("Admin123!")
-        c.execute(
-            "INSERT INTO users (username, password_hash, must_change_password) VALUES (?, ?, 1)",
-            ("admin", hashed),
-        )
+        c.execute("INSERT INTO users (username, password_hash, must_change_password) VALUES (?, ?, 1)", ("admin", hashed))
         conn.commit()
         conn.close()
 
         # 1. Login with default credentials
         self.client.post("/login", data={"username": "admin", "password": "Admin123!"})
         # 2. Change password as required
-        self.client.post(
-            "/change-password",
-            data={"new_password": "NewAdmin123!", "confirm_password": "NewAdmin123!"},
-        )
+        self.client.post("/change-password", data={"new_password": "NewAdmin123!", "confirm_password": "NewAdmin123!"})
+
+
 
     def teardown_method(self):
         """Clean up after each test."""
