@@ -28,6 +28,9 @@ class Config:
         )
         self.max_log_size = 10 * 1024 * 1024  # 10MB
         self.max_workers = 4  # For concurrent processing
+        self.flask_secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24).hex())
+        self.default_admin_user = os.environ.get("DEFAULT_ADMIN_USER", "admin")
+        self.default_admin_pass = os.environ.get("DEFAULT_ADMIN_PASS", "Admin123!")
 
     def get_cache_minutes(self, day_offset: int) -> int:
         """
