@@ -6,6 +6,8 @@ import os
 class Config:
     """Configuration class with attribute access."""
 
+
+
     def __init__(self):
         self.log_level = "DEBUG"
         # Use container path if running in container, local path otherwise
@@ -33,23 +35,17 @@ class Config:
         self.flask_secret_key = os.environ.get("FLASK_SECRET_KEY")
         if not self.flask_secret_key:
             if not is_test:
-                print(
-                    "WARNING: FLASK_SECRET_KEY not set. Using a temporary random key. "
-                    "Sessions will be cleared on restart. Please set FLASK_SECRET_KEY for persistence."
-                )
+                print("WARNING: FLASK_SECRET_KEY not set. Using a temporary random key. "
+                      "Sessions will be cleared on restart. Please set FLASK_SECRET_KEY for persistence.")
             self.flask_secret_key = os.urandom(24).hex()
 
         self.default_admin_user = os.environ.get("DEFAULT_ADMIN_USER") or "admin"
         self.default_admin_pass = os.environ.get("DEFAULT_ADMIN_PASS") or "Admin123!"
 
-        if not os.environ.get("DEFAULT_ADMIN_USER") or not os.environ.get(
-            "DEFAULT_ADMIN_PASS"
-        ):
+        if not os.environ.get("DEFAULT_ADMIN_USER") or not os.environ.get("DEFAULT_ADMIN_PASS"):
             if not is_test:
-                print(
-                    "WARNING: DEFAULT_ADMIN_USER or DEFAULT_ADMIN_PASS not set. "
-                    "Using default 'admin' / 'Admin123!'. Change these in environment for security."
-                )
+                print("WARNING: DEFAULT_ADMIN_USER or DEFAULT_ADMIN_PASS not set. "
+                      "Using default 'admin' / 'Admin123!'. Change these in environment for security.")
 
     def get_cache_minutes(self, day_offset: int) -> int:
         """

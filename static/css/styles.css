@@ -443,3 +443,17 @@ body {
     background-color: #f8f9fa;
     color: #e74c3c;
 }
+
+.password-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 1.2em;
+    color: #718096;
+}
