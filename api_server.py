@@ -468,9 +468,6 @@ def root():
         now = get_now()
         crew_data = []
         with get_db() as conn:
-            # Role ranks for sorting (WC=Watch Commander, CM=Crew Manager, etc.)
-            role_ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
-
             # Join crew with their CURRENT availability (if any)
             # Use LEFT JOIN to ensure all crew are returned even if off
             # Static query string with hardcoded role ranks to satisfy security scanners (Bandit B608)
@@ -518,9 +515,7 @@ def root():
             ).fetchone()
 
             if app_row:
-                end = app_row["end_time"]
-                dur = int((end - now).total_seconds() / 60)
-                p22p6_base = {"available": True, "duration": format_hours(dur)}
+                p22p6_base = _format_avail_info(app_row, now)
 
             p22p6_avail = p22p6_base["available"] and rules_res["rules_pass"]
 
