@@ -776,7 +776,7 @@ LOGIN_TEMPLATE = """
                 <label for="password">Password</label>
                 <div class="password-container">
                     <input type="password" id="password" name="password" required style="padding-right: 40px;">
-                    <span id="toggle-icon" class="password-toggle" onclick="togglePassword('password', 'toggle-icon')">👁️</span>
+                    <button type="button" id="toggle-icon" class="password-toggle" data-toggle-for="password" data-toggle-icon="toggle-icon" aria-label="Show password" aria-pressed="false" aria-controls="password">👁️</button>
                 </div>
             </div>
 
@@ -789,19 +789,7 @@ LOGIN_TEMPLATE = """
 
 
 
-<script>
-function togglePassword(id, iconId) {
-    var x = document.getElementById(id);
-    var icon = document.getElementById(iconId);
-    if (x.type === "password") {
-        x.type = "text";
-        icon.textContent = "🔒";
-    } else {
-        x.type = "password";
-        icon.textContent = "👁️";
-    }
-}
-</script>
+<script src="/static/js/auth.js"></script>
 </body>
 </html>
 """
@@ -834,14 +822,14 @@ CHANGE_PASSWORD_TEMPLATE = """
                 <label for="new_password">New Password</label>
                 <div class="password-container">
                     <input type="password" id="new_password" name="new_password" required autofocus style="padding-right: 40px;">
-                    <span id="toggle-icon-1" class="password-toggle" onclick="togglePassword('new_password', 'toggle-icon-1')">👁️</span>
+                    <button type="button" id="toggle-icon-1" class="password-toggle" data-toggle-for="new_password" data-toggle-icon="toggle-icon-1" aria-label="Show password" aria-pressed="false" aria-controls="new_password">👁️</button>
                 </div>
             </div>
             <div class="form-group">
                 <label for="confirm_password">Confirm New Password</label>
                 <div class="password-container">
                     <input type="password" id="confirm_password" name="confirm_password" required style="padding-right: 40px;">
-                    <span id="toggle-icon-2" class="password-toggle" onclick="togglePassword('confirm_password', 'toggle-icon-2')">👁️</span>
+                    <button type="button" id="toggle-icon-2" class="password-toggle" data-toggle-for="confirm_password" data-toggle-icon="toggle-icon-2" aria-label="Show password" aria-pressed="false" aria-controls="confirm_password">👁️</button>
                 </div>
             </div>
 
@@ -854,19 +842,7 @@ CHANGE_PASSWORD_TEMPLATE = """
 
 
 
-<script>
-function togglePassword(id, iconId) {
-    var x = document.getElementById(id);
-    var icon = document.getElementById(iconId);
-    if (x.type === "password") {
-        x.type = "text";
-        icon.textContent = "🔒";
-    } else {
-        x.type = "password";
-        icon.textContent = "👁️";
-    }
-}
-</script>
+<script src="/static/js/auth.js"></script>
 </body>
 </html>
 """
@@ -887,7 +863,7 @@ DASHBOARD_TEMPLATE = """
             <div class="timestamp-container">
                 <span class="live-indicator" aria-hidden="true"></span>
                 <span class="timestamp">Updated: {{ now.strftime('%H:%M:%S on %d/%m/%Y') }}</span>
-                <button id="refresh-btn" class="refresh-button" aria-label="Refresh Dashboard">
+                <button id="refresh-btn" class="refresh-button" aria-label="Refresh Dashboard" title="Refresh Dashboard">
                     <span class="refresh-icon">🔄</span>
                 </button>
                 <button id="retrieve-btn" class="retrieve-button">Retrieve More Data</button>
