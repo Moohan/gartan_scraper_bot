@@ -99,6 +99,9 @@ def init_db(db_path: str = DB_PATH, reset: bool = False):
     c.execute(
         "CREATE INDEX IF NOT EXISTS idx_crew_availability_crew_times ON crew_availability(crew_id, start_time, end_time)"
     )
+    c.execute(
+        "CREATE INDEX IF NOT EXISTS idx_appliance_availability_times ON appliance_availability(appliance_id, start_time, end_time)"
+    )
     conn.commit()
     return conn
 

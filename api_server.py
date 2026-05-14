@@ -38,7 +38,6 @@ logger = logging.getLogger(__name__)
 fetch_lock = threading.Lock()
 fetch_state = {"in_progress": False, "error": None}
 
-
 # Initialize Database and Admin User
 from db_store import init_db
 
@@ -226,11 +225,7 @@ def get_availability(target_id: int, table: str, now: datetime) -> Dict:
         else:
             raise ValueError(f"Invalid table for availability: {table}")
 
-        if not row:
-            return {"available": False, "duration": None}
-        end = parse_dt(row[0])
-        dur = int((end - now).total_seconds() / 60)
-        return {"available": True, "duration": format_hours(dur)}
+        return _format_avail_info(row, now) if row else {"available": False, "duration": None}
 
 
 def get_crew_list() -> List[Dict]:
@@ -250,14 +245,17 @@ def get_crew_list() -> List[Dict]:
 
 
 def _format_avail_info(row, now):
-    if not row["end_time"]:
+    """Format availability info from a database row."""
+    end_time = row["end_time"]
+    if not end_time:
         return {"available": False, "duration": None, "end_time_display": None}
-    end = parse_dt(row["end_time"])
-    dur = int((end - now).total_seconds() / 60)
+
+    # end_time is already an aware datetime due to sqlite3 converter
+    dur = int((end_time - now).total_seconds() / 60)
     return {
         "available": True,
         "duration": format_hours(dur),
-        "end_time_display": end.strftime("%H:%M on %d/%m/%Y"),
+        "end_time_display": end_time.strftime("%H:%M on %d/%m/%Y"),
     }
 
 
@@ -468,37 +466,52 @@ def root():
         with get_db() as conn:
             # Join crew with their CURRENT availability (if any)
             # Use LEFT JOIN to ensure all crew are returned even if off
+            # Static query string with hardcoded role ranks to satisfy security scanners (Bandit B608)
             rows = conn.execute(
                 """
                 SELECT c.*, ca.end_time
                 FROM crew c
                 LEFT JOIN crew_availability ca ON c.id = ca.crew_id
                 AND ca.start_time <= ? AND ca.end_time > ?
-                ORDER BY c.name
+                ORDER BY
+                    (ca.end_time IS NULL),
+                    CASE c.role
+                        WHEN 'WC' THEN 1
+                        WHEN 'CM' THEN 2
+                        WHEN 'CC' THEN 3
+                        WHEN 'FFC' THEN 4
+                        WHEN 'FFD' THEN 5
+                        WHEN 'FFT' THEN 6
+                        ELSE 99
+                    END,
+                    c.name
                 """,
                 (now, now),
             ).fetchall()
 
+            available_crew = []
             for r in rows:
                 avail = _format_avail_info(r, now)
-                crew_data.append({**dict(r), **avail})
-
-            ranks = {"WC": 1, "CM": 2, "CC": 3, "FFC": 4, "FFD": 5, "FFT": 6}
-            crew_data.sort(
-                key=lambda x: (not x["available"], ranks.get(x["role"], 99), x["name"])
-            )
-
-            available_crew = [c for c in crew_data if c["available"]]
+                member = {**dict(r), **avail}
+                crew_data.append(member)
+                if member["available"]:
+                    available_crew.append(member)
             rules_res = check_rules(available_crew)
 
+            # Optimized single-query appliance lookup
             p22p6_base = {"available": False, "duration": None}
-            app_p22 = conn.execute(
-                "SELECT id FROM appliance WHERE name = 'P22P6'"
+            app_row = conn.execute(
+                """
+                SELECT aa.end_time FROM appliance a
+                JOIN appliance_availability aa ON a.id = aa.appliance_id
+                WHERE a.name = 'P22P6' AND aa.start_time <= ? AND aa.end_time > ?
+                ORDER BY aa.end_time DESC LIMIT 1
+                """,
+                (now, now),
             ).fetchone()
-            if app_p22:
-                p22p6_base = get_availability(
-                    app_p22["id"], "appliance_availability", now
-                )
+
+            if app_row:
+                p22p6_base = _format_avail_info(app_row, now)
 
             p22p6_avail = p22p6_base["available"] and rules_res["rules_pass"]
 
