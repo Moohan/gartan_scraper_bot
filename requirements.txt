@@ -1,5 +1,5 @@
 # Core dependencies
-requests==2.33.1
+requests==2.34.0
 beautifulsoup4==4.12.3
 python-dotenv==1.2.2
 flask==3.1.3
