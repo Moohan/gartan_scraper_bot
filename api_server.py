@@ -228,7 +228,7 @@ def get_availability(target_id: int, table: str, now: datetime) -> Dict:
         return (
             _format_avail_info(row, now)
             if row
-            else {"available": False, "duration": None}
+            else {"available": False, "duration": None, "end_time_display": None}
         )
 
 
