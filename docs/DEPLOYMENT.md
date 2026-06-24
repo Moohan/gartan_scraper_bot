@@ -41,6 +41,8 @@ CACHE_PATH=/media/elements/gartan/cache
 LOGS_PATH=/media/elements/gartan/logs
 ```
 
+> Note: The container also mounts `./crew_details.local` into the app at `/app/crew_details.local`. Create this file locally before deployment; it is intentionally gitignored.
+
 ## 2. Deploy the Container
 
 The project relies on a unified `docker-compose.yml` that handles both development and production (by overriding variables).
@@ -48,14 +50,16 @@ The project relies on a unified `docker-compose.yml` that handles both developme
 Start the service in detached mode:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ### What happens next?
 
 1. The container starts up and runs `container_main.py`.
-2. A background **scheduler** begins executing `Gartran_fetch` operations asynchronously every few minutes.
+2. A background **scheduler** begins executing scraper operations asynchronously every few minutes.
 3. The **Flask API** spins up and listens on port 5000 (`http://localhost:5000`).
+
+> Note: The initial startup may take several minutes while the scheduler performs the first data fetch and populates the database.
 
 ## 3. Verify Deployment & Health
 
@@ -80,7 +84,7 @@ curl http://localhost:5000/v1/crew
 The easiest way to debug issues or see the scheduler in action is to review the logs:
 
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ### Updating to the Latest Release
@@ -90,15 +94,15 @@ If the codebase on GitHub changes and a new tagged release or commit to `main` c
 To pull those changes and seamlessly restart your container use:
 
 ```bash
-docker-compose pull && docker-compose up -d
+docker compose pull && docker compose up -d
 ```
 
 ### Stopping the Service
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
-## Migration Note
+### Migration Note
 
-If you are migrating from an older configuration (with `deploy/pi-docker-compose.yml` or `docker-compose.prod.yml`), those files have been removed. The unified `docker-compose.yml` now relies on `.env` overrides to handle custom paths and production-ready images. Simply set `DOCKER_IMAGE=jamesmcmahon0/gartan_scraper_bot:latest` and run `docker-compose up -d`.
+If you are migrating from an older configuration (with `deploy/pi-docker-compose.yml` or `docker-compose.prod.yml`), those files have been removed. The unified `docker-compose.yml` now relies on `.env` overrides to handle custom paths and production-ready images. Simply set `DOCKER_IMAGE=jamesmcmahon0/gartan_scraper_bot:latest` and run `docker compose up -d`.

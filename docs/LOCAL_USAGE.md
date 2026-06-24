@@ -32,26 +32,21 @@ This guide is intended for users who want to run the Gartan Scraper Bot on their
     GARTAN_PASSWORD=your_password
     ```
 
-4. **Install Playwright Browsers**:
-    The scraper uses a headless browser. Install the required binaries:
-
-    ```bash
-    playwright install chromium
-    ```
-
 ## Running the Bot Locally
 
-The main entry point for running the bot locally is `run_bot.py`. It handles fetching data, parsing it, saving it to the SQLite database (`gartan_data.db`), and optionally running the REST API.
+The main entry point for fetching data locally is `run_bot.py`. It handles fetching availability data, parsing it, and saving it to the SQLite database (`gartan_availability.db`).
+
+Note: `run_bot.py` does not start the web API server. To serve the API, run `python api_server.py` after the database is populated.
 
 ### Common Commands
 
-**1. Standard Run (Fetch Data and Start API)**:
+**1. Standard Run (Fetch Data)**:
 
 ```bash
 python run_bot.py
 ```
 
-This will fetch the latest 7 days of data (using cached files if available and fresh) and start the Flask API on port 5000.
+This will fetch the latest 7 days of data (using cached files if available and fresh) and populate the SQLite database `gartan_availability.db`.
 
 **2. Fresh Start (Clear DB and Rescrape)**:
 If you want to ensure your local database represents the absolute latest source of truth without any cached data corruption:
@@ -74,9 +69,9 @@ python run_bot.py --cache-first --max-days 3
 python run_bot.py --cache-only --max-days 3
 ```
 
-### Starting Only the API
+### Starting the API
 
-If your database (`gartan_data.db`) is already populated and you just want to test your queries against the running API:
+If your database (`gartan_availability.db`) is already populated and you want to serve the REST API:
 
 ```bash
 python api_server.py

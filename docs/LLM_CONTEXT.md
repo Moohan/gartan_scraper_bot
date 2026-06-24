@@ -18,7 +18,7 @@ The system consists of several interoperating components:
 
 ### 1. Data Collection (`gartan_fetch.py` & `parse_grid.py`)
 
-- **`gartan_fetch.py`**: Handles authentication and fetches the raw HTML pages from the Gartan system. It uses `playwright` (headless browser) because the Gartan system heavily relies on client-side rendering and complex session management.
+- **`gartan_fetch.py`**: Handles authentication and fetches the raw HTML pages from the Gartan system using `requests` and session management.
 - **`parse_grid.py`**: Parses the HTML grids using `BeautifulSoup`. It extracts crew and appliance availability based on cell colors (e.g., empty cells mean crew are available, green cells mean appliances are available) and text content.
 
 ### 2. Data Storage (`db_store.py`)
@@ -40,7 +40,7 @@ The system consists of several interoperating components:
 
 ## Background Decisions & Context
 
-- **Headless Browser (Playwright):** Raw HTTP requests (via `requests`) proved too brittle for logging into Gartan and navigating the grid due to dynamic JavaScript tokens and session handling. Playwright ensures reliable loading of the fully rendered DOM.
+- **HTTP Session Handling:** The current implementation uses `requests` with authenticated sessions and direct HTML parsing. It avoids heavyweight browser automation while still capturing the needed page data.
 - **Continuous Time Blocks:** Storing data as `[start_time, end_time]` records simplifies duration calculation and reduces database size significantly compared to storing thousands of rows for every 15-minute interval.
 - **API Quality Filters:** The database historically suffered from corrupted scraping runs that created physically impossible time spans (e.g., >24 hours available in one day). The API queries specifically filter out corrupted blocks (e.g., `(julianday(end_time) - julianday(start_time)) <= 1.0` and merge overlapping periods to ensure accurate reporting.
 

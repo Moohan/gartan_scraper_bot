@@ -42,7 +42,7 @@ This Python bot logs in to the Gartan Availability system, retrieves and parses 
 
 ### Primary Commands
 - **Run scraper**: `python run_bot.py --max-days 7` (supports cache options: `--no-cache`, `--cache-first`)
-- **Container deployment**: `docker-compose up -d` (uses published `jamesmcmahon0/gartan_scraper_bot:latest`)
+- **Container deployment**: `docker compose up -d` (uses published `jamesmcmahon0/gartan_scraper_bot:latest`)
 - **Database inspection**: `python check_db_quick.py` (shows row counts and sample data)
 - **Full test suite**: `pytest tests/` (comprehensive validation - must pass 77 tests)
 
@@ -54,7 +54,7 @@ This Python bot logs in to the Gartan Availability system, retrieves and parses 
 ### Debugging Workflows
 - **Parsing issues**: Check `gartan_debug.log` for slot detection and aggregation details
 - **Cache debugging**: Inspect `_cache/grid_*.html` files for raw HTML content
-- **Container issues**: `docker-compose logs -f` for real-time container logs
+- **Container issues**: `docker compose logs -f` for real-time container logs
 - **API testing**: Direct curl commands or use test functions in `tests/test_*.py`
 
 ## Project-Specific Conventions
