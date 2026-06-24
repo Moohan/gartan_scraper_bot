@@ -404,10 +404,10 @@ def run_scraper_task(max_days: int):
             else:
                 logger.error(f"Background fetch failed: {result.stderr}")
                 fetch_state = {"in_progress": False, "error": "Scraper failed"}
-    except Exception as e:
+    except Exception:
         logger.exception("Error in background fetch task")
         with fetch_lock:
-            fetch_state = {"in_progress": False, "error": str(e)}
+            fetch_state = {"in_progress": False, "error": "Internal error during fetch"}
 
 
 @app.route("/retrieve_more", methods=["POST"])
