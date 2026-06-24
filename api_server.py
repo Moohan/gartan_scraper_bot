@@ -225,7 +225,11 @@ def get_availability(target_id: int, table: str, now: datetime) -> Dict:
         else:
             raise ValueError(f"Invalid table for availability: {table}")
 
-        return _format_avail_info(row, now) if row else {"available": False, "duration": None}
+        return (
+            _format_avail_info(row, now)
+            if row
+            else {"available": False, "duration": None}
+        )
 
 
 def get_crew_list() -> List[Dict]:
