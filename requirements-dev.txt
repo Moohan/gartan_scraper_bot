@@ -1,5 +1,5 @@
 # Testing
-pytest==9.1.0 # Security fix: resolve CVE-2025-71176
+pytest==9.1.1 # Security fix: resolve CVE-2025-71176
 pytest-xdist==3.6.1
 
 # Linting
