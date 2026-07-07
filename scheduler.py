@@ -18,7 +18,7 @@ from datetime import timedelta
 import schedule
 
 from config import Config
-from utils import get_now
+from utils import get_auth_lock_info, get_now, is_auth_locked
 
 # Configure logging
 logging.basicConfig(
@@ -29,6 +29,23 @@ logger = logging.getLogger(__name__)
 # Initialize configuration
 config = Config()
 DB_PATH = config.db_path
+
+
+def check_auth_lock():
+    """Check if authentication lock exists and exit if it does"""
+    if is_auth_locked():
+        last_tried = get_auth_lock_info()
+        logger.critical("=" * 50)
+        logger.critical("🔒 AUTHENTICATION LOCK DETECTED")
+        logger.critical(
+            f"Lock file found at `{config.auth_lock_path}` due to incorrect password."
+        )
+        logger.critical(f"Last tried on {last_tried}")
+        logger.critical(
+            "Update the password in .env then delete the lock file to resume."
+        )
+        logger.critical("=" * 50)
+        sys.exit(2)
 
 
 def check_database_health() -> bool:
@@ -75,6 +92,7 @@ def check_database_health() -> bool:
 def run_scraper(max_days: int = 3) -> bool:
     """Run the scraper with specified parameters"""
     try:
+        check_auth_lock()
         logger.info(f"Starting scraper run for {max_days} days")
 
         # Use cache-first mode for efficiency in production
@@ -95,6 +113,11 @@ def run_scraper(max_days: int = 3) -> bool:
             logger.info("Scraper run completed successfully")
             logger.debug(f"Scraper output: {result.stdout}")
             return True
+        elif result.returncode == 2:
+            logger.critical(
+                "Scraper exited with authentication lock. Shutting down scheduler."
+            )
+            sys.exit(2)
         else:
             logger.error(f"Scraper failed with return code {result.returncode}")
             logger.error(f"Scraper stderr: {result.stderr}")
@@ -165,6 +188,7 @@ def main():
     logger.info("Scheduling scraper to run every 5 minutes")
 
     # Perform initial data check
+    check_auth_lock()
     initial_data_check()
 
     # Schedule the scraper to run every 5 minutes

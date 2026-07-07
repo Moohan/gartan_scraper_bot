@@ -28,7 +28,7 @@ from config import config
 from db_store import ensure_admin_user
 from gartan_fetch import fetch_station_feed_html
 from parse_grid import parse_station_feed_html
-from utils import ensure_london, get_now
+from utils import ensure_london, get_now, is_auth_locked
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -382,6 +382,17 @@ def get_current_max_days() -> int:
 def run_scraper_task(max_days: int):
     """Run the scraper in a background thread."""
     global fetch_state
+
+    # Check for authentication lock before starting
+    if is_auth_locked():
+        logger.error("Cannot start background fetch: Authentication lock is active.")
+        with fetch_lock:
+            fetch_state = {
+                "in_progress": False,
+                "error": "Authentication lock active. Check .env and delete lock file.",
+            }
+        return
+
     try:
         logger.info(f"Background fetch started for {max_days} days")
         # Inline the command list and ensure static strings to satisfy security scanners
@@ -502,6 +513,15 @@ def root():
                     available_crew.append(member)
             rules_res = check_rules(available_crew)
 
+            # Check for authentication lock
+            auth_lock = is_auth_locked()
+            last_scrape_time = None
+            if os.path.exists(config.db_path):
+                mtime = os.path.getmtime(config.db_path)
+                # Use project helper for timezone consistency (creating aware UTC first)
+                ls_dt = ensure_london(datetime.fromtimestamp(mtime, tz=timezone.utc))
+                last_scrape_time = ls_dt.strftime("%H:%M on %d/%m/%Y")
+
             # Optimized single-query appliance lookup
             p22p6_base = {"available": False, "duration": None}
             app_row = conn.execute(
@@ -528,6 +548,8 @@ def root():
                 p22p6_duration=p22p6_base["duration"] if p22p6_avail else None,
                 rules=rules_res["rules"],
                 skill_counts=rules_res["skill_counts"],
+                auth_lock=auth_lock,
+                last_scrape_time=last_scrape_time,
             )
     except Exception as e:
         logger.error(f"Root error: {e}")
@@ -875,6 +897,14 @@ DASHBOARD_TEMPLATE = """
 </head>
 <body>
     <div class="container">
+        {% if auth_lock %}
+        <div class="auth-lock-banner" role="alert" style="background-color: #ff4444; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; border: 2px solid #cc0000;">
+            ⚠️ AUTHENTICATION ERROR: Scraping has been halted due to an incorrect password.
+            <br>
+            Current data is as of {{ last_scrape_time or "unknown" }} and will not be updated until the password is corrected in .env and the lock file is deleted.
+        </div>
+        {% endif %}
+
         <div class="header">
             <div style="display: flex; justify-content: space-between; align-items: center;"><h1>Managing Station: P22</h1><a href="/logout" class="logout-link">Logout</a></div>
             <div class="timestamp-container">

@@ -27,7 +27,7 @@ from parse_grid import (
     aggregate_crew_availability,
     parse_grid_html,
 )
-from utils import get_week_aligned_date_range
+from utils import get_auth_lock_info, get_week_aligned_date_range, is_auth_locked
 
 logger = get_logger()
 
@@ -65,6 +65,15 @@ def main():
 
     today = datetime.now()
 
+    # Check for authentication lock
+    if is_auth_locked():
+        logger.critical(
+            f"🔒 Authentication lock active: {config.auth_lock_path}. "
+            "Scraping is halted to prevent account lockout. "
+            "Please update the password in .env and delete the lock file to resume."
+        )
+        sys.exit(2)
+
     # If running in cache-only mode, we skip authentication and proceed using only cached files.
     session = None
     if args.cache_mode != "cache-only":
@@ -72,6 +81,22 @@ def main():
             # Authenticate using the synchronous requests library
             session = gartan_login_and_get_session()
         except AuthenticationError as e:
+            if e.is_credential_failure:
+                logger.critical(
+                    f"🔒 CRITICAL: Authentication failed due to invalid credentials: {str(e)}"
+                )
+                logger.critical(f"Creating lock file: {config.auth_lock_path}")
+                try:
+                    with open(config.auth_lock_path, "w") as f:
+                        f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                except Exception as ex:
+                    logger.error(f"Failed to create lock file: {ex}")
+
+                logger.critical(
+                    "Execution halted to prevent account lockout. System requires manual intervention."
+                )
+                sys.exit(2)
+
             logger.warning(
                 f"🔒 Authentication failed: {str(e)} — continuing without authenticated session"
             )

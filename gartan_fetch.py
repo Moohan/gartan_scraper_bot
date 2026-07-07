@@ -243,7 +243,9 @@ def _perform_delay(min_delay, max_delay, base):
 class AuthenticationError(Exception):
     """Raised when authentication fails."""
 
-    pass
+    def __init__(self, message: str, is_credential_failure: bool = False):
+        super().__init__(message)
+        self.is_credential_failure = is_credential_failure
 
 
 # Load environment variables
@@ -507,7 +509,9 @@ def _post_login(session, post_url, payload, headers):
     if login_resp.status_code != 200:
         log_debug("error", f"Login POST failed with status: {login_resp.status_code}")
         log_debug("error", f"Response content: {login_resp.text}")
-        raise AuthenticationError("Login request failed - incorrect credentials")
+        raise AuthenticationError(
+            "Login request failed - incorrect credentials", is_credential_failure=True
+        )
 
     # Check for login failure indicators in response
     if (
@@ -515,7 +519,9 @@ def _post_login(session, post_url, payload, headers):
         or "unsuccessfulAttempts" in login_resp.text
     ):
         log_debug("error", "Login rejected - invalid credentials")
-        raise AuthenticationError("Invalid username or password")
+        raise AuthenticationError(
+            "Invalid username or password", is_credential_failure=True
+        )
 
 
 def _get_data_page(session, headers):
