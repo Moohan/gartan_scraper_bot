@@ -28,7 +28,7 @@ from config import config
 from db_store import ensure_admin_user
 from gartan_fetch import fetch_station_feed_html
 from parse_grid import parse_station_feed_html
-from utils import (ensure_london, get_now, is_auth_locked, get_auth_lock_info)
+from utils import ensure_london, get_auth_lock_info, get_now, is_auth_locked
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -387,7 +387,10 @@ def run_scraper_task(max_days: int):
     if is_auth_locked():
         logger.error("Cannot start background fetch: Authentication lock is active.")
         with fetch_lock:
-            fetch_state = {"in_progress": False, "error": "Authentication lock active. Check .env and delete lock file."}
+            fetch_state = {
+                "in_progress": False,
+                "error": "Authentication lock active. Check .env and delete lock file.",
+            }
         return
 
     try:
