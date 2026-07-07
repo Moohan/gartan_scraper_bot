@@ -1,8 +1,11 @@
 import os
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 import run_bot
 import scheduler
+
 
 def test_run_bot_auth_lock_exit(tmp_path):
     # Setup lock file
@@ -14,6 +17,7 @@ def test_run_bot_auth_lock_exit(tmp_path):
             run_bot.main()
         assert e.value.code == 2
 
+
 def test_scheduler_auth_lock_exit(tmp_path):
     # Setup lock file
     lock_file = tmp_path / "AUTH_LOCK"
@@ -24,9 +28,11 @@ def test_scheduler_auth_lock_exit(tmp_path):
             scheduler.check_auth_lock()
         assert e.value.code == 2
 
+
 @patch("run_bot.gartan_login_and_get_session")
 def test_run_bot_creates_lock_on_auth_error(mock_login, tmp_path):
     from gartan_fetch import AuthenticationError
+
     mock_login.side_effect = AuthenticationError("Invalid username or password")
 
     lock_file = tmp_path / "AUTH_LOCK"

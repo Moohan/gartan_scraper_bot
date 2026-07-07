@@ -387,7 +387,10 @@ def run_scraper_task(max_days: int):
     if os.path.exists(config.auth_lock_path):
         logger.error("Cannot start background fetch: Authentication lock is active.")
         with fetch_lock:
-            fetch_state = {"in_progress": False, "error": "Authentication lock active. Check .env and delete lock file."}
+            fetch_state = {
+                "in_progress": False,
+                "error": "Authentication lock active. Check .env and delete lock file.",
+            }
         return
 
     try:
@@ -515,7 +518,9 @@ def root():
             last_scrape_time = None
             if os.path.exists(config.db_path):
                 mtime = os.path.getmtime(config.db_path)
-                last_scrape_time = datetime.fromtimestamp(mtime).strftime("%H:%M on %d/%m/%Y")
+                last_scrape_time = datetime.fromtimestamp(mtime).strftime(
+                    "%H:%M on %d/%m/%Y"
+                )
 
             # Optimized single-query appliance lookup
             p22p6_base = {"available": False, "duration": None}

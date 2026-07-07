@@ -19,9 +19,7 @@ class Config:
             if in_container
             else "gartan_availability.db"
         )
-        self.auth_lock_path = (
-            "/app/data/AUTH_LOCK" if in_container else "AUTH_LOCK"
-        )
+        self.auth_lock_path = "/app/data/AUTH_LOCK" if in_container else "AUTH_LOCK"
         self.cache_dir = "_cache"
         self.max_cache_minutes = 60 * 24 * 7  # 1 week
         self.gartan_username = os.environ.get("GARTAN_USERNAME", "")
