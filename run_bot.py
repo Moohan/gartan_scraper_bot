@@ -65,6 +65,15 @@ def main():
 
     today = datetime.now()
 
+    # Check for authentication lock
+    if os.path.exists(config.auth_lock_path):
+        logger.critical(
+            f"🔒 Authentication lock active: {config.auth_lock_path}. "
+            "Scraping is halted to prevent account lockout. "
+            "Please update the password in .env and delete the lock file to resume."
+        )
+        sys.exit(2)
+
     # If running in cache-only mode, we skip authentication and proceed using only cached files.
     session = None
     if args.cache_mode != "cache-only":
@@ -72,6 +81,20 @@ def main():
             # Authenticate using the synchronous requests library
             session = gartan_login_and_get_session()
         except AuthenticationError as e:
+            if "Invalid username or password" in str(e):
+                logger.critical(
+                    f"🔒 CRITICAL: Authentication failed due to invalid credentials: {str(e)}"
+                )
+                logger.critical(f"Creating lock file: {config.auth_lock_path}")
+                try:
+                    with open(config.auth_lock_path, "w") as f:
+                        f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                except Exception as ex:
+                    logger.error(f"Failed to create lock file: {ex}")
+
+                logger.critical("Execution halted to prevent account lockout. System requires manual intervention.")
+                sys.exit(2)
+
             logger.warning(
                 f"🔒 Authentication failed: {str(e)} — continuing without authenticated session"
             )
