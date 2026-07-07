@@ -509,7 +509,9 @@ def _post_login(session, post_url, payload, headers):
     if login_resp.status_code != 200:
         log_debug("error", f"Login POST failed with status: {login_resp.status_code}")
         log_debug("error", f"Response content: {login_resp.text}")
-        raise AuthenticationError("Login request failed - incorrect credentials", is_credential_failure=True)
+        raise AuthenticationError(
+            "Login request failed - incorrect credentials", is_credential_failure=True
+        )
 
     # Check for login failure indicators in response
     if (
@@ -517,7 +519,9 @@ def _post_login(session, post_url, payload, headers):
         or "unsuccessfulAttempts" in login_resp.text
     ):
         log_debug("error", "Login rejected - invalid credentials")
-        raise AuthenticationError("Invalid username or password", is_credential_failure=True)
+        raise AuthenticationError(
+            "Invalid username or password", is_credential_failure=True
+        )
 
 
 def _get_data_page(session, headers):

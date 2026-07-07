@@ -92,7 +92,9 @@ def main():
                 except Exception as ex:
                     logger.error(f"Failed to create lock file: {ex}")
 
-                logger.critical("Execution halted to prevent account lockout. System requires manual intervention.")
+                logger.critical(
+                    "Execution halted to prevent account lockout. System requires manual intervention."
+                )
                 sys.exit(2)
 
             logger.warning(
