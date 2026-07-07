@@ -35,7 +35,7 @@ def signal_handler(signum, frame):
     shutdown_flag.set()
 
     # Terminate all processes
-    for process in list(processes):
+    for process in processes:
         try:
             if process.is_alive():
                 process.terminate()
@@ -155,16 +155,13 @@ def main():
                     # Check exit code
                     exitcode = process.exitcode
                     if process.name == "scheduler" and exitcode == 2:
-                        logger.critical(
-                            "Scheduler exited due to authentication lock. API server will remain running."
-                        )
+                        logger.critical("Scheduler exited due to authentication lock. API server will remain running.")
+                        logger.critical("NOTE: Authentication fix requires a FULL container restart after updating credentials.")
                         # Remove from monitored processes so we don't keep logging error
                         processes.remove(process)
                         continue
 
-                    logger.error(
-                        f"Process {process.name} died unexpectedly (exit code: {exitcode})"
-                    )
+                    logger.error(f"Process {process.name} died unexpectedly (exit code: {exitcode})")
                     shutdown_flag.set()
                     break
 

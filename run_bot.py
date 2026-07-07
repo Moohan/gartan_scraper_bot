@@ -81,7 +81,7 @@ def main():
             # Authenticate using the synchronous requests library
             session = gartan_login_and_get_session()
         except AuthenticationError as e:
-            if "Invalid username or password" in str(e):
+            if e.is_credential_failure:
                 logger.critical(
                     f"🔒 CRITICAL: Authentication failed due to invalid credentials: {str(e)}"
                 )
@@ -92,9 +92,7 @@ def main():
                 except Exception as ex:
                     logger.error(f"Failed to create lock file: {ex}")
 
-                logger.critical(
-                    "Execution halted to prevent account lockout. System requires manual intervention."
-                )
+                logger.critical("Execution halted to prevent account lockout. System requires manual intervention.")
                 sys.exit(2)
 
             logger.warning(

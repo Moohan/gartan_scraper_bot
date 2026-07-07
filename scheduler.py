@@ -37,13 +37,9 @@ def check_auth_lock():
         last_tried = get_auth_lock_info()
         logger.critical("=" * 50)
         logger.critical("🔒 AUTHENTICATION LOCK DETECTED")
-        logger.critical(
-            f"Lock file found at `{config.auth_lock_path}` due to incorrect password."
-        )
+        logger.critical(f"Lock file found at `{config.auth_lock_path}` due to incorrect password.")
         logger.critical(f"Last tried on {last_tried}")
-        logger.critical(
-            "Update the password in .env then delete the lock file to resume."
-        )
+        logger.critical("Update the password in .env then delete the lock file to resume.")
         logger.critical("=" * 50)
         sys.exit(2)
 
@@ -114,9 +110,7 @@ def run_scraper(max_days: int = 3) -> bool:
             logger.debug(f"Scraper output: {result.stdout}")
             return True
         elif result.returncode == 2:
-            logger.critical(
-                "Scraper exited with authentication lock. Shutting down scheduler."
-            )
+            logger.critical("Scraper exited with authentication lock. Shutting down scheduler.")
             sys.exit(2)
         else:
             logger.error(f"Scraper failed with return code {result.returncode}")

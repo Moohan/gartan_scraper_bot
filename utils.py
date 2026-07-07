@@ -66,22 +66,17 @@ def get_week_aligned_date_range(max_days: int) -> tuple[datetime, int]:
     effective_max_days = max_days + now.weekday()
     return start_date, effective_max_days
 
-
 def is_auth_locked() -> bool:
     """Check if the authentication lock file exists."""
-    import os
-
     from config import config
-
+    import os
     return os.path.exists(config.auth_lock_path)
 
 
 def get_auth_lock_info() -> Optional[str]:
     """Return a formatted string with the last authentication attempt time if locked."""
-    import os
-
     from config import config
-
+    import os
     if not os.path.exists(config.auth_lock_path):
         return None
 
