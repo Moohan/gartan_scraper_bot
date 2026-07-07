@@ -155,16 +155,12 @@ def main():
                     # Check exit code
                     exitcode = process.exitcode
                     if process.name == "scheduler" and exitcode == 2:
-                        logger.critical(
-                            "Scheduler exited due to authentication lock. API server will remain running."
-                        )
+                        logger.critical("Scheduler exited due to authentication lock. API server will remain running.")
                         # Remove from monitored processes so we don't keep logging error
                         processes.remove(process)
                         continue
 
-                    logger.error(
-                        f"Process {process.name} died unexpectedly (exit code: {exitcode})"
-                    )
+                    logger.error(f"Process {process.name} died unexpectedly (exit code: {exitcode})")
                     shutdown_flag.set()
                     break
 

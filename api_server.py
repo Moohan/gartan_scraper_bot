@@ -28,7 +28,7 @@ from config import config
 from db_store import ensure_admin_user
 from gartan_fetch import fetch_station_feed_html
 from parse_grid import parse_station_feed_html
-from utils import ensure_london, get_now
+from utils import (ensure_london, get_now, is_auth_locked, get_auth_lock_info)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -384,13 +384,10 @@ def run_scraper_task(max_days: int):
     global fetch_state
 
     # Check for authentication lock before starting
-    if os.path.exists(config.auth_lock_path):
+    if is_auth_locked():
         logger.error("Cannot start background fetch: Authentication lock is active.")
         with fetch_lock:
-            fetch_state = {
-                "in_progress": False,
-                "error": "Authentication lock active. Check .env and delete lock file.",
-            }
+            fetch_state = {"in_progress": False, "error": "Authentication lock active. Check .env and delete lock file."}
         return
 
     try:
@@ -514,13 +511,13 @@ def root():
             rules_res = check_rules(available_crew)
 
             # Check for authentication lock
-            auth_lock = os.path.exists(config.auth_lock_path)
+            auth_lock = is_auth_locked()
             last_scrape_time = None
             if os.path.exists(config.db_path):
                 mtime = os.path.getmtime(config.db_path)
-                last_scrape_time = datetime.fromtimestamp(mtime).strftime(
-                    "%H:%M on %d/%m/%Y"
-                )
+                # Use project helper for timezone consistency
+                ls_dt = ensure_london(datetime.fromtimestamp(mtime))
+                last_scrape_time = ls_dt.strftime("%H:%M on %d/%m/%Y")
 
             # Optimized single-query appliance lookup
             p22p6_base = {"available": False, "duration": None}

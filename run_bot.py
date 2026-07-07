@@ -27,7 +27,7 @@ from parse_grid import (
     aggregate_crew_availability,
     parse_grid_html,
 )
-from utils import get_week_aligned_date_range
+from utils import get_auth_lock_info, get_week_aligned_date_range, is_auth_locked
 
 logger = get_logger()
 
@@ -66,7 +66,7 @@ def main():
     today = datetime.now()
 
     # Check for authentication lock
-    if os.path.exists(config.auth_lock_path):
+    if is_auth_locked():
         logger.critical(
             f"🔒 Authentication lock active: {config.auth_lock_path}. "
             "Scraping is halted to prevent account lockout. "
@@ -92,9 +92,7 @@ def main():
                 except Exception as ex:
                     logger.error(f"Failed to create lock file: {ex}")
 
-                logger.critical(
-                    "Execution halted to prevent account lockout. System requires manual intervention."
-                )
+                logger.critical("Execution halted to prevent account lockout. System requires manual intervention.")
                 sys.exit(2)
 
             logger.warning(
